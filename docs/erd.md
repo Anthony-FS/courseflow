@@ -17,13 +17,15 @@ erDiagram
   profiles ||--o{ promo_redemptions : redeems
   profiles ||--o{ courses : creates
 
-  courses ||--o{ sub_lessons : contains
+  courses ||--o{ lessons : contains
   courses ||--o{ materials : has
   courses ||--o{ enrollments : has
   courses ||--o{ wishlists : saved_in
   courses ||--o{ assignments : has
   courses ||--o{ reviews : receives
   courses ||--o{ promo_codes : discounts
+
+  lessons ||--o{ sub_lessons : contains
 
   sub_lessons ||--o{ materials : has
   sub_lessons ||--o{ assignments : optional
@@ -52,16 +54,26 @@ erDiagram
     uuid id PK
     uuid created_by FK
     string title
+    text summary
     text description
-    string cover_file_url
-    string cover_file_type
+    string total_learning_time
+    string cover_image_url
+    string video_trailer_url
     numeric price
     timestamptz created_at
+  }
+
+  lessons {
+    uuid id PK
+    uuid course_id FK
+    string title
+    int sort_order
   }
 
   sub_lessons {
     uuid id PK
     uuid course_id FK
+    uuid lesson_id FK
     string title
     text description
     int sort_order
@@ -133,6 +145,7 @@ erDiagram
     string code
     string discount_type
     numeric discount_value
+    numeric min_purchase_amount
     int max_redemptions
     timestamptz starts_at
     timestamptz ends_at
@@ -147,14 +160,34 @@ erDiagram
   }
 ```
 
+## Form ↔ tables (Add Course)
+
+| Add Course form field | Table.column |
+| --------------------- | ------------ |
+| Course name | `courses.title` |
+| Course summary | `courses.summary` |
+| Course detail | `courses.description` |
+| Price | `courses.price` |
+| Total learning time | `courses.total_learning_time` |
+| Cover image | `courses.cover_image_url` (Storage path) |
+| Video trailer | `courses.video_trailer_url` (Storage path) |
+| Attach file (optional) | `materials` row with `course_id` set, `sub_lesson_id` null |
+| Promo code / min purchase / discount | `promo_codes` (`code`, `min_purchase_amount`, `discount_type` `thb`\|`percent`, `discount_value`) |
+| Lesson name + drag order | `lessons.title`, `lessons.sort_order` |
+
+Sub-lesson **count** in the UI is derived from child `sub_lessons` rows (not stored on `lessons`). Creating a course from today’s UI inserts lesson rows only; sub-lessons are added later via a sub-lesson editor.
+
 ## Design rules
 
 - `profiles.id` = `auth.users.id`.
 - `profiles.role` is `student` | `admin`. `profiles.is_active` covers admin deactivation.
 - Subscribe / unsubscribe is `enrollments`, not a flag on `courses`.
 - Wishlist / “Will Learn” is `wishlists`, separate from enrollment. Saving a course does not subscribe the user.
-- Course cover is a **file upload** to Storage, not an external URL. `cover_file_url` is the storage path; `cover_file_type` is `image` or `video`. Use one cover file per course (picture or video). Lesson PDFs/videos stay in `materials`.
+- Cover image and video trailer are **separate required file uploads** to Storage. `cover_image_url` and `video_trailer_url` store storage paths (not external URLs).
+- Optional course attachment is a course-level `materials` row (`sub_lesson_id` null). Lesson PDFs/videos stay in `materials` (optionally linked to a `sub_lesson_id`).
 - Course `price` is `numeric` (`0` = free) so promo discounts have something to apply to.
+- Promo `discount_type` is `thb` | `percent`. `min_purchase_amount` defaults to `0`. `max_redemptions` / `starts_at` / `ends_at` may be null when not collected by the form.
+- A course has many **lessons**; each lesson has many **sub_lessons**. `sub_lessons.course_id` is kept for convenient course-scoped queries.
 - Sub-lesson samples: `sub_lessons.is_preview`. Full sub-lesson content is gated by enrollment in app logic.
 - `materials.content` holds text (or HTML) when the item is not a file. `file_url` / `file_type` stay for PDF, video, and images; unused columns stay null.
 - Overdue assignment status is computed from `assignments.end_at`, not stored.
@@ -163,7 +196,7 @@ erDiagram
 ## Cardinality
 
 - One profile per auth user.
-- A course has many sub-lessons. Materials always belong to a **course**, and optionally a **sub-lesson** (`sub_lesson_id` null = course-level file).
+- A course has many lessons; a lesson has many sub-lessons. Materials always belong to a **course**, and optionally a **sub-lesson** (`sub_lesson_id` null = course-level file).
 - Wishlist is unique `(user_id, course_id)`.
 - Enrollment is unique `(user_id, course_id)`. `completed_at` is set when all sub-lessons are done — that unlocks reviews.
 - Submission is unique `(assignment_id, user_id)`. `status` is `in_progress` | `submitted`.

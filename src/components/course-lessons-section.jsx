@@ -40,10 +40,27 @@ const INITIAL_LESSONS = [
   },
 ];
 
-function CourseLessonsSection({ className }) {
-  const [lessons, setLessons] = useState(INITIAL_LESSONS);
+function CourseLessonsSection({
+  className,
+  lessons: controlledLessons,
+  onLessonsChange,
+}) {
+  const [uncontrolledLessons, setUncontrolledLessons] = useState(INITIAL_LESSONS);
   const [dragIndex, setDragIndex] = useState(null);
   const isDragging = dragIndex !== null;
+
+  const isControlled = controlledLessons !== undefined;
+  const lessons = isControlled ? controlledLessons : uncontrolledLessons;
+
+  function setLessons(updater) {
+    if (isControlled) {
+      const next =
+        typeof updater === "function" ? updater(controlledLessons) : updater;
+      onLessonsChange?.(next);
+      return;
+    }
+    setUncontrolledLessons(updater);
+  }
 
   function handleAddLesson() {
     setLessons((current) => [
@@ -67,7 +84,6 @@ function CourseLessonsSection({ className }) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", String(index));
 
-    // Hide the browser's default drag ghost; the lifted row is the only preview.
     const ghost = document.createElement("div");
     ghost.style.cssText =
       "position:fixed;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0;pointer-events:none;";
@@ -234,4 +250,4 @@ function CourseLessonsSection({ className }) {
   );
 }
 
-export { CourseLessonsSection };
+export { CourseLessonsSection, INITIAL_LESSONS };
