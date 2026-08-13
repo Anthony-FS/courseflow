@@ -67,7 +67,7 @@ function validateField(name, values) {
       return "";
     }
     case "education":
-      return value ? "" : "Please enter your educational background";
+      return "";
     case "email":
       if (!value) {
         return "Please enter your email";

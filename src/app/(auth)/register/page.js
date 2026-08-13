@@ -1,5 +1,5 @@
-import { LoginDecorations } from "@/components/auth/auth-shapes";
-import { RegisterForm } from "./register-form";
+import { LoginDecorations } from "@/components/auth/auth-background";
+import { RegisterForm } from "@/components/auth/register-form";
 import Navbar from "@/components/navbar";
 
 export const metadata = {
