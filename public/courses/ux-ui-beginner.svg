@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="96" viewBox="0 0 160 96" role="img" aria-label="UX UI design course cover">
+  <rect width="160" height="96" fill="#E5ECF8"/>
+  <rect x="16" y="14" width="70" height="68" rx="8" fill="#FFFFFF"/>
+  <rect x="26" y="24" width="50" height="28" rx="4" fill="#C6D6EF"/>
+  <rect x="26" y="58" width="32" height="6" rx="3" fill="#2F5FAC"/>
+  <rect x="26" y="68" width="44" height="4" rx="2" fill="#9AA1B9"/>
+  <rect x="96" y="22" width="48" height="52" rx="8" fill="#FFFFFF"/>
+  <circle cx="120" cy="42" r="10" fill="#F47E20"/>
+  <rect x="106" y="58" width="28" height="6" rx="3" fill="#5483D0"/>
+</svg>
