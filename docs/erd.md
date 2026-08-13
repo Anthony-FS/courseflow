@@ -2,7 +2,7 @@
 
 Normalized public schema on top of Supabase `auth.users`. Email and password stay in Auth; “change password” needs no extra table.
 
-Out of scope: payments, bundles, wishlist / “Will Learn”, extra course filters (type, subject), REST path list, SQL / RLS.
+Out of scope: payments, bundles, extra course filters (type, subject), REST path list, SQL / RLS.
 
 ## Diagram
 
@@ -10,22 +10,24 @@ Out of scope: payments, bundles, wishlist / “Will Learn”, extra course filte
 erDiagram
   auth_users ||--|| profiles : has
   profiles ||--o{ enrollments : subscribes
+  profiles ||--o{ wishlists : saves
   profiles ||--o{ submissions : writes
-  profiles ||--o{ module_progress : tracks
+  profiles ||--o{ sub_lesson_progress : tracks
   profiles ||--o{ reviews : writes
   profiles ||--o{ promo_redemptions : redeems
   profiles ||--o{ courses : creates
 
-  courses ||--o{ modules : contains
+  courses ||--o{ sub_lessons : contains
   courses ||--o{ materials : has
   courses ||--o{ enrollments : has
+  courses ||--o{ wishlists : saved_in
   courses ||--o{ assignments : has
   courses ||--o{ reviews : receives
   courses ||--o{ promo_codes : discounts
 
-  modules ||--o{ materials : has
-  modules ||--o{ assignments : optional
-  modules ||--o{ module_progress : tracked_by
+  sub_lessons ||--o{ materials : has
+  sub_lessons ||--o{ assignments : optional
+  sub_lessons ||--o{ sub_lesson_progress : tracked_by
 
   assignments ||--o{ submissions : receives
   enrollments ||--o| promo_redemptions : used_on
@@ -51,11 +53,12 @@ erDiagram
     uuid created_by FK
     string title
     text description
+    string thumbnail_url
     numeric price
     timestamptz created_at
   }
 
-  modules {
+  sub_lessons {
     uuid id PK
     uuid course_id FK
     string title
@@ -67,10 +70,18 @@ erDiagram
   materials {
     uuid id PK
     uuid course_id FK
-    uuid module_id FK
+    uuid sub_lesson_id FK
     string name
     string file_url
     string file_type
+    text content
+  }
+
+  wishlists {
+    uuid id PK
+    uuid user_id FK
+    uuid course_id FK
+    timestamptz created_at
   }
 
   enrollments {
@@ -84,7 +95,7 @@ erDiagram
   assignments {
     uuid id PK
     uuid course_id FK
-    uuid module_id FK
+    uuid sub_lesson_id FK
     string title
     text description
     timestamptz start_at
@@ -100,10 +111,10 @@ erDiagram
     timestamptz submitted_at
   }
 
-  module_progress {
+  sub_lesson_progress {
     uuid id PK
     uuid user_id FK
-    uuid module_id FK
+    uuid sub_lesson_id FK
     timestamptz completed_at
   }
 
@@ -140,17 +151,21 @@ erDiagram
 - `profiles.id` = `auth.users.id`.
 - `profiles.role` is `student` | `admin`. `profiles.is_active` covers admin deactivation.
 - Subscribe / unsubscribe is `enrollments`, not a flag on `courses`.
+- Wishlist / “Will Learn” is `wishlists`, separate from enrollment. Saving a course does not subscribe the user.
+- Course `thumbnail_url` is the cover image (Storage path or public URL).
 - Course `price` is `numeric` (`0` = free) so promo discounts have something to apply to.
-- Module samples: `modules.is_preview`. Full module content is gated by enrollment in app logic.
+- Sub-lesson samples: `sub_lessons.is_preview`. Full sub-lesson content is gated by enrollment in app logic.
+- `materials.content` holds text (or HTML) when the item is not a file. `file_url` / `file_type` stay for PDF, video, and images; unused columns stay null.
 - Overdue assignment status is computed from `assignments.end_at`, not stored.
 - Analytics are queries over enrollments / progress / submissions — no extra fact table.
 
 ## Cardinality
 
 - One profile per auth user.
-- A course has many modules. Materials always belong to a **course**, and optionally a **module** (`module_id` null = course-level file).
-- Enrollment is unique `(user_id, course_id)`. `completed_at` is set when all modules are done — that unlocks reviews.
+- A course has many sub-lessons. Materials always belong to a **course**, and optionally a **sub-lesson** (`sub_lesson_id` null = course-level file).
+- Wishlist is unique `(user_id, course_id)`.
+- Enrollment is unique `(user_id, course_id)`. `completed_at` is set when all sub-lessons are done — that unlocks reviews.
 - Submission is unique `(assignment_id, user_id)`. `status` is `in_progress` | `submitted`.
-- Progress is unique `(user_id, module_id)`. Course % = completed modules / total modules.
+- Progress is unique `(user_id, sub_lesson_id)`. Course % = completed sub-lessons / total sub-lessons.
 - Review is unique `(user_id, course_id)`.
 - Promo `course_id` null = applies to any course. One redemption row per use, tied to the enrollment it discounted.
