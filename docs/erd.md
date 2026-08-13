@@ -53,7 +53,8 @@ erDiagram
     uuid created_by FK
     string title
     text description
-    string thumbnail_url
+    string cover_file_url
+    string cover_file_type
     numeric price
     timestamptz created_at
   }
@@ -152,7 +153,7 @@ erDiagram
 - `profiles.role` is `student` | `admin`. `profiles.is_active` covers admin deactivation.
 - Subscribe / unsubscribe is `enrollments`, not a flag on `courses`.
 - Wishlist / “Will Learn” is `wishlists`, separate from enrollment. Saving a course does not subscribe the user.
-- Course `thumbnail_url` is the cover image (Storage path or public URL).
+- Course cover is a **file upload** to Storage, not an external URL. `cover_file_url` is the storage path; `cover_file_type` is `image` or `video`. Use one cover file per course (picture or video). Lesson PDFs/videos stay in `materials`.
 - Course `price` is `numeric` (`0` = free) so promo discounts have something to apply to.
 - Sub-lesson samples: `sub_lessons.is_preview`. Full sub-lesson content is gated by enrollment in app logic.
 - `materials.content` holds text (or HTML) when the item is not a file. `file_url` / `file_type` stay for PDF, video, and images; unused columns stay null.
