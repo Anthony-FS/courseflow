@@ -6,26 +6,18 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  CourseLessonsSection,
-  INITIAL_LESSONS,
-} from "@/components/course-lessons-section";
+import { CourseLessonsSection } from "@/components/course-lessons-section";
 import { createAdminCourse, uploadAdminFile } from "@/lib/admin-courses";
+import {
+  COURSE_LIMITS,
+  EMPTY_FIELD_MESSAGE,
+  isFreePrice,
+  validateCourseFields,
+  validatePromoFields,
+} from "@/lib/course-validation";
 import { cn } from "@/lib/utils";
 
-const PLACEHOLDER = "Place Holder";
-const ERROR_MESSAGE = "Please fill out this field";
 const ERROR_COLOR = "#9B2C6B";
-
-const REQUIRED_FIELDS = [
-  "courseName",
-  "price",
-  "learningTime",
-  "courseSummary",
-  "courseDetail",
-  "coverImage",
-  "videoTrailer",
-];
 
 function FieldLabel({ htmlFor, required, children }) {
   return (
@@ -39,8 +31,8 @@ function FieldLabel({ htmlFor, required, children }) {
   );
 }
 
-function FieldError({ id, show }) {
-  if (!show) return null;
+function FieldError({ id, message }) {
+  if (!message) return null;
 
   return (
     <p
@@ -49,12 +41,14 @@ function FieldError({ id, show }) {
       style={{ color: ERROR_COLOR }}
       role="alert"
     >
-      {ERROR_MESSAGE}
+      {message}
     </p>
   );
 }
 
-function TextInput({ id, className, error, onChange, ...props }) {
+function TextInput({ id, className, error, onChange, hint, ...props }) {
+  const hasError = Boolean(error);
+
   return (
     <div>
       <div className="relative">
@@ -62,21 +56,21 @@ function TextInput({ id, className, error, onChange, ...props }) {
           id={id}
           data-slot="input"
           {...props}
-          aria-invalid={error || undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
           onChange={onChange}
           className={cn(
             "h-12 min-h-12 w-full rounded-lg px-4 text-body3",
-            error && "pr-10",
+            hasError && "pr-10",
             className
           )}
           style={
-            error
+            hasError
               ? { borderColor: ERROR_COLOR, boxShadow: "none" }
               : undefined
           }
         />
-        {error ? (
+        {hasError ? (
           <CircleAlert
             aria-hidden
             className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2"
@@ -84,12 +78,26 @@ function TextInput({ id, className, error, onChange, ...props }) {
           />
         ) : null}
       </div>
-      <FieldError id={`${id}-error`} show={error} />
+      {hint && !hasError ? (
+        <p className="mt-1.5 text-body4 font-medium text-green">{hint}</p>
+      ) : null}
+      <FieldError id={`${id}-error`} message={error} />
     </div>
   );
 }
 
-function TextArea({ id, className, error, onChange, ...props }) {
+function TextArea({
+  id,
+  className,
+  error,
+  onChange,
+  maxLength,
+  value,
+  ...props
+}) {
+  const hasError = Boolean(error);
+  const length = String(value ?? "").length;
+
   return (
     <div>
       <div className="relative">
@@ -97,21 +105,23 @@ function TextArea({ id, className, error, onChange, ...props }) {
           id={id}
           data-slot="textarea"
           {...props}
-          aria-invalid={error || undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
+          value={value}
+          maxLength={maxLength}
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
           onChange={onChange}
           className={cn(
             "w-full rounded-lg px-4 py-3 text-body3",
-            error && "pr-10",
+            hasError && "pr-10",
             className
           )}
           style={
-            error
+            hasError
               ? { borderColor: ERROR_COLOR, boxShadow: "none" }
               : undefined
           }
         />
-        {error ? (
+        {hasError ? (
           <CircleAlert
             aria-hidden
             className="pointer-events-none absolute top-3 right-3 size-5"
@@ -119,7 +129,12 @@ function TextArea({ id, className, error, onChange, ...props }) {
           />
         ) : null}
       </div>
-      <FieldError id={`${id}-error`} show={error} />
+      {typeof maxLength === "number" ? (
+        <p className="mt-1 text-right text-body4 text-gray-600">
+          {length}/{maxLength}
+        </p>
+      ) : null}
+      <FieldError id={`${id}-error`} message={error} />
     </div>
   );
 }
@@ -164,13 +179,9 @@ function UploadBox({
           {file ? file.name : label}
         </span>
       </button>
-      <FieldError id={`${id}-error`} show={error} />
+      <FieldError id={`${id}-error`} message={error || undefined} />
     </div>
   );
-}
-
-function isBlank(value) {
-  return String(value ?? "").trim() === "";
 }
 
 function AddCourseForm({ cancelHref = "/admin/courses" }) {
@@ -193,7 +204,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
   const [coverImage, setCoverImage] = useState(null);
   const [videoTrailer, setVideoTrailer] = useState(null);
   const [attachment, setAttachment] = useState(null);
-  const [lessons, setLessons] = useState(INITIAL_LESSONS);
+  const [lessons, setLessons] = useState([]);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -217,28 +228,20 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
   }
 
   function validate() {
-    const nextErrors = {};
+    const nextErrors = {
+      ...validateCourseFields(values),
+      ...validatePromoFields({
+        enabled: promoEnabled,
+        code: promo.code,
+        discountType,
+        discountValue:
+          discountType === "thb" ? promo.discountThb : promo.discountPercent,
+        price: values.price,
+      }),
+    };
 
-    for (const field of REQUIRED_FIELDS) {
-      if (field === "coverImage") {
-        if (!coverImage) nextErrors.coverImage = true;
-        continue;
-      }
-      if (field === "videoTrailer") {
-        if (!videoTrailer) nextErrors.videoTrailer = true;
-        continue;
-      }
-      if (isBlank(values[field])) {
-        nextErrors[field] = true;
-      }
-    }
-
-    if (promoEnabled) {
-      if (isBlank(promo.code)) nextErrors.promoCode = true;
-      const discountValue =
-        discountType === "thb" ? promo.discountThb : promo.discountPercent;
-      if (isBlank(discountValue)) nextErrors.discountValue = true;
-    }
+    if (!coverImage) nextErrors.coverImage = EMPTY_FIELD_MESSAGE;
+    if (!videoTrailer) nextErrors.videoTrailer = EMPTY_FIELD_MESSAGE;
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -322,6 +325,16 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
       </header>
 
       <main className="space-y-8 px-10 py-8">
+        {submitError ? (
+          <p
+            className="mx-auto max-w-5xl text-body3"
+            style={{ color: ERROR_COLOR }}
+            role="alert"
+          >
+            {submitError}
+          </p>
+        ) : null}
+
         <form
           id="add-course-form"
           onSubmit={handleSubmit}
@@ -337,11 +350,12 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 id="course-name"
                 name="courseName"
                 value={values.courseName}
+                maxLength={COURSE_LIMITS.title}
                 onChange={(event) =>
                   updateField("courseName", event.target.value)
                 }
-                error={Boolean(errors.courseName)}
-                placeholder={PLACEHOLDER}
+                error={errors.courseName}
+                placeholder="Enter course name"
               />
             </div>
 
@@ -358,8 +372,9 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                   step="0.01"
                   value={values.price}
                   onChange={(event) => updateField("price", event.target.value)}
-                  error={Boolean(errors.price)}
-                  placeholder={PLACEHOLDER}
+                  error={errors.price}
+                  hint={isFreePrice(values.price) ? "Free" : undefined}
+                  placeholder="Enter Price"
                 />
               </div>
               <div>
@@ -369,12 +384,15 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 <TextInput
                   id="learning-time"
                   name="learningTime"
+                  type="number"
+                  min="1"
+                  step="1"
                   value={values.learningTime}
                   onChange={(event) =>
                     updateField("learningTime", event.target.value)
                   }
-                  error={Boolean(errors.learningTime)}
-                  placeholder={PLACEHOLDER}
+                  error={errors.learningTime}
+                  placeholder="Hours"
                 />
               </div>
             </div>
@@ -404,8 +422,8 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           updatePromo("code", event.target.value);
                           clearError("promoCode");
                         }}
-                        error={Boolean(errors.promoCode)}
-                        placeholder={PLACEHOLDER}
+                        error={errors.promoCode}
+                        placeholder="Enter promo code"
                       />
                     </div>
 
@@ -422,7 +440,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                         onChange={(event) =>
                           updatePromo("minPurchase", event.target.value)
                         }
-                        placeholder={PLACEHOLDER}
+                        placeholder="THB"
                       />
                     </div>
                   </div>
@@ -457,11 +475,12 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           }}
                           disabled={discountType !== "thb"}
                           error={
-                            discountType === "thb" &&
-                            Boolean(errors.discountValue)
+                            discountType === "thb"
+                              ? errors.discountValue
+                              : undefined
                           }
                           className="ml-1 h-10 min-h-10 w-28"
-                          placeholder={PLACEHOLDER}
+                          placeholder="THB"
                         />
                       </label>
 
@@ -491,11 +510,12 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           }}
                           disabled={discountType !== "percent"}
                           error={
-                            discountType === "percent" &&
-                            Boolean(errors.discountValue)
+                            discountType === "percent"
+                              ? errors.discountValue
+                              : undefined
                           }
                           className="ml-1 h-10 min-h-10 w-28"
-                          placeholder={PLACEHOLDER}
+                          placeholder="%"
                         />
                       </label>
                     </div>
@@ -513,11 +533,12 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 name="courseSummary"
                 rows={4}
                 value={values.courseSummary}
+                maxLength={COURSE_LIMITS.summary}
                 onChange={(event) =>
                   updateField("courseSummary", event.target.value)
                 }
-                error={Boolean(errors.courseSummary)}
-                placeholder={PLACEHOLDER}
+                error={errors.courseSummary}
+                placeholder="Enter course summary"
               />
             </div>
 
@@ -530,11 +551,12 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 name="courseDetail"
                 rows={8}
                 value={values.courseDetail}
+                maxLength={COURSE_LIMITS.description}
                 onChange={(event) =>
                   updateField("courseDetail", event.target.value)
                 }
-                error={Boolean(errors.courseDetail)}
-                placeholder={PLACEHOLDER}
+                error={errors.courseDetail}
+                placeholder="Enter course detail"
               />
             </div>
 
@@ -552,7 +574,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 label="Upload Image"
                 accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 file={coverImage}
-                error={Boolean(errors.coverImage)}
+                error={errors.coverImage}
                 onChange={(file) => {
                   setCoverImage(file);
                   clearError("coverImage");
@@ -574,7 +596,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 label="Upload Video"
                 accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
                 file={videoTrailer}
-                error={Boolean(errors.videoTrailer)}
+                error={errors.videoTrailer}
                 onChange={(file) => {
                   setVideoTrailer(file);
                   clearError("videoTrailer");
