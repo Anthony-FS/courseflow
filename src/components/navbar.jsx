@@ -9,7 +9,7 @@ export default function Navbar() {
           <Image src="/courseflow-logo.svg" alt="CourseFlow Logo" width={120} height={40} />
         </Link>
         <nav className="flex items-center gap-16 max-[760px]:gap-4" aria-label="Main navigation">
-          <Link className="font-medium text-body2 text-blue-700 max-[760px]:hidden" href="#courses">Our Courses</Link>
+          <Link className="font-medium text-body2 text-blue-700 max-[760px]:hidden" href="/#courses">Our Courses</Link>
           <Link className="inline-flex h-15 min-w-28 items-center justify-center rounded-lg bg-blue-500 font-medium text-white shadow-button transition duration-200 hover:-translate-y-px hover:bg-blue-400" href="/login">Log in</Link>
         </nav>
       </div>
