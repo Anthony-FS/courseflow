@@ -1,31 +1,51 @@
-import Image from "next/image";
+import { Plus } from "lucide-react";
 
-export function AuthShapes() {
+export function LoginDecorations() {
   return (
     <div
-      aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 h-[70vh] w-full overflow-hidden"
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
     >
-      <svg className="absolute size-0">
-        <filter id="auth-knock-black" colorInterpolationFilters="sRGB">
-          <feColorMatrix
-            type="matrix"
-            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  1 1 1 0 0"
-          />
-        </filter>
-      </svg>
-      <div
-        className="absolute inset-0"
-        style={{ filter: "url(#auth-knock-black)" }}
+      <svg
+        className="absolute top-[421px] left-[-20px] h-[418px] w-[113px]"
+        viewBox="0 0 113 418"
+        fill="#FBAA1C"
+        aria-hidden
       >
-        <Image
-          src="/auth-shapes.png"
-          alt=""
-          fill
-          priority
-          className="object-cover object-center"
+        <circle cx="-137" cy="209" r="250" />
+      </svg>
+
+      <svg
+        className="absolute top-0 right-0 h-[617px] w-[172.64px] text-blue-500"
+        viewBox="0 0 173 617"
+        fill="currentColor"
+        aria-hidden
+      >
+        <path d="M173 0C95 35 8 95 6 200C4 310 70 490 173 617V0Z" />
+      </svg>
+
+      <div className="absolute top-28 left-10 size-[92px] rounded-full bg-blue-200 md:top-36 md:left-16 md:size-[130px]" />
+
+      <Plus
+        className="absolute top-52 left-36 size-7 text-green md:top-64 md:left-52 md:size-10"
+        strokeWidth={2.75}
+      />
+
+      <svg
+        className="absolute top-[589px] right-[59px] z-[1] size-[35px]"
+        viewBox="0 0 35 35"
+        aria-hidden
+      >
+        <circle cx="17.5" cy="17.5" r="17.5" fill="#FFFFFF" />
+        <circle
+          cx="17.5"
+          cy="17.5"
+          r="16"
+          fill="none"
+          stroke="#F47E20"
+          strokeWidth="3"
         />
-      </div>
+      </svg>
     </div>
   );
 }
