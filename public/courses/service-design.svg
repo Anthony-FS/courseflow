@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="96" viewBox="0 0 160 96" role="img" aria-label="Service design course cover">
+  <rect width="160" height="96" fill="#C6D6EF"/>
+  <rect x="12" y="18" width="88" height="60" rx="4" fill="#F6F7FC"/>
+  <rect x="20" y="28" width="48" height="6" rx="3" fill="#2F5FAC"/>
+  <rect x="20" y="40" width="72" height="4" rx="2" fill="#9AA1B9"/>
+  <rect x="20" y="50" width="56" height="4" rx="2" fill="#C8CCDB"/>
+  <circle cx="128" cy="36" r="18" fill="#5483D0"/>
+  <rect x="110" y="58" width="36" height="20" rx="4" fill="#234781"/>
+</svg>
