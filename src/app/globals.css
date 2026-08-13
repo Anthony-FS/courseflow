@@ -595,3 +595,17 @@
     color: var(--status-in-progress-fg);
   }
 }
+
+/* Landing page vector */
+.feature-decoration { position: absolute; pointer-events: none; }
+.feature-decoration--top { top: -23px; left: 10.3%; width: 74px; height: 74px; border-radius: 50%; background: var(--gradient-linear2); }
+.feature-decoration--dot { top: 94px; left: 35.2%; width: 32px; height: 32px; border-radius: 50%; background: var(--blue-100); }
+.feature-decoration--plus { top: 35%; right: 4.8%; color: #a52bb5; font-size: 36px; font-weight: var(--type-body-weight); transform: rotate(12deg); }
+.feature-decoration--bottom { right: 8.5%; bottom: -37px; width: 84px; height: 84px; border-radius: 50%; background: var(--blue-200); }
+
+.instructor-decoration { position: absolute; bottom: 70px; left: 5.5%; width: 30px; height: 27px; border: 3px solid var(--orange-100); clip-path: polygon(50% 100%, 0 0, 100% 0); transform: rotate(180deg); }
+
+@media (max-width: 680px) {
+  .feature-decoration--plus { right: 8%; }
+  .instructor-decoration { left: var(--space-6); bottom: 24px; }
+}
