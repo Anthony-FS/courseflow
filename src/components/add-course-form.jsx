@@ -2,10 +2,15 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CircleAlert, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { CourseLessonsSection } from "@/components/course-lessons-section";
+import {
+  CourseLessonsSection,
+  INITIAL_LESSONS,
+} from "@/components/course-lessons-section";
+import { createAdminCourse, uploadAdminFile } from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
 
 const PLACEHOLDER = "Place Holder";
@@ -169,8 +174,15 @@ function isBlank(value) {
 }
 
 function AddCourseForm({ cancelHref = "/admin/courses" }) {
+  const router = useRouter();
   const [promoEnabled, setPromoEnabled] = useState(true);
   const [discountType, setDiscountType] = useState("thb");
+  const [promo, setPromo] = useState({
+    code: "NEWYEAR200",
+    minPurchase: "0",
+    discountThb: "200",
+    discountPercent: "",
+  });
   const [values, setValues] = useState({
     courseName: "",
     price: "",
@@ -181,7 +193,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
   const [coverImage, setCoverImage] = useState(null);
   const [videoTrailer, setVideoTrailer] = useState(null);
   const [attachment, setAttachment] = useState(null);
+  const [lessons, setLessons] = useState(INITIAL_LESSONS);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function clearError(field) {
     setErrors((current) => {
@@ -195,6 +210,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
   function updateField(field, value) {
     setValues((current) => ({ ...current, [field]: value }));
     clearError(field);
+  }
+
+  function updatePromo(field, value) {
+    setPromo((current) => ({ ...current, [field]: value }));
   }
 
   function validate() {
@@ -214,14 +233,73 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
       }
     }
 
+    if (promoEnabled) {
+      if (isBlank(promo.code)) nextErrors.promoCode = true;
+      const discountValue =
+        discountType === "thb" ? promo.discountThb : promo.discountPercent;
+      if (isBlank(discountValue)) nextErrors.discountValue = true;
+    }
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setSubmitError("");
     if (!validate()) return;
-    // Form wiring only for now — connect to API later.
+
+    setIsSubmitting(true);
+
+    try {
+      const [coverUpload, trailerUpload] = await Promise.all([
+        uploadAdminFile("cover", coverImage),
+        uploadAdminFile("trailer", videoTrailer),
+      ]);
+
+      let attachmentPayload = null;
+      if (attachment) {
+        const uploaded = await uploadAdminFile("attachment", attachment);
+        attachmentPayload = {
+          name: uploaded.name,
+          fileUrl: uploaded.fileUrl,
+          fileType: uploaded.fileType,
+        };
+      }
+
+      const discountValue =
+        discountType === "thb" ? promo.discountThb : promo.discountPercent;
+
+      const created = await createAdminCourse({
+        title: values.courseName.trim(),
+        summary: values.courseSummary.trim(),
+        description: values.courseDetail.trim(),
+        price: Number(values.price),
+        totalLearningTime: values.learningTime.trim(),
+        coverImageUrl: coverUpload.fileUrl,
+        videoTrailerUrl: trailerUpload.fileUrl,
+        attachment: attachmentPayload,
+        promo: promoEnabled
+          ? {
+              code: promo.code.trim(),
+              minPurchaseAmount: Number(promo.minPurchase || 0),
+              discountType,
+              discountValue: Number(discountValue),
+            }
+          : null,
+        lessons: lessons.map((lesson, index) => ({
+          title: lesson.name,
+          sortOrder: index,
+        })),
+      });
+
+      router.push(`/admin/courses?created=${created.id}`);
+      router.refresh();
+    } catch (err) {
+      setSubmitError(err.message || "Failed to create course");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -232,13 +310,18 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
           <Button asChild variant="secondary" size="sm">
             <Link href={cancelHref}>Cancel</Link>
           </Button>
-          <Button type="submit" form="add-course-form" size="sm">
-            Create
+          <Button
+            type="submit"
+            form="add-course-form"
+            size="sm"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Creating..." : "Create"}
           </Button>
         </div>
       </header>
 
-      <main className="flex-1 space-y-8 px-10 py-8">
+      <main className="space-y-8 px-10 py-8">
         <form
           id="add-course-form"
           onSubmit={handleSubmit}
@@ -316,7 +399,12 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                       <TextInput
                         id="promo-code"
                         name="promoCode"
-                        defaultValue="NEWYEAR200"
+                        value={promo.code}
+                        onChange={(event) => {
+                          updatePromo("code", event.target.value);
+                          clearError("promoCode");
+                        }}
+                        error={Boolean(errors.promoCode)}
                         placeholder={PLACEHOLDER}
                       />
                     </div>
@@ -330,7 +418,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                         name="minPurchase"
                         type="number"
                         min="0"
-                        defaultValue="0"
+                        value={promo.minPurchase}
+                        onChange={(event) =>
+                          updatePromo("minPurchase", event.target.value)
+                        }
                         placeholder={PLACEHOLDER}
                       />
                     </div>
@@ -347,7 +438,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           name="discountType"
                           value="thb"
                           checked={discountType === "thb"}
-                          onChange={() => setDiscountType("thb")}
+                          onChange={() => {
+                            setDiscountType("thb");
+                            clearError("discountValue");
+                          }}
                           className="size-4 accent-blue-500"
                         />
                         Discount (THB)
@@ -356,8 +450,16 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           name="discountThb"
                           type="number"
                           min="0"
-                          defaultValue="200"
+                          value={promo.discountThb}
+                          onChange={(event) => {
+                            updatePromo("discountThb", event.target.value);
+                            clearError("discountValue");
+                          }}
                           disabled={discountType !== "thb"}
+                          error={
+                            discountType === "thb" &&
+                            Boolean(errors.discountValue)
+                          }
                           className="ml-1 h-10 min-h-10 w-28"
                           placeholder={PLACEHOLDER}
                         />
@@ -369,7 +471,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           name="discountType"
                           value="percent"
                           checked={discountType === "percent"}
-                          onChange={() => setDiscountType("percent")}
+                          onChange={() => {
+                            setDiscountType("percent");
+                            clearError("discountValue");
+                          }}
                           className="size-4 accent-blue-500"
                         />
                         Discount (%)
@@ -379,7 +484,16 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                           type="number"
                           min="0"
                           max="100"
+                          value={promo.discountPercent}
+                          onChange={(event) => {
+                            updatePromo("discountPercent", event.target.value);
+                            clearError("discountValue");
+                          }}
                           disabled={discountType !== "percent"}
+                          error={
+                            discountType === "percent" &&
+                            Boolean(errors.discountValue)
+                          }
                           className="ml-1 h-10 min-h-10 w-28"
                           placeholder={PLACEHOLDER}
                         />
@@ -484,7 +598,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
           </div>
         </form>
 
-        <CourseLessonsSection />
+        <CourseLessonsSection
+          lessons={lessons}
+          onLessonsChange={setLessons}
+        />
       </main>
     </div>
   );
