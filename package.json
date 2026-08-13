@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepare": "husky"
   },
   "dependencies": {
@@ -33,6 +35,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "husky": "^9.1.7",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "vitest": "^4.1.10"
   }
 }

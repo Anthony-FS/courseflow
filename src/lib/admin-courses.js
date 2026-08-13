@@ -38,3 +38,17 @@ export async function createAdminCourse(payload) {
 
   return data;
 }
+
+export async function getAdminCourseLessons(courseId) {
+  const response = await fetch(`/api/admin/courses/${courseId}/lessons`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to load lessons");
+  }
+
+  return Array.isArray(data?.lessons) ? data.lessons : [];
+}

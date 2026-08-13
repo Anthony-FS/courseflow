@@ -1,56 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { GripVertical, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getAdminCourseLessons } from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
-
-const INITIAL_LESSONS = [
-  {
-    id: 1,
-    name: "Introduction",
-    subLessons: 10,
-  },
-  {
-    id: 2,
-    name: "Service Design Theories and Principles",
-    subLessons: 10,
-  },
-  {
-    id: 3,
-    name: "Understanding Users and Finding Opportunities",
-    subLessons: 10,
-  },
-  {
-    id: 4,
-    name: "Turning Problems into Opportunities",
-    subLessons: 10,
-  },
-  {
-    id: 5,
-    name: "Prototyping and Testing Concepts",
-    subLessons: 10,
-  },
-  {
-    id: 6,
-    name: "Final Project",
-    subLessons: 10,
-  },
-];
 
 function CourseLessonsSection({
   className,
+  courseId,
   lessons: controlledLessons,
   onLessonsChange,
 }) {
-  const [uncontrolledLessons, setUncontrolledLessons] = useState(INITIAL_LESSONS);
+  const addLessonHref = courseId
+    ? `/admin/courses/${courseId}/lessons/new`
+    : "/admin/courses/new/lessons/new";
+
+  const [uncontrolledLessons, setUncontrolledLessons] = useState([]);
   const [dragIndex, setDragIndex] = useState(null);
+  const [loadStatus, setLoadStatus] = useState(courseId ? "loading" : "ready");
+  const [loadError, setLoadError] = useState("");
   const isDragging = dragIndex !== null;
 
   const isControlled = controlledLessons !== undefined;
   const lessons = isControlled ? controlledLessons : uncontrolledLessons;
+
+  useEffect(() => {
+    if (!courseId || isControlled) {
+      setLoadStatus("ready");
+      setLoadError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadLessons() {
+      setLoadStatus("loading");
+      setLoadError("");
+
+      try {
+        const data = await getAdminCourseLessons(courseId);
+        if (!cancelled) {
+          setUncontrolledLessons(data);
+          setLoadStatus("ready");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setUncontrolledLessons([]);
+          setLoadError(error.message || "Failed to load lessons");
+          setLoadStatus("error");
+        }
+      }
+    }
+
+    loadLessons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, isControlled]);
 
   function setLessons(updater) {
     if (isControlled) {
@@ -60,17 +71,6 @@ function CourseLessonsSection({
       return;
     }
     setUncontrolledLessons(updater);
-  }
-
-  function handleAddLesson() {
-    setLessons((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        name: `Lesson ${current.length + 1}`,
-        subLessons: 0,
-      },
-    ]);
   }
 
   function handleDeleteLesson(id) {
@@ -111,13 +111,17 @@ function CourseLessonsSection({
     setDragIndex(null);
   }
 
+  const showEmpty = loadStatus === "ready" && lessons.length === 0;
+
   return (
     <section className={cn("mx-auto max-w-5xl", className)}>
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-headline3 text-gray-900">Lesson</h2>
-        <Button type="button" size="sm" onClick={handleAddLesson}>
-          <Plus className="size-4" aria-hidden />
-          Add Lesson
+        <Button asChild size="sm">
+          <Link href={addLessonHref}>
+            <Plus className="size-4" aria-hidden />
+            Add Lesson
+          </Link>
         </Button>
       </div>
 
@@ -142,13 +146,32 @@ function CourseLessonsSection({
               </tr>
             </thead>
             <tbody>
-              {lessons.length === 0 ? (
+              {loadStatus === "loading" ? (
                 <tr>
                   <td
                     colSpan={4}
                     className="px-4 py-10 text-center text-body3 text-gray-700"
                   >
-                    No lessons yet. Click &quot;Add Lesson&quot; to create one.
+                    Loading lessons...
+                  </td>
+                </tr>
+              ) : loadStatus === "error" ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-body3 text-orange-500"
+                    role="alert"
+                  >
+                    {loadError || "Failed to load lessons"}
+                  </td>
+                </tr>
+              ) : showEmpty ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-body3 text-gray-700"
+                  >
+                    No lessons added
                   </td>
                 </tr>
               ) : (
@@ -250,4 +273,4 @@ function CourseLessonsSection({
   );
 }
 
-export { CourseLessonsSection, INITIAL_LESSONS };
+export { CourseLessonsSection };

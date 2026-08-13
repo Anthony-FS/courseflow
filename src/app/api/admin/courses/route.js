@@ -1,5 +1,11 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import {
+  parseCoursePrice,
+  parseLearningTime,
+  validateCourseFields,
+  validatePromoFields,
+} from "@/lib/course-validation";
 
 function isBlank(value) {
   return String(value ?? "").trim() === "";
@@ -27,23 +33,30 @@ export async function POST(request) {
   const totalLearningTime = String(body.totalLearningTime ?? "").trim();
   const coverImageUrl = String(body.coverImageUrl ?? "").trim();
   const videoTrailerUrl = String(body.videoTrailerUrl ?? "").trim();
-  const price = asNumber(body.price);
+  const price = parseCoursePrice(body.price);
+  const learningTimeNumber = parseLearningTime(body.totalLearningTime);
+
+  const fieldErrors = validateCourseFields({
+    courseName: title,
+    price: body.price,
+    learningTime: body.totalLearningTime,
+    courseSummary: summary,
+    courseDetail: description,
+  });
 
   if (
-    isBlank(title) ||
-    isBlank(summary) ||
-    isBlank(description) ||
-    isBlank(totalLearningTime) ||
+    Object.keys(fieldErrors).length > 0 ||
     isBlank(coverImageUrl) ||
     isBlank(videoTrailerUrl) ||
     !Number.isFinite(price) ||
-    price < 0
+    !Number.isFinite(learningTimeNumber)
   ) {
     return jsonError(
       "Missing or invalid required course fields",
       400,
       {
-        fields: [
+        fields: fieldErrors,
+        required: [
           "title",
           "summary",
           "description",
@@ -65,16 +78,23 @@ export async function POST(request) {
     const discountType = String(promo.discountType ?? "").trim();
     const discountValue = asNumber(promo.discountValue);
     const minPurchaseAmount = asNumber(promo.minPurchaseAmount ?? 0);
+    const promoErrors = validatePromoFields({
+      enabled: true,
+      code,
+      discountType,
+      discountValue: promo.discountValue,
+      price,
+    });
 
     if (
-      isBlank(code) ||
+      Object.keys(promoErrors).length > 0 ||
       !["thb", "percent"].includes(discountType) ||
       !Number.isFinite(discountValue) ||
       discountValue < 0 ||
       !Number.isFinite(minPurchaseAmount) ||
       minPurchaseAmount < 0
     ) {
-      return jsonError("Invalid promo payload", 400);
+      return jsonError("Invalid promo payload", 400, { fields: promoErrors });
     }
   }
 
@@ -86,7 +106,7 @@ export async function POST(request) {
       summary,
       description,
       price,
-      total_learning_time: totalLearningTime,
+      total_learning_time: String(learningTimeNumber),
       cover_image_url: coverImageUrl,
       video_trailer_url: videoTrailerUrl,
     })
