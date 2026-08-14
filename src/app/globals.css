@@ -692,6 +692,24 @@
     border-top-right-radius: 12px;
     border-bottom-right-radius: 12px;
   }
+
+  /* Sub-lesson tile reorder on Add/Edit Lesson */
+  .sub-lesson-tile {
+    transition:
+      transform 200ms ease-out,
+      box-shadow 200ms ease-out,
+      opacity 200ms ease-out,
+      background-color 200ms ease-out;
+  }
+
+  .sub-lesson-tile--dragging {
+    position: relative;
+    z-index: 30;
+    cursor: grabbing;
+    transform: translate3d(0, -8px, 0) scale(1.015);
+    box-shadow: 0 18px 28px rgb(42 46 63 / 18%);
+    background: var(--white);
+  }
 }
 
 /* Landing page vector */
