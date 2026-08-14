@@ -106,27 +106,20 @@ export default function LessonForm({
   const [isDeleting, setIsDeleting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // Load existing data in edit mode if not provided via props
   useEffect(() => {
-    if (mode === "edit" && lessonId && !initialData) {
-      setIsLoading(true);
-      getAdminLessonDetail(courseId, lessonId)
-        .then((data) => {
-          if (data) {
-            setLessonName(data.name || "");
-            if (Array.isArray(data.subLessons) && data.subLessons.length > 0) {
-              setSubLessons(data.subLessons);
-            }
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load lesson detail:", err);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+    function clearAllowDrag() {
+      if (!isDraggingRef.current) {
+        allowDragRef.current = false;
+      }
     }
-  }, [mode, courseId, lessonId, initialData]);
+
+    window.addEventListener("mouseup", clearAllowDrag);
+    window.addEventListener("touchend", clearAllowDrag);
+    return () => {
+      window.removeEventListener("mouseup", clearAllowDrag);
+      window.removeEventListener("touchend", clearAllowDrag);
+    };
+  }, []);
 
   // Sub-lesson Handlers
   const handleAddSubLesson = () => {
