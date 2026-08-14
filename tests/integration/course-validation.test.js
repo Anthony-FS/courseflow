@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  COURSE_LIMITS,
+  isFreePrice,
+  validateCourseFields,
+  validatePromoFields,
+} from "@/lib/course-validation";
+
+describe("course field validation", () => {
+  const valid = {
+    courseName: "Service Design",
+    price: "100",
+    learningTime: "12",
+    courseSummary: "A short summary",
+    courseDetail: "A longer detail section",
+  };
+
+  it("accepts valid course fields", () => {
+    expect(validateCourseFields(valid)).toEqual({});
+  });
+
+  it("rejects course name over 50 characters", () => {
+    const errors = validateCourseFields({
+      ...valid,
+      courseName: "a".repeat(COURSE_LIMITS.title + 1),
+    });
+    expect(errors.courseName).toMatch(/cannot exceed 50 characters/i);
+  });
+
+  it("rejects non-numeric and negative prices", () => {
+    expect(validateCourseFields({ ...valid, price: "abc" }).price).toMatch(
+      /must be a number/i,
+    );
+    expect(validateCourseFields({ ...valid, price: "-1" }).price).toMatch(
+      /cannot be negative/i,
+    );
+  });
+
+  it("treats price 0 as Free", () => {
+    expect(isFreePrice("0")).toBe(true);
+    expect(isFreePrice(0)).toBe(true);
+    expect(isFreePrice("10")).toBe(false);
+    expect(validateCourseFields({ ...valid, price: "0" })).toEqual({});
+  });
+
+  it("rejects learning time that is not a number or <= 0", () => {
+    expect(
+      validateCourseFields({ ...valid, learningTime: "two hours" }).learningTime,
+    ).toMatch(/must be a number/i);
+    expect(
+      validateCourseFields({ ...valid, learningTime: "0" }).learningTime,
+    ).toMatch(/greater than 0/i);
+    expect(
+      validateCourseFields({ ...valid, learningTime: "-3" }).learningTime,
+    ).toMatch(/greater than 0/i);
+  });
+
+  it("rejects summary over 200 and detail over 400 characters", () => {
+    expect(
+      validateCourseFields({
+        ...valid,
+        courseSummary: "s".repeat(COURSE_LIMITS.summary + 1),
+      }).courseSummary,
+    ).toMatch(/cannot exceed 200 characters/i);
+
+    expect(
+      validateCourseFields({
+        ...valid,
+        courseDetail: "d".repeat(COURSE_LIMITS.description + 1),
+      }).courseDetail,
+    ).toMatch(/cannot exceed 400 characters/i);
+  });
+});
+
+describe("promo field validation", () => {
+  it("skips validation when promo is disabled", () => {
+    expect(
+      validatePromoFields({
+        enabled: false,
+        code: "",
+        discountType: "thb",
+        discountValue: "9999",
+        price: "100",
+      }),
+    ).toEqual({});
+  });
+
+  it("rejects THB discount greater than course price", () => {
+    const errors = validatePromoFields({
+      enabled: true,
+      code: "SAVE200",
+      discountType: "thb",
+      discountValue: "201",
+      price: "200",
+    });
+    expect(errors.discountValue).toMatch(
+      /cannot exceed course price/i,
+    );
+  });
+
+  it("allows THB discount equal to course price", () => {
+    expect(
+      validatePromoFields({
+        enabled: true,
+        code: "SAVE200",
+        discountType: "thb",
+        discountValue: "200",
+        price: "200",
+      }),
+    ).toEqual({});
+  });
+
+  it("does not apply price cap to percent discounts", () => {
+    expect(
+      validatePromoFields({
+        enabled: true,
+        code: "SAVE50",
+        discountType: "percent",
+        discountValue: "50",
+        price: "100",
+      }),
+    ).toEqual({});
+  });
+});

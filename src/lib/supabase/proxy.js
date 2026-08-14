@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
+/** Temporary: allow /admin pages without login until admin auth UI exists. */
+const TEMP_DISABLE_ADMIN_PAGE_PROTECTION = true;
+
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -39,6 +42,45 @@ export async function updateSession(request) {
   // Refresh the session. Do not run other logic between createServerClient
   // and getClaims() or users may be randomly logged out.
   await supabase.auth.getClaims();
+
+  if (TEMP_DISABLE_ADMIN_PAGE_PROTECTION) {
+    return supabaseResponse;
+  }
+
+  const pathname = request.nextUrl.pathname;
+  const isAdminPage =
+    pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminApi = pathname.startsWith("/api/admin");
+
+  // Page routes only — API handlers enforce auth via requireAdmin().
+  if (isAdminPage && !isAdminApi) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const isAdmin =
+      profile?.role === "admin" && profile?.is_active === true;
+
+    if (!isAdmin) {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      homeUrl.search = "";
+      return NextResponse.redirect(homeUrl);
+    }
+  }
 
   return supabaseResponse;
 }
