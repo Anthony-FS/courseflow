@@ -1,10 +1,10 @@
-export default function AddLessonPlaceholderPage() {
-  return (
-    <main className="p-10">
-      <h1 className="text-headline3">Add Lesson</h1>
-      <p className="mt-2 text-body2 text-gray-700">
-        Placeholder — add lesson form is not available yet.
-      </p>
-    </main>
-  );
+import LessonForm from "@/components/admin/lesson-form";
+
+export const metadata = {
+  title: "Add Lesson | CourseFlow Admin",
+  description: "Add lesson to course",
+};
+
+export default function AddLessonNewCoursePage() {
+  return <LessonForm mode="add" />;
 }
