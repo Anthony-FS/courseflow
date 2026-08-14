@@ -41,7 +41,7 @@ erDiagram
   profiles {
     uuid id PK
     string full_name
-    int age
+    date date_of_birth
     string educational_background
     string avatar_url
     string role
