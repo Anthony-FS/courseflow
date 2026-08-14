@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Plus, X, Play, Loader2 } from "lucide-react";
 import ConfirmationModal from "./confirmation-modal";
+import {
+  uploadAdminFile,
+  createAdminLesson,
+  getAdminLessonDetail,
+  updateAdminLesson,
+  deleteAdminLesson,
+} from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
 
 function remapSubLessonTitleErrors(errors, fromIndex, toIndex) {
@@ -79,6 +86,25 @@ export default function LessonForm({
   const allowDragRef = useRef(false);
   const isDraggingRef = useRef(false);
   const isDragging = dragIndex !== null;
+
+  useEffect(() => {
+    function clearAllowDrag() {
+      if (!isDraggingRef.current) {
+        allowDragRef.current = false;
+      }
+    }
+
+    window.addEventListener("mouseup", clearAllowDrag);
+    window.addEventListener("touchend", clearAllowDrag);
+    return () => {
+      window.removeEventListener("mouseup", clearAllowDrag);
+      window.removeEventListener("touchend", clearAllowDrag);
+    };
+  }, []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     function clearAllowDrag() {
