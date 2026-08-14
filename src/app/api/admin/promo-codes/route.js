@@ -21,6 +21,9 @@ export async function POST(request) {
   const discountType = requestedDiscountType === "thb"
     ? "fixed"
     : requestedDiscountType;
+  const courseIds = Array.isArray(body.courseIds)
+    ? body.courseIds.filter((courseId) => typeof courseId === "string" && courseId)
+    : [];
   const discountValue = Number(body.discountValue);
 
   if (!CODE_PATTERN.test(code)) {
@@ -39,22 +42,25 @@ export async function POST(request) {
     return jsonError("Percent discount cannot exceed 100.", 400);
   }
 
+  const promoRows = (courseIds.length > 0 ? courseIds : [null]).map((courseId) => ({
+    course_id: courseId,
+    code,
+    discount_type: discountType,
+    discount_value: discountValue,
+    min_purchase_amount: minPurchaseAmount,
+    starts_at: new Date().toISOString(),
+    is_active: true,
+  }));
+
   const { data, error: insertError } = await supabase
     .from("promo_codes")
-    .insert({
-      code,
-      discount_type: discountType,
-      discount_value: discountValue,
-      min_purchase_amount: minPurchaseAmount,
-      starts_at: new Date().toISOString(),
-      is_active: true,
-    })
+    .insert(promoRows)
     .select("id")
-    .single();
+    .limit(1);
 
   if (insertError) {
     return jsonError(insertError.message || "Failed to create promo code.", 500);
   }
 
-  return jsonOk({ id: data.id }, { status: 201 });
+  return jsonOk({ id: data?.[0]?.id ?? null }, { status: 201 });
 }

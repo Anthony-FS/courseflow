@@ -14,6 +14,20 @@ export async function getPromoCodes() {
   return data ?? [];
 }
 
+export async function getPromoCourseOptions() {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("courses")
+    .select("id, title")
+    .order("title");
+
+  if (error) {
+    throw new Error(error.message || "Failed to load courses.");
+  }
+
+  return data ?? [];
+}
+
 export function searchPromoCodes(promoCodes, query) {
   const normalizedQuery = query.trim().toLowerCase();
 
