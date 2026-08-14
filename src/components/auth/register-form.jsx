@@ -31,21 +31,6 @@ const EMPTY_VALUES = {
   confirmPassword: "",
 };
 
-function ageFromDob(isoDate) {
-  const dob = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(dob.getTime())) {
-    return null;
-  }
-
-  const today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-    age -= 1;
-  }
-  return age;
-}
-
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -60,8 +45,8 @@ function validateField(name, values) {
       if (!values.dob) {
         return "Please enter your date of birth";
       }
-      const age = ageFromDob(values.dob);
-      if (age == null || age < 1) {
+      const dob = new Date(`${values.dob}T00:00:00`);
+      if (Number.isNaN(dob.getTime()) || values.dob > todayIsoDate()) {
         return "Please enter a valid date of birth";
       }
       return "";
@@ -218,7 +203,6 @@ export function RegisterForm() {
       return;
     }
 
-    const age = ageFromDob(values.dob);
     setSubmitting(true);
 
     try {
@@ -229,7 +213,7 @@ export function RegisterForm() {
         options: {
           data: {
             full_name: values.fullName.trim(),
-            age,
+            date_of_birth: values.dob,
             educational_background: values.education.trim(),
           },
         },
