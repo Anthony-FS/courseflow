@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, FileText, LogOut, TicketPercent } from "lucide-react";
@@ -33,8 +34,15 @@ export function AdminSidebar() {
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-300 bg-white">
       <header className="px-6 pt-10 pb-8">
-        <p className="text-headline3 text-blue-500">CourseFlow</p>
-        <p className="text-body3 text-gray-600">Admin Panel Control</p>
+        <Link href="/admin" aria-label="CourseFlow admin home">
+          <Image
+            src="/courseflow-logo.svg"
+            alt="CourseFlow"
+            width={140}
+            height={16}
+          />
+        </Link>
+        <p className="mt-2 text-body3 text-gray-600">Admin Panel Control</p>
       </header>
 
       <nav aria-label="Admin" className="flex flex-1 flex-col px-3">
