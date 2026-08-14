@@ -105,7 +105,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/");
       router.refresh();
     } catch {
       const message = "Login failed. Please try again.";
