@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Plus, X, Play } from "lucide-react";
+import { ArrowLeft, Plus, X, Play, Loader2 } from "lucide-react";
 import ConfirmationModal from "./confirmation-modal";
+import {
+  uploadAdminFile,
+  createAdminLesson,
+  getAdminLessonDetail,
+  updateAdminLesson,
+  deleteAdminLesson,
+} from "@/lib/admin-courses";
 
 export default function LessonForm({
   mode = "add", // 'add' | 'edit'
@@ -14,10 +21,10 @@ export default function LessonForm({
   const router = useRouter();
   const params = useParams();
   const courseId = params?.id || "1";
+  const lessonId = params?.lessonId;
 
   // Form State
   const [lessonName, setLessonName] = useState(initialData?.name || "");
-
   const [subLessons, setSubLessons] = useState(
     initialData?.subLessons || [
       {
@@ -32,6 +39,32 @@ export default function LessonForm({
 
   const [errors, setErrors] = useState({});
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  // Load existing data in edit mode if not provided via props
+  useEffect(() => {
+    if (mode === "edit" && lessonId && !initialData) {
+      setIsLoading(true);
+      getAdminLessonDetail(courseId, lessonId)
+        .then((data) => {
+          if (data) {
+            setLessonName(data.name || "");
+            if (Array.isArray(data.subLessons) && data.subLessons.length > 0) {
+              setSubLessons(data.subLessons);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load lesson detail:", err);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [mode, courseId, lessonId, initialData]);
 
   // Sub-lesson Handlers
   const handleAddSubLesson = () => {
@@ -77,7 +110,7 @@ export default function LessonForm({
   };
 
   // Form Validation & Submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
 
@@ -96,21 +129,73 @@ export default function LessonForm({
       return;
     }
 
-    const payload = {
-      lessonName,
-      subLessons,
-    };
+    setIsSaving(true);
+    setSubmitError("");
 
-    if (onSave) {
-      onSave(payload);
-    } else {
-      router.push(`/admin/courses/${courseId}`);
+    try {
+      // 1. Upload any newly selected video files to Supabase Storage
+      const preparedSubLessons = await Promise.all(
+        subLessons.map(async (sub) => {
+          if (sub.videoFile) {
+            const uploadRes = await uploadAdminFile("trailer", sub.videoFile);
+            return {
+              title: sub.title.trim(),
+              videoUrl: uploadRes.fileUrl,
+              videoName: uploadRes.name || sub.videoName,
+              isPreview: sub.isPreview || false,
+            };
+          }
+          return {
+            title: sub.title.trim(),
+            videoUrl: sub.videoUrl || null,
+            videoName: sub.videoName || "",
+            isPreview: sub.isPreview || false,
+          };
+        })
+      );
+
+      const payload = {
+        lessonName: lessonName.trim(),
+        subLessons: preparedSubLessons,
+      };
+
+      if (onSave) {
+        await onSave(payload);
+      } else if (mode === "add") {
+        await createAdminLesson(courseId, payload);
+      } else {
+        await updateAdminLesson(courseId, lessonId, payload);
+      }
+
+      if (courseId && courseId !== "new") {
+        router.push(`/admin/courses/${courseId}/edit`);
+      } else {
+        router.push("/admin/courses");
+      }
+    } catch (err) {
+      setSubmitError(err.message || "Failed to save lesson");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeleteLessonConfirm = () => {
-    setIsDeleteModalOpen(false);
-    router.push(`/admin/courses/${courseId}`);
+  const handleDeleteLessonConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      if (lessonId) {
+        await deleteAdminLesson(courseId, lessonId);
+      }
+      setIsDeleteModalOpen(false);
+      if (courseId && courseId !== "new") {
+        router.push(`/admin/courses/${courseId}/edit`);
+      } else {
+        router.push("/admin/courses");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to delete lesson");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -141,16 +226,19 @@ export default function LessonForm({
           <button
             type="button"
             onClick={() => router.back()}
-            className="min-w-[110px] px-7 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-base hover:bg-[#FFF7F0] active:scale-[0.98] transition-all cursor-pointer bg-white"
+            disabled={isSaving}
+            className="min-w-[110px] px-7 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-base hover:bg-[#FFF7F0] active:scale-[0.98] transition-all cursor-pointer bg-white disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="min-w-[110px] px-7 py-2.5 rounded-xl bg-[#2F5FAC] hover:bg-[#234781] active:scale-[0.98] text-white font-bold text-base transition-all cursor-pointer"
+            disabled={isSaving || isLoading}
+            className="min-w-[110px] px-7 py-2.5 rounded-xl bg-[#2F5FAC] hover:bg-[#234781] active:scale-[0.98] text-white font-bold text-base transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {mode === "add" ? "Create" : "Edit"}
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            <span>{mode === "add" ? "Create" : "Edit"}</span>
           </button>
         </div>
       </header>
@@ -161,6 +249,12 @@ export default function LessonForm({
           onSubmit={handleSubmit}
           className="bg-white rounded-2xl border border-[#E4E6ED] p-8 sm:p-10 space-y-8"
         >
+          {submitError && (
+            <div className="p-4 rounded-xl bg-[#FAE7F4] border border-[#9B2C6B] text-[#9B2C6B] text-sm font-medium">
+              {submitError}
+            </div>
+          )}
+
           {/* Lesson Name Field */}
           <div>
             <label className="block text-sm font-medium text-[#2A2E3F] mb-2">

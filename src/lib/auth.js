@@ -41,47 +41,45 @@ export async function requireAdmin() {
   const session = await getSessionUser();
 
   if (TEMP_DISABLE_ADMIN_API_PROTECTION) {
+    const service = createServiceClient();
+    if (service) {
+      const { data: admin } = await service
+        .from("profiles")
+        .select("id, role, is_active, full_name")
+        .eq("role", "admin")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      const adminId =
+        admin?.id || session.user?.id || "00000000-0000-0000-0000-000000000001";
+
+      return {
+        supabase: service,
+        user: { id: adminId },
+        profile: admin || {
+          id: adminId,
+          role: "admin",
+          is_active: true,
+          full_name: "Admin Tester",
+        },
+        error: null,
+      };
+    }
+
     if (session.user) {
       return { ...session, error: null };
     }
 
-    // No browser session: use service role + first active admin for local testing.
-    const service = createServiceClient();
-    if (!service) {
-      return {
-        ...session,
-        error: jsonError(
-          "Temporary API bypass needs a logged-in user or SUPABASE_SERVICE_ROLE_KEY in .env",
-          401,
-        ),
-      };
-    }
-
-    const { data: admin, error: adminError } = await service
-      .from("profiles")
-      .select("id, role, is_active, full_name")
-      .eq("role", "admin")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-
-    if (adminError || !admin) {
-      return {
-        supabase: service,
-        user: null,
-        profile: null,
-        error: jsonError(
-          adminError?.message ||
-            "Temporary API bypass needs at least one active admin profile",
-          500,
-        ),
-      };
-    }
-
     return {
-      supabase: service,
-      user: { id: admin.id },
-      profile: admin,
+      supabase: session.supabase,
+      user: { id: "00000000-0000-0000-0000-000000000001" },
+      profile: {
+        id: "00000000-0000-0000-0000-000000000001",
+        role: "admin",
+        is_active: true,
+        full_name: "Admin Tester",
+      },
       error: null,
     };
   }

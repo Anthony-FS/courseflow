@@ -52,3 +52,69 @@ export async function getAdminCourseLessons(courseId) {
 
   return Array.isArray(data?.lessons) ? data.lessons : [];
 }
+
+export async function createAdminLesson(courseId, payload) {
+  const response = await fetch(`/api/admin/courses/${courseId}/lessons`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to create lesson");
+  }
+
+  return data;
+}
+
+export async function getAdminLessonDetail(courseId, lessonId) {
+  const response = await fetch(
+    `/api/admin/courses/${courseId}/lessons/${lessonId}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
+  );
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to load lesson detail");
+  }
+
+  return data?.lesson || null;
+}
+
+export async function updateAdminLesson(courseId, lessonId, payload) {
+  const response = await fetch(
+    `/api/admin/courses/${courseId}/lessons/${lessonId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to update lesson");
+  }
+
+  return data;
+}
+
+export async function deleteAdminLesson(courseId, lessonId) {
+  const response = await fetch(
+    `/api/admin/courses/${courseId}/lessons/${lessonId}`,
+    {
+      method: "DELETE",
+    },
+  );
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to delete lesson");
+  }
+
+  return data;
+}
