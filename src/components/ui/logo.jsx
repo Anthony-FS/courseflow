@@ -11,14 +11,14 @@ export default function Logo({
 }) {
   return (
     <Link href={href} className={`block group ${className}`}>
-      <div className="flex items-center">
+      <div className="flex items-center justify-center">
         <Image
           src="/courseflow-logo.svg"
           alt="CourseFlow Logo"
           width={width}
           height={height}
           priority
-          className="w-auto h-auto"
+          style={{ width, height: "auto" }}
         />
       </div>
       {showSubtext && (

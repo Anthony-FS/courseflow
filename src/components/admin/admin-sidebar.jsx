@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, FileText, LogOut, TicketPercent } from "lucide-react";
 
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -30,6 +31,14 @@ const NAV_ITEMS = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/admin/login");
+    router.refresh();
+  }
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-300 bg-white">
@@ -73,13 +82,14 @@ export function AdminSidebar() {
       </nav>
 
       <footer className="p-3 pb-6">
-        <Link
-          href="/login"
-          className="flex items-center gap-3 rounded-lg px-4 py-3 text-body2 text-gray-700 transition-colors hover:bg-gray-100"
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-body2 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <LogOut aria-hidden="true" className="size-5" />
           Log out
-        </Link>
+        </button>
       </footer>
     </aside>
   );

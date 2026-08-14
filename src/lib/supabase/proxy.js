@@ -58,9 +58,13 @@ export async function updateSession(request) {
       data: { user },
     } = await supabase.auth.getUser();
 
+    if (pathname === "/admin/login") {
+      return supabaseResponse;
+    }
+
     if (!user) {
       const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
+      loginUrl.pathname = "/admin/login";
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
     }
