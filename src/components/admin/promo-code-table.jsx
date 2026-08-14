@@ -1,4 +1,5 @@
 import { SquarePen, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 
@@ -21,7 +22,7 @@ function formatCreatedDate(promo) {
   }).format(new Date(promo.starts_at));
 }
 
-export function PromoCodeTable({ promoCodes, isLoading = false }) {
+export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
   const emptyMessage = isLoading ? "Loading promo codes..." : "No promo codes found.";
 
   return (
@@ -56,11 +57,13 @@ export function PromoCodeTable({ promoCodes, isLoading = false }) {
                 <td className="whitespace-nowrap px-4 py-4">{formatCreatedDate(promo)}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3 text-blue-300">
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Delete ${promo.code}`}>
+                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Delete ${promo.code}`} onClick={() => onDelete?.(promo)}>
                       <Trash2 aria-hidden="true" className="size-5" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${promo.code}`}>
+                    <Button asChild variant="ghost" size="icon-sm">
+                      <Link href={`/admin/promo-codes/${promo.id}/edit`} aria-label={`Edit ${promo.code}`}>
                       <SquarePen aria-hidden="true" className="size-5" />
+                      </Link>
                     </Button>
                   </div>
                 </td>

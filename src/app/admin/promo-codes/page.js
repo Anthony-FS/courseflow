@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
 import { PromoCodeTable } from "@/components/admin/promo-code-table";
+import { DeletePromoCodeDialog } from "@/components/admin/delete-promo-code-dialog";
 import { Button } from "@/components/ui/button";
 import { getPromoCodes, searchPromoCodes } from "@/lib/promo-codes";
 
@@ -13,6 +14,8 @@ export default function AdminPromoCodesPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [promoToDelete, setPromoToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +43,21 @@ export default function AdminPromoCodesPage() {
     () => searchPromoCodes(promoCodes, query),
     [promoCodes, query],
   );
+
+  async function handleDelete() {
+    if (!promoToDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/promo-codes/${promoToDelete.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to delete promo code.");
+      setPromoCodes((current) => current.filter((promo) => promo.id !== promoToDelete.id));
+      setPromoToDelete(null);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <main className="flex min-h-full flex-col">
@@ -70,9 +88,10 @@ export default function AdminPromoCodesPage() {
       <section className="p-10">
         {errorMessage ? <p className="mb-4 text-body2 text-orange-500" role="alert">{errorMessage}</p> : null}
         <div className="overflow-hidden rounded-lg bg-white shadow-card">
-          <PromoCodeTable promoCodes={visiblePromoCodes} isLoading={status === "loading"} />
+          <PromoCodeTable promoCodes={visiblePromoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
         </div>
       </section>
+      <DeletePromoCodeDialog open={Boolean(promoToDelete)} code={promoToDelete?.code} isDeleting={isDeleting} onOpenChange={(open) => !open && !isDeleting && setPromoToDelete(null)} onConfirm={handleDelete} />
     </main>
   );
 }
