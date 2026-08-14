@@ -27,12 +27,20 @@ export default function Navbar() {
           >
             Our Courses
           </Link>
-          <Link
-            className="inline-flex h-15 min-w-28 items-center justify-center rounded-lg bg-blue-500 font-medium text-white shadow-button transition duration-200 hover:-translate-y-px hover:bg-blue-400"
-            href="/login"
-          >
-            Log in
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              className="inline-flex h-15 min-w-28 items-center justify-center rounded-lg bg-blue-500 font-medium text-white shadow-button transition duration-200 hover:-translate-y-px hover:bg-blue-400"
+              href="/login"
+            >
+              Log in
+            </Link>
+            <Link
+              className="inline-flex h-15 min-w-28 items-center justify-center rounded-lg bg-blue-200 font-medium text-blue-500 shadow-button transition duration-200 hover:-translate-y-px hover:bg-blue-400"
+              href="/register"
+            >
+              Register
+            </Link>
+          </div>
         </nav>
       </div>
     </header>

@@ -10,7 +10,7 @@ export default function LearningCta() {
             Want to start learning?
           </h2>
           <Link
-            href="/login"
+            href="/register"
             className="mt-12 inline-flex min-h-15 min-w-42.25 items-center justify-center rounded-[10px] border border-orange-500 bg-white px-8 text-body2 font-medium text-orange-500 transition-colors hover:bg-orange-500 hover:text-white"
           >
             Register here

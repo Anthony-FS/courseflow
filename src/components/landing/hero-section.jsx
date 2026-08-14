@@ -8,7 +8,8 @@ export default function HeroSection() {
         <div className="py-9 pb-22.5 max-[760px]:pt-17.5">
           <h1 className="text-headline1 font-medium leading-tight tracking-[-0.02em] text-black">Best Virtual<br />Classroom Software</h1>
           <p className="my-6 mb-12 text-body1 leading-normal text-gray-700 max-[760px]:text-body2">Welcome to Schooler! The one-stop online class management<br className="max-[760px]:hidden" /> system that caters to all your educational needs!</p>
-          <Link className="inline-flex min-h-15 min-w-48.25 items-center justify-center rounded-lg bg-blue-500 font-medium text-white shadow-button transition duration-200 hover:-translate-y-px hover:bg-blue-400" href="#courses">Explore Courses</Link>
+          {/*Add navigation links here*/}
+          <Link className="inline-flex min-h-15 min-w-48.25 items-center justify-center rounded-lg bg-blue-500 font-medium text-white shadow-button transition duration-200 hover:-translate-y-px hover:bg-blue-400" href="/">Explore Courses</Link>
         </div>
         <div className="absolute bottom-[18%] right-0 w-113 max-[760px]:bottom-[3%] max-[760px]:-right-25 max-[760px]:w-90" aria-hidden="true">
           <Image
