@@ -246,10 +246,10 @@ function CourseLessonsSection({
                               className="h-5 w-[18px]"
                             />
                           </button>
-                          <button
-                            type="button"
+                          <Link
+                            href={`/admin/courses/${courseId || "1"}/lessons/${lesson.id}/edit`}
                             aria-label={`Edit ${lesson.name}`}
-                            className="rounded-md p-1.5 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:shadow-focus"
+                            className="rounded-md p-1.5 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:shadow-focus inline-flex items-center justify-center"
                           >
                             <Image
                               src="/edit.svg"
@@ -258,7 +258,7 @@ function CourseLessonsSection({
                               height={24}
                               className="size-5"
                             />
-                          </button>
+                          </Link>
                         </div>
                       </td>
                     </tr>
