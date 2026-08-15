@@ -17,7 +17,7 @@ export async function getSessionUser() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, is_active, full_name")
+    .select("id, role, is_active, full_name, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -45,7 +45,7 @@ export async function requireAdmin() {
     if (service) {
       const { data: admin } = await service
         .from("profiles")
-        .select("id, role, is_active, full_name")
+        .select("id, role, is_active, full_name, avatar_url")
         .eq("role", "admin")
         .eq("is_active", true)
         .limit(1)
