@@ -17,10 +17,15 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { registerGuest } from "@/lib/register-guest";
+import {
+  hasRegisterErrors,
+  todayIsoDate,
+  validateAll,
+  validateField,
+} from "@/lib/register-validation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const EMPTY_VALUES = {
   fullName: "",
@@ -30,63 +35,6 @@ const EMPTY_VALUES = {
   password: "",
   confirmPassword: "",
 };
-
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function validateField(name, values) {
-  const value = values[name].trim();
-
-  switch (name) {
-    case "fullName":
-      return value ? "" : "Please enter your name";
-    case "dob": {
-      if (!values.dob) {
-        return "Please enter your date of birth";
-      }
-      const dob = new Date(`${values.dob}T00:00:00`);
-      if (Number.isNaN(dob.getTime()) || values.dob > todayIsoDate()) {
-        return "Please enter a valid date of birth";
-      }
-      return "";
-    }
-    case "education":
-      return "";
-    case "email":
-      if (!value) {
-        return "Please enter your email";
-      }
-      return EMAIL_PATTERN.test(value) ? "" : "Please enter a valid email";
-    case "password":
-      if (!values.password) {
-        return "Please enter a password";
-      }
-      return values.password.length >= 6
-        ? ""
-        : "Password must be at least 6 characters";
-    case "confirmPassword":
-      if (!values.confirmPassword) {
-        return "Please confirm your password";
-      }
-      return values.confirmPassword === values.password
-        ? ""
-        : "Passwords do not match";
-    default:
-      return "";
-  }
-}
-
-function validateAll(values) {
-  return {
-    fullName: validateField("fullName", values),
-    dob: validateField("dob", values),
-    education: validateField("education", values),
-    email: validateField("email", values),
-    password: validateField("password", values),
-    confirmPassword: validateField("confirmPassword", values),
-  };
-}
 
 function ErrorMark() {
   return (
@@ -199,7 +147,7 @@ export function RegisterForm() {
     setErrors(nextErrors);
     setSubmitError("");
 
-    if (Object.values(nextErrors).some(Boolean)) {
+    if (hasRegisterErrors(nextErrors)) {
       return;
     }
 
@@ -207,27 +155,16 @@ export function RegisterForm() {
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signUp({
-        email: values.email.trim(),
-        password: values.password,
-        options: {
-          data: {
-            full_name: values.fullName.trim(),
-            date_of_birth: values.dob,
-            educational_background: values.education.trim(),
-          },
-        },
-      });
+      const result = await registerGuest(supabase, values);
 
-      if (error) {
-        setSubmitError(
-          error.message || "Registration failed. Please try again.",
-        );
+      if (result.errors) {
+        setErrors(result.errors);
         return;
       }
 
-      if (data.session) {
-        await supabase.auth.signOut();
+      if (result.error) {
+        setSubmitError(result.error);
+        return;
       }
 
       router.push("/login?registered=1");
