@@ -65,11 +65,7 @@ function NativeSelect({ id, value, error, className, children, ...props }) {
           value={value}
           aria-invalid={hasError || undefined}
           aria-describedby={hasError ? `${id}-error` : undefined}
-          className={cn(
-            selectClassName,
-            hasError && "pr-10",
-            className,
-          )}
+          className={cn(selectClassName, hasError && "pr-10", className)}
           {...props}
           style={
             hasError
@@ -191,7 +187,8 @@ function MenuSelect({
                       aria-selected={isSelected}
                       className={cn(
                         "flex w-full px-3 py-2 text-left text-body2 text-gray-900 hover:bg-blue-100",
-                        isSelected && "bg-blue-500 text-white hover:bg-blue-500",
+                        isSelected &&
+                          "bg-blue-500 text-white hover:bg-blue-500",
                       )}
                       onClick={() => {
                         onChange(option.id);
@@ -402,11 +399,14 @@ export default function AssignmentForm() {
         id="assignment-form"
         onSubmit={handleSubmit}
         noValidate
-        className="m-10 rounded-2xl border border-gray-300 bg-white p-10 shadow-card"
+        className="m-10 rounded-2xl bg-white p-5 shadow-card"
       >
         <div className="grid grid-cols-2 gap-x-10 gap-y-8">
           <div className="col-span-2">
-            <label htmlFor="assignment-course" className="mb-1.5 block text-body2">
+            <label
+              htmlFor="assignment-course"
+              className="mb-1.5 block text-body2"
+            >
               Course
             </label>
             <MenuSelect
@@ -425,7 +425,10 @@ export default function AssignmentForm() {
           </div>
 
           <div>
-            <label htmlFor="assignment-lesson" className="mb-1.5 block text-body2">
+            <label
+              htmlFor="assignment-lesson"
+              className="mb-1.5 block text-body2"
+            >
               Lesson
             </label>
             <MenuSelect
@@ -445,7 +448,10 @@ export default function AssignmentForm() {
           </div>
 
           <div>
-            <label htmlFor="assignment-sub-lesson" className="mb-1.5 block text-body2">
+            <label
+              htmlFor="assignment-sub-lesson"
+              className="mb-1.5 block text-body2"
+            >
               Sub-lesson
             </label>
             <MenuSelect
@@ -471,7 +477,10 @@ export default function AssignmentForm() {
 
         <div className="grid max-w-3xl gap-8">
           <div>
-            <label htmlFor="assignment-title" className="mb-1.5 block text-body2">
+            <label
+              htmlFor="assignment-title"
+              className="mb-1.5 block text-body2"
+            >
               Assignment <span className="text-orange-500">*</span>
             </label>
             <div>
@@ -480,7 +489,9 @@ export default function AssignmentForm() {
                   id="assignment-title"
                   value={form.title}
                   aria-invalid={errors.title ? true : undefined}
-                  aria-describedby={errors.title ? "assignment-title-error" : undefined}
+                  aria-describedby={
+                    errors.title ? "assignment-title-error" : undefined
+                  }
                   onChange={(event) => setField("title", event.target.value)}
                   className={cn(
                     "h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100",
@@ -515,7 +526,10 @@ export default function AssignmentForm() {
           </label>
 
           <div>
-            <label htmlFor="assignment-submission" className="mb-1.5 block text-body2">
+            <label
+              htmlFor="assignment-submission"
+              className="mb-1.5 block text-body2"
+            >
               Submission
             </label>
             <NativeSelect
