@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronDown, CircleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { createAdminAssignment } from "@/lib/admin-assignments";
@@ -10,8 +11,11 @@ import {
   getAdminCourseLessons,
   getAdminLessonDetail,
 } from "@/lib/admin-courses";
+import { validateAssignmentFields } from "@/lib/assignment-validation";
 import { getCourses } from "@/lib/courses";
 import { cn } from "@/lib/utils";
+
+const ERROR_COLOR = "#9B2C6B";
 
 const FILE_TYPE_OPTIONS = [
   { id: "pdf", label: "PDF" },
@@ -35,15 +39,176 @@ const INITIAL_FORM = {
 const selectClassName =
   "h-12 w-full rounded-lg border border-gray-400 bg-white px-3 text-body2 outline-none focus:border-orange-100 disabled:bg-gray-100 disabled:text-gray-500";
 
-function NativeSelect({ value, className, children, ...props }) {
+function FieldError({ id, message }) {
+  if (!message) return null;
+
   return (
-    <select
-      value={value}
-      className={cn(selectClassName, !value && "text-gray-500", className)}
-      {...props}
+    <p
+      id={id}
+      className="mt-1.5 text-body4"
+      style={{ color: ERROR_COLOR }}
+      role="alert"
     >
-      {children}
-    </select>
+      {message}
+    </p>
+  );
+}
+
+function NativeSelect({ id, value, error, className, children, ...props }) {
+  const hasError = Boolean(error);
+
+  return (
+    <div>
+      <div className="relative">
+        <select
+          id={id}
+          value={value}
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
+          className={cn(
+            selectClassName,
+            hasError && "pr-10",
+            className,
+          )}
+          {...props}
+          style={
+            hasError
+              ? { borderColor: ERROR_COLOR, boxShadow: "none" }
+              : undefined
+          }
+        >
+          {children}
+        </select>
+        {hasError ? (
+          <CircleAlert
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2"
+            style={{ color: ERROR_COLOR }}
+          />
+        ) : null}
+      </div>
+      <FieldError id={`${id}-error`} message={error} />
+    </div>
+  );
+}
+
+function MenuSelect({
+  id,
+  value,
+  placeholder,
+  options,
+  disabled = false,
+  error,
+  open,
+  onOpenChange,
+  onChange,
+}) {
+  const hasError = Boolean(error);
+  const menuRef = useRef(null);
+  const selected = options.find((option) => option.id === value);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handleOutsideClick(event) {
+      if (!menuRef.current?.contains(event.target)) {
+        onOpenChange(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") onOpenChange(false);
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={menuRef}>
+      <div className="relative">
+        <button
+          type="button"
+          id={id}
+          disabled={disabled}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? `${id}-error` : undefined}
+          onClick={() => {
+            if (!disabled) onOpenChange(!open);
+          }}
+          className={cn(
+            "relative flex h-12 w-full items-center rounded-lg border bg-white px-3 text-left text-body2 outline-none",
+            hasError ? "pr-16" : "pr-12",
+            disabled
+              ? "cursor-not-allowed bg-gray-100 text-gray-500"
+              : "focus:border-orange-100",
+            !disabled && open ? "border-orange-100" : "border-gray-400",
+          )}
+          style={
+            hasError
+              ? { borderColor: ERROR_COLOR, boxShadow: "none" }
+              : undefined
+          }
+        >
+          <span className={selected ? "text-gray-900" : "text-gray-500"}>
+            {selected ? selected.label : placeholder}
+          </span>
+          <ChevronDown
+            aria-hidden
+            className="pointer-events-none absolute right-4 size-4 text-gray-500"
+          />
+          {hasError ? (
+            <CircleAlert
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 right-10 size-5 -translate-y-1/2"
+              style={{ color: ERROR_COLOR }}
+            />
+          ) : null}
+        </button>
+
+        {open ? (
+          <ul
+            role="listbox"
+            aria-labelledby={id}
+            className="absolute z-20 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white py-1 shadow-card"
+          >
+            {options.length === 0 ? (
+              <li className="px-3 py-2 text-body2 text-gray-700">No options</li>
+            ) : (
+              options.map((option) => {
+                const isSelected = option.id === value;
+                return (
+                  <li key={option.id} role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      className={cn(
+                        "flex w-full px-3 py-2 text-left text-body2 text-gray-900 hover:bg-blue-100",
+                        isSelected && "bg-blue-500 text-white hover:bg-blue-500",
+                      )}
+                      onClick={() => {
+                        onChange(option.id);
+                        onOpenChange(false);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        ) : null}
+      </div>
+      <FieldError id={`${id}-error`} message={error} />
+    </div>
   );
 }
 
@@ -53,8 +218,10 @@ export default function AssignmentForm() {
   const [courses, setCourses] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [subLessons, setSubLessons] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openMenu, setOpenMenu] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,8 +281,23 @@ export default function AssignmentForm() {
     };
   }, [form.courseId, form.lessonId]);
 
+  function clearErrors(...fields) {
+    setErrors((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const field of fields) {
+        if (next[field]) {
+          delete next[field];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }
+
   function setField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+    clearErrors(field);
   }
 
   function handleCourseChange(courseId) {
@@ -126,6 +308,8 @@ export default function AssignmentForm() {
       subLessonId: "",
     }));
     setSubLessons([]);
+    setOpenMenu(null);
+    clearErrors("courseId", "lessonId", "subLessonId");
   }
 
   function handleLessonChange(lessonId) {
@@ -134,6 +318,8 @@ export default function AssignmentForm() {
       lessonId,
       subLessonId: "",
     }));
+    setOpenMenu(null);
+    clearErrors("lessonId", "subLessonId");
   }
 
   function handleSubmissionTypeChange(submissionType) {
@@ -143,6 +329,7 @@ export default function AssignmentForm() {
       allowedFileTypes: [],
       maxFileSizeMb: 20,
     }));
+    clearErrors("allowedFileTypes");
   }
 
   function toggleFileType(typeId) {
@@ -152,21 +339,19 @@ export default function AssignmentForm() {
         : [...current.allowedFileTypes, typeId];
       return { ...current, allowedFileTypes };
     });
+    clearErrors("allowedFileTypes");
+  }
+
+  function validate() {
+    const nextErrors = validateAssignmentFields(form);
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setErrorMessage("");
-
-    if (!form.courseId || !form.lessonId || !form.subLessonId || !form.title.trim()) {
-      setErrorMessage("Please fill out all required fields.");
-      return;
-    }
-
-    if (form.submissionType === "file" && form.allowedFileTypes.length === 0) {
-      setErrorMessage("Select at least one allowed file type.");
-      return;
-    }
+    setSubmitError("");
+    if (!validate()) return;
 
     setIsSubmitting(true);
     try {
@@ -185,13 +370,14 @@ export default function AssignmentForm() {
       router.push("/admin/assignments");
       router.refresh();
     } catch (error) {
-      setErrorMessage(error.message);
+      setSubmitError(error.message);
     } finally {
       setIsSubmitting(false);
     }
   }
 
   const showFileFields = form.submissionType === "file";
+  const allowedFilesError = errors.allowedFileTypes;
 
   return (
     <main className="flex min-h-full flex-col">
@@ -215,58 +401,68 @@ export default function AssignmentForm() {
       <form
         id="assignment-form"
         onSubmit={handleSubmit}
+        noValidate
         className="m-10 rounded-2xl border border-gray-300 bg-white p-10 shadow-card"
       >
         <div className="grid grid-cols-2 gap-x-10 gap-y-8">
-          <label className="col-span-2 block">
-            <span className="mb-1.5 block text-body2">Course</span>
-            <NativeSelect
-              required
+          <div className="col-span-2">
+            <label htmlFor="assignment-course" className="mb-1.5 block text-body2">
+              Course
+            </label>
+            <MenuSelect
+              id="assignment-course"
               value={form.courseId}
-              onChange={(event) => handleCourseChange(event.target.value)}
-            >
-              <option value="">Select course</option>
-              {courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.title}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
+              placeholder="Select course"
+              error={errors.courseId}
+              open={openMenu === "course"}
+              onOpenChange={(open) => setOpenMenu(open ? "course" : null)}
+              onChange={handleCourseChange}
+              options={courses.map((course) => ({
+                id: course.id,
+                label: course.title,
+              }))}
+            />
+          </div>
 
-          <label className="block">
-            <span className="mb-1.5 block text-body2">Lesson</span>
-            <NativeSelect
-              required
+          <div>
+            <label htmlFor="assignment-lesson" className="mb-1.5 block text-body2">
+              Lesson
+            </label>
+            <MenuSelect
+              id="assignment-lesson"
               disabled={!form.courseId}
               value={form.lessonId}
-              onChange={(event) => handleLessonChange(event.target.value)}
-            >
-              <option value="">Select lesson</option>
-              {lessons.map((lesson) => (
-                <option key={lesson.id} value={lesson.id}>
-                  {lesson.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
+              placeholder="Select lesson"
+              error={errors.lessonId}
+              open={openMenu === "lesson"}
+              onOpenChange={(open) => setOpenMenu(open ? "lesson" : null)}
+              onChange={handleLessonChange}
+              options={lessons.map((lesson) => ({
+                id: lesson.id,
+                label: lesson.name,
+              }))}
+            />
+          </div>
 
-          <label className="block">
-            <span className="mb-1.5 block text-body2">Sub-lesson</span>
-            <NativeSelect
-              required
+          <div>
+            <label htmlFor="assignment-sub-lesson" className="mb-1.5 block text-body2">
+              Sub-lesson
+            </label>
+            <MenuSelect
+              id="assignment-sub-lesson"
               disabled={!form.lessonId}
               value={form.subLessonId}
-              onChange={(event) => setField("subLessonId", event.target.value)}
-            >
-              <option value="">Select sub-lesson</option>
-              {subLessons.map((subLesson) => (
-                <option key={subLesson.id} value={subLesson.id}>
-                  {subLesson.title}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
+              placeholder="Select sub-lesson"
+              error={errors.subLessonId}
+              open={openMenu === "sub-lesson"}
+              onOpenChange={(open) => setOpenMenu(open ? "sub-lesson" : null)}
+              onChange={(subLessonId) => setField("subLessonId", subLessonId)}
+              options={subLessons.map((subLesson) => ({
+                id: subLesson.id,
+                label: subLesson.title,
+              }))}
+            />
+          </div>
         </div>
 
         <hr className="my-10 border-gray-300" />
@@ -274,17 +470,39 @@ export default function AssignmentForm() {
         <h2 className="mb-8 text-headline3">Assignment detail</h2>
 
         <div className="grid max-w-3xl gap-8">
-          <label className="block">
-            <span className="mb-1.5 block text-body2">
+          <div>
+            <label htmlFor="assignment-title" className="mb-1.5 block text-body2">
               Assignment <span className="text-orange-500">*</span>
-            </span>
-            <input
-              required
-              value={form.title}
-              onChange={(event) => setField("title", event.target.value)}
-              className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100"
-            />
-          </label>
+            </label>
+            <div>
+              <div className="relative">
+                <input
+                  id="assignment-title"
+                  value={form.title}
+                  aria-invalid={errors.title ? true : undefined}
+                  aria-describedby={errors.title ? "assignment-title-error" : undefined}
+                  onChange={(event) => setField("title", event.target.value)}
+                  className={cn(
+                    "h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100",
+                    errors.title && "pr-10",
+                  )}
+                  style={
+                    errors.title
+                      ? { borderColor: ERROR_COLOR, boxShadow: "none" }
+                      : undefined
+                  }
+                />
+                {errors.title ? (
+                  <CircleAlert
+                    aria-hidden
+                    className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2"
+                    style={{ color: ERROR_COLOR }}
+                  />
+                ) : null}
+              </div>
+              <FieldError id="assignment-title-error" message={errors.title} />
+            </div>
+          </div>
 
           <label className="block">
             <span className="mb-1.5 block text-body2">Description</span>
@@ -296,9 +514,12 @@ export default function AssignmentForm() {
             />
           </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-body2">Submission</span>
+          <div>
+            <label htmlFor="assignment-submission" className="mb-1.5 block text-body2">
+              Submission
+            </label>
             <NativeSelect
+              id="assignment-submission"
               value={form.submissionType}
               onChange={(event) =>
                 handleSubmissionTypeChange(event.target.value)
@@ -308,33 +529,54 @@ export default function AssignmentForm() {
               <option value="file">File upload</option>
               <option value="url">URL</option>
             </NativeSelect>
-          </label>
+          </div>
 
           {showFileFields ? (
             <>
               <fieldset>
                 <legend className="mb-3 text-body2">Allowed files</legend>
-                <div className="flex flex-wrap gap-8">
-                  {FILE_TYPE_OPTIONS.map((option) => (
-                    <label
-                      key={option.id}
-                      className="flex cursor-pointer items-center gap-3 text-gray-800"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.allowedFileTypes.includes(option.id)}
-                        onChange={() => toggleFileType(option.id)}
-                        className="size-5 accent-blue-500"
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
+                <div
+                  className="relative rounded-lg border px-4 py-3"
+                  style={
+                    allowedFilesError
+                      ? { borderColor: ERROR_COLOR }
+                      : { borderColor: "transparent" }
+                  }
+                >
+                  <div className="flex flex-wrap gap-8 pr-10">
+                    {FILE_TYPE_OPTIONS.map((option) => (
+                      <label
+                        key={option.id}
+                        className="flex cursor-pointer items-center gap-3 text-gray-800"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.allowedFileTypes.includes(option.id)}
+                          onChange={() => toggleFileType(option.id)}
+                          className="size-5 accent-blue-500"
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {allowedFilesError ? (
+                    <CircleAlert
+                      aria-hidden
+                      className="pointer-events-none absolute top-3 right-3 size-5"
+                      style={{ color: ERROR_COLOR }}
+                    />
+                  ) : null}
                 </div>
+                <FieldError
+                  id="assignment-allowed-files-error"
+                  message={allowedFilesError}
+                />
               </fieldset>
 
               <label className="block max-w-xs">
                 <span className="mb-1.5 block text-body2">Max file size</span>
                 <NativeSelect
+                  id="assignment-max-size"
                   value={String(form.maxFileSizeMb)}
                   onChange={(event) =>
                     setField("maxFileSizeMb", Number(event.target.value))
@@ -351,9 +593,13 @@ export default function AssignmentForm() {
           ) : null}
         </div>
 
-        {errorMessage ? (
-          <p role="alert" className="mt-6 text-body2 text-orange-500">
-            {errorMessage}
+        {submitError ? (
+          <p
+            role="alert"
+            className="mt-6 text-body2"
+            style={{ color: ERROR_COLOR }}
+          >
+            {submitError}
           </p>
         ) : null}
       </form>
