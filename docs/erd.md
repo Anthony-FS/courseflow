@@ -111,6 +111,9 @@ erDiagram
     uuid sub_lesson_id FK
     string title
     text description
+    string submission_type
+    string[] allowed_file_types
+    int max_file_size_mb
     timestamptz start_at
     timestamptz end_at
   }
@@ -177,6 +180,21 @@ erDiagram
 
 Sub-lesson **count** in the UI is derived from child `sub_lessons` rows (not stored on `lessons`). Creating a course from today’s UI inserts lesson rows only; sub-lessons are added later via a sub-lesson editor.
 
+## Form ↔ tables (Add Assignment)
+
+| Add Assignment form field | Table.column |
+| ------------------------- | ------------ |
+| Course | `assignments.course_id` |
+| Lesson | used to pick a sub-lesson; not stored |
+| Sub-lesson | `assignments.sub_lesson_id` |
+| Assignment | `assignments.title` |
+| Description (optional) | `assignments.description` |
+| Submission | `assignments.submission_type` (`text` \| `file` \| `url`) |
+| Allowed files | `assignments.allowed_file_types` (`pdf`, `doc`, `image`; null unless `file`) |
+| Max file size | `assignments.max_file_size_mb` (5 / 10 / 20 / 50; null unless `file`) |
+
+A sub-lesson may have many assignments. `start_at` and `end_at` stay unused by this form.
+
 ## Design rules
 
 - `profiles.id` = `auth.users.id`.
@@ -190,7 +208,8 @@ Sub-lesson **count** in the UI is derived from child `sub_lessons` rows (not sto
 - A course has many **lessons**; each lesson has many **sub_lessons**. `sub_lessons.course_id` is kept for convenient course-scoped queries.
 - Sub-lesson samples: `sub_lessons.is_preview`. Full sub-lesson content is gated by enrollment in app logic.
 - `materials.content` holds text (or HTML) when the item is not a file. `file_url` / `file_type` stay for PDF, video, and images; unused columns stay null.
-- Overdue assignment status is computed from `assignments.end_at`, not stored.
+- Assignment `submission_type` is `text` | `file` | `url`. `allowed_file_types` (`pdf`, `doc`, `image`) and `max_file_size_mb` (5 / 10 / 20 / 50) are set only for `file`; otherwise both stay null. A sub-lesson may have many assignments.
+- Overdue assignment status is computed from `assignments.end_at`, not stored. The Add Assignment form does not set `start_at` or `end_at`.
 - Analytics are queries over enrollments / progress / submissions — no extra fact table.
 
 ## Cardinality
