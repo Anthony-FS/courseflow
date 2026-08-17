@@ -399,7 +399,7 @@ export default function AssignmentForm() {
         id="assignment-form"
         onSubmit={handleSubmit}
         noValidate
-        className="m-10 rounded-2xl bg-white p-5 shadow-card"
+        className="m-10 rounded-2xl bg-white px-10 py-5 shadow-card"
       >
         <div className="grid grid-cols-2 gap-x-10 gap-y-8">
           <div className="col-span-2">
