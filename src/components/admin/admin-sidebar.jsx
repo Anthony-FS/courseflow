@@ -43,7 +43,7 @@ export function AdminSidebar() {
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-300 bg-white">
       <header className="px-6 pt-10 pb-8">
-        <Link href="/admin" aria-label="CourseFlow admin home">
+        <Link href="/admin/courses" aria-label="CourseFlow admin home">
           <Image
             src="/courseflow-logo.svg"
             alt="CourseFlow"
