@@ -1,14 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useParams, usePathname } from "next/navigation";
-import { ArrowLeft, Plus, X, Play, Loader2 } from "lucide-react";
+import { useRouter, useParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  Play,
+  Loader2,
+  FileText,
+  Paperclip,
+  Eye,
+  Check,
+} from "lucide-react";
 import ConfirmationModal from "./confirmation-modal";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import {
   uploadAdminFile,
   createAdminLesson,
-  getAdminLessonDetail,
   updateAdminLesson,
   deleteAdminLesson,
 } from "@/lib/admin-courses";
@@ -73,15 +82,21 @@ export default function LessonForm({
   // Form State
   const [lessonName, setLessonName] = useState(initialData?.name || "");
   const [subLessons, setSubLessons] = useState(
-    initialData?.subLessons || [
-      {
-        id: Date.now(),
-        title: "",
-        videoUrl: null,
-        videoFile: null,
-        videoName: "",
-      },
-    ],
+    () =>
+      initialData?.subLessons || [
+        {
+          id: "sub-initial-1",
+          title: "",
+          description: "",
+          videoUrl: null,
+          videoFile: null,
+          videoName: "",
+          attachmentUrl: null,
+          attachmentFile: null,
+          attachmentName: "",
+          isPreview: false,
+        },
+      ],
   );
 
   const [errors, setErrors] = useState({});
@@ -105,33 +120,11 @@ export default function LessonForm({
       window.removeEventListener("touchend", clearAllowDrag);
     };
   }, []);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-
-  function leaveForm() {
-    if (isNewCourseFlow) {
-      router.push("/admin/courses/new");
-      return;
-    }
-    router.back();
-  }
-
-  useEffect(() => {
-    function clearAllowDrag() {
-      if (!isDraggingRef.current) {
-        allowDragRef.current = false;
-      }
-    }
-
-    window.addEventListener("mouseup", clearAllowDrag);
-    window.addEventListener("touchend", clearAllowDrag);
-    return () => {
-      window.removeEventListener("mouseup", clearAllowDrag);
-      window.removeEventListener("touchend", clearAllowDrag);
-    };
-  }, []);
 
   // Sub-lesson Handlers
   const handleAddSubLesson = () => {
@@ -140,9 +133,14 @@ export default function LessonForm({
       {
         id: Date.now() + Math.random(),
         title: "",
+        description: "",
         videoUrl: null,
         videoFile: null,
         videoName: "",
+        attachmentUrl: null,
+        attachmentFile: null,
+        attachmentName: "",
+        isPreview: false,
       },
     ]);
   };
@@ -174,6 +172,18 @@ export default function LessonForm({
     setSubLessons(updated);
   };
 
+  const handleSubLessonDescriptionChange = (index, value) => {
+    const updated = [...subLessons];
+    updated[index].description = value;
+    setSubLessons(updated);
+  };
+
+  const handleTogglePreview = (index) => {
+    const updated = [...subLessons];
+    updated[index].isPreview = !updated[index].isPreview;
+    setSubLessons(updated);
+  };
+
   const handleVideoUpload = (index, file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -192,9 +202,25 @@ export default function LessonForm({
     setSubLessons(updated);
   };
 
+  const handleAttachmentUpload = (index, file) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const updated = [...subLessons];
+    updated[index].attachmentFile = file;
+    updated[index].attachmentUrl = url;
+    updated[index].attachmentName = file.name;
+    setSubLessons(updated);
+  };
+
+  const handleRemoveAttachment = (index) => {
+    const updated = [...subLessons];
+    updated[index].attachmentFile = null;
+    updated[index].attachmentUrl = null;
+    updated[index].attachmentName = "";
+    setSubLessons(updated);
+  };
+
   function handleDragHandleMouseDown(event) {
-    // Mark that this gesture started on the 6-dot icon.
-    // dragstart's event.target is the tile (draggable element), not the handle.
     event.stopPropagation();
     allowDragRef.current = true;
   }
@@ -267,43 +293,39 @@ export default function LessonForm({
     setSubmitError("");
 
     try {
-      if (isNewCourseFlow) {
-        const lesson = {
-          id: crypto.randomUUID(),
-          name: lessonName.trim(),
-          subLessons: subLessons.length,
-        };
-        if (draftContent?.addLesson) {
-          draftContent.addLesson(lesson);
-        } else if (draftContent?.setDraft) {
-          draftContent.setDraft((current) => ({
-            ...current,
-            lessons: [...current.lessons, lesson],
-          }));
-        }
-        router.push("/admin/courses/new");
-        return;
-      }
-
-      // 1. Upload any newly selected video files to Supabase Storage
+      // 1. Upload any newly selected video or attachment files to Supabase Storage
       const preparedSubLessons = await Promise.all(
         subLessons.map(async (sub) => {
+          let finalVideoUrl = sub.videoUrl || null;
+          let finalVideoName = sub.videoName || "";
+          let finalAttachmentUrl = sub.attachmentUrl || null;
+          let finalAttachmentName = sub.attachmentName || "";
+
           if (sub.videoFile) {
             const uploadRes = await uploadAdminFile("trailer", sub.videoFile);
-            return {
-              title: sub.title.trim(),
-              videoUrl: uploadRes.fileUrl,
-              videoName: uploadRes.name || sub.videoName,
-              isPreview: sub.isPreview || false,
-            };
+            finalVideoUrl = uploadRes.fileUrl;
+            finalVideoName = uploadRes.name || sub.videoName;
           }
+
+          if (sub.attachmentFile) {
+            const uploadRes = await uploadAdminFile(
+              "attachment",
+              sub.attachmentFile,
+            );
+            finalAttachmentUrl = uploadRes.fileUrl;
+            finalAttachmentName = uploadRes.name || sub.attachmentName;
+          }
+
           return {
             title: sub.title.trim(),
-            videoUrl: sub.videoUrl || null,
-            videoName: sub.videoName || "",
-            isPreview: sub.isPreview || false,
+            description: sub.description ? sub.description.trim() : "",
+            videoUrl: finalVideoUrl,
+            videoName: finalVideoName,
+            attachmentUrl: finalAttachmentUrl,
+            attachmentName: finalAttachmentName,
+            isPreview: Boolean(sub.isPreview),
           };
-        })
+        }),
       );
 
       const payload = {
@@ -415,6 +437,7 @@ export default function LessonForm({
             <input
               type="text"
               value={lessonName}
+              placeholder="e.g. Introduction to Service Design"
               onChange={(e) => {
                 setLessonName(e.target.value);
                 if (errors.lessonName)
@@ -435,9 +458,14 @@ export default function LessonForm({
 
           {/* Sub-Lesson Section */}
           <div>
-            <h2 className="text-base font-bold text-[#646D89] mb-6">
-              Sub-Lesson
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-base font-bold text-[#646D89]">
+                Sub-Lessons
+              </h2>
+              <span className="text-xs text-[#9AA1B9] font-medium">
+                {subLessons.length} {subLessons.length === 1 ? "lesson" : "lessons"}
+              </span>
+            </div>
 
             {/* Sub-lesson Cards List */}
             <div
@@ -457,7 +485,7 @@ export default function LessonForm({
                     onDragOver={(event) => handleDragOver(event, index)}
                     onDragEnd={handleDragEnd}
                     className={cn(
-                      "sub-lesson-tile bg-[#F8F9FD] border border-[#E4E6ED] rounded-2xl p-6 sm:p-8 relative",
+                      "sub-lesson-tile bg-[#F8F9FD] border border-[#E4E6ED] rounded-2xl p-6 sm:p-8 relative transition-shadow hover:shadow-xs",
                       isDragging && !isLifted && "opacity-70",
                       isLifted && "sub-lesson-tile--dragging",
                     )}
@@ -468,7 +496,7 @@ export default function LessonForm({
                         data-drag-handle
                         onMouseDown={handleDragHandleMouseDown}
                         onTouchStart={handleDragHandleMouseDown}
-                        className="pt-2 text-[#C8CCDB] cursor-grab active:cursor-grabbing select-none shrink-0"
+                        className="pt-2.5 text-[#C8CCDB] hover:text-[#9AA1B9] cursor-grab active:cursor-grabbing select-none shrink-0"
                         aria-label={`Reorder sub-lesson ${index + 1}`}
                       >
                         <svg
@@ -479,41 +507,68 @@ export default function LessonForm({
                           xmlns="http://www.w3.org/2000/svg"
                           aria-hidden="true"
                         >
-                          <circle cx="3" cy="3" r="1.5" fill="#C8CCDB" />
-                          <circle cx="9" cy="3" r="1.5" fill="#C8CCDB" />
-                          <circle cx="3" cy="9" r="1.5" fill="#C8CCDB" />
-                          <circle cx="9" cy="9" r="1.5" fill="#C8CCDB" />
-                          <circle cx="3" cy="15" r="1.5" fill="#C8CCDB" />
-                          <circle cx="9" cy="15" r="1.5" fill="#C8CCDB" />
+                          <circle cx="3" cy="3" r="1.5" fill="currentColor" />
+                          <circle cx="9" cy="3" r="1.5" fill="currentColor" />
+                          <circle cx="3" cy="9" r="1.5" fill="currentColor" />
+                          <circle cx="9" cy="9" r="1.5" fill="currentColor" />
+                          <circle cx="3" cy="15" r="1.5" fill="currentColor" />
+                          <circle cx="9" cy="15" r="1.5" fill="currentColor" />
                         </svg>
                       </div>
 
                       {/* Sub-Lesson Inputs */}
-                      <div className="flex-1">
-                        {/* Top Row: Label & Delete Button */}
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="block text-sm font-medium text-[#2A2E3F]">
-                            Sub-lesson name *
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSubLesson(index)}
-                            disabled={subLessons.length <= 1}
-                            className={`text-sm font-semibold transition-colors ${
-                              subLessons.length <= 1
-                                ? "text-[#C8CCDB] cursor-not-allowed"
-                                : "text-[#9AA1B9] hover:text-[#F47E20] cursor-pointer"
-                            }`}
-                          >
-                            Delete
-                          </button>
+                      <div className="flex-1 space-y-6">
+                        {/* Top Row: Label, Free Preview Toggle & Delete Button */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#E2E8F5] text-[#2F5FAC] text-xs font-bold">
+                              {index + 1}
+                            </span>
+                            <label className="block text-sm font-semibold text-[#2A2E3F]">
+                              Sub-lesson name *
+                            </label>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            {/* Free Preview Toggle */}
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePreview(index)}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border",
+                                sub.isPreview
+                                  ? "bg-[#E6F4EA] text-[#137333] border-[#CEEAD6]"
+                                  : "bg-white text-[#646D89] border-[#D6D9E4] hover:bg-[#F1F3F9]",
+                              )}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>
+                                {sub.isPreview ? "Free Preview ON" : "Free Preview OFF"}
+                              </span>
+                            </button>
+
+                            {/* Delete Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSubLesson(index)}
+                              disabled={subLessons.length <= 1}
+                              className={`text-sm font-semibold transition-colors ${
+                                subLessons.length <= 1
+                                  ? "text-[#C8CCDB] cursor-not-allowed"
+                                  : "text-[#9AA1B9] hover:text-[#9B2C6B] cursor-pointer"
+                              }`}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
 
                         {/* Sub-lesson Name Input */}
-                        <div className="max-w-[420px]">
+                        <div>
                           <input
                             type="text"
                             value={sub.title}
+                            placeholder="e.g. What is Service Design?"
                             onChange={(e) => {
                               handleSubLessonTitleChange(index, e.target.value);
                               if (errors[`subLessonTitle_${index}`]) {
@@ -536,48 +591,108 @@ export default function LessonForm({
                           )}
                         </div>
 
-                        {/* Video Upload Section */}
-                        <div className="mt-6">
-                          <label className="block text-sm font-medium text-[#2A2E3F] mb-3">
-                            Video *
+                        {/* Text Content / Description Area */}
+                        <div>
+                          <label className="block text-sm font-medium text-[#2A2E3F] mb-2 flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-[#646D89]" />
+                            <span>Lesson Content / Description (Optional)</span>
                           </label>
+                          <textarea
+                            rows={3}
+                            value={sub.description || ""}
+                            placeholder="Write lesson notes, key takeaways, summary, or reading materials..."
+                            onChange={(e) =>
+                              handleSubLessonDescriptionChange(index, e.target.value)
+                            }
+                            className="w-full p-3.5 bg-white rounded-lg border border-[#D6D9E4] focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F] resize-y"
+                          />
+                        </div>
 
-                          {sub.videoUrl ? (
-                            <div className="relative w-36 h-36 bg-black rounded-2xl overflow-hidden group border border-[#D6D9E4] flex items-center justify-center shadow-xs">
-                              <video
-                                src={sub.videoUrl}
-                                className="w-full h-full object-cover opacity-80"
-                              />
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                <div className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                                  <Play className="w-5 h-5 text-[#2F5FAC] fill-[#2F5FAC] ml-0.5" />
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveVideo(index)}
-                                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F47E20] text-white flex items-center justify-center hover:bg-[#d66b16] transition-colors shadow-xs"
-                                title="Remove Video"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <label className="w-36 h-36 rounded-2xl bg-[#EEF1F7] hover:bg-[#E2E8F5] flex flex-col items-center justify-center cursor-pointer transition-colors group">
-                              <input
-                                type="file"
-                                accept="video/*"
-                                className="hidden"
-                                onChange={(e) =>
-                                  handleVideoUpload(index, e.target.files[0])
-                                }
-                              />
-                              <Plus className="w-6 h-6 text-[#2F5FAC] stroke-[2.5]" />
-                              <span className="text-xs font-semibold text-[#2F5FAC] mt-2">
-                                Upload Video
-                              </span>
+                        {/* Media & Attachments Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                          {/* Video Upload Section */}
+                          <div>
+                            <label className="block text-sm font-medium text-[#2A2E3F] mb-3">
+                              Video *
                             </label>
-                          )}
+
+                            {sub.videoUrl ? (
+                              <div className="relative w-full max-w-[240px] h-36 bg-black rounded-2xl overflow-hidden group border border-[#D6D9E4] flex items-center justify-center shadow-xs">
+                                <video
+                                  src={sub.videoUrl}
+                                  className="w-full h-full object-cover opacity-80"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <div className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                                    <Play className="w-5 h-5 text-[#2F5FAC] fill-[#2F5FAC] ml-0.5" />
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveVideo(index)}
+                                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F47E20] text-white flex items-center justify-center hover:bg-[#d66b16] transition-colors shadow-xs cursor-pointer"
+                                  title="Remove Video"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="w-full max-w-[240px] h-36 rounded-2xl bg-[#EEF1F7] hover:bg-[#E2E8F5] flex flex-col items-center justify-center cursor-pointer transition-colors group border border-dashed border-[#C8CCDB]">
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    handleVideoUpload(index, e.target.files[0])
+                                  }
+                                />
+                                <Plus className="w-6 h-6 text-[#2F5FAC] stroke-[2.5]" />
+                                <span className="text-xs font-semibold text-[#2F5FAC] mt-2">
+                                  Upload Video
+                                </span>
+                              </label>
+                            )}
+                          </div>
+
+                          {/* Supplementary Attachment (PDF / Document) */}
+                          <div>
+                            <label className="block text-sm font-medium text-[#2A2E3F] mb-3 flex items-center gap-1.5">
+                              <Paperclip className="w-4 h-4 text-[#646D89]" />
+                              <span>Attachment (PDF, Doc, ZIP)</span>
+                            </label>
+
+                            {sub.attachmentUrl ? (
+                              <div className="flex items-center justify-between p-3.5 bg-white border border-[#D6D9E4] rounded-xl max-w-sm">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <Paperclip className="w-4 h-4 text-[#2F5FAC] shrink-0" />
+                                  <span className="text-xs font-medium text-[#2A2E3F] truncate">
+                                    {sub.attachmentName || "Attached File"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveAttachment(index)}
+                                  className="text-[#9AA1B9] hover:text-[#9B2C6B] transition-colors p-1 cursor-pointer"
+                                  title="Remove Attachment"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#C8CCDB] bg-white hover:bg-[#F6F7FC] text-[#646D89] text-xs font-medium cursor-pointer transition-colors max-w-xs">
+                                <input
+                                  type="file"
+                                  accept=".pdf,.doc,.docx,.zip,.png,.jpg"
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    handleAttachmentUpload(index, e.target.files[0])
+                                  }
+                                />
+                                <Paperclip className="w-4 h-4 text-[#2F5FAC]" />
+                                <span>Attach supplementary material</span>
+                              </label>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
