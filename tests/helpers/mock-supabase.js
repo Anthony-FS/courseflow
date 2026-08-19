@@ -55,6 +55,11 @@ export function createMockSupabase({
 
         return chain;
       },
+      update() {
+        return {
+          eq: async () => ({ error: null }),
+        };
+      },
       delete() {
         return {
           eq: async () => ({ error: null }),

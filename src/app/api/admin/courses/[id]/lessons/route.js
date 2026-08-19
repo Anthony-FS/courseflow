@@ -173,6 +173,7 @@ export async function POST(request, { params }) {
         course_id: courseId,
         lesson_id: lesson.id,
         title: String(sub.title).trim(),
+        description: sub.description ? String(sub.description).trim() : null,
         sort_order: i + 1,
         is_preview: Boolean(sub.isPreview),
       })
@@ -190,6 +191,16 @@ export async function POST(request, { params }) {
         name: String(sub.videoName || `${sub.title} Video`).trim(),
         file_url: String(sub.videoUrl),
         file_type: "video/mp4",
+      });
+    }
+
+    if (sub.attachmentUrl) {
+      await supabase.from("materials").insert({
+        course_id: courseId,
+        sub_lesson_id: subLesson.id,
+        name: String(sub.attachmentName || `${sub.title} Attachment`).trim(),
+        file_url: String(sub.attachmentUrl),
+        file_type: String(sub.attachmentType || "application/pdf"),
       });
     }
   }
