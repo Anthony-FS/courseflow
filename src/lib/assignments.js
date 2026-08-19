@@ -66,22 +66,3 @@ export function searchAssignments(assignments, query) {
     return searchableText.includes(normalizedQuery);
   });
 }
-export const ASSIGNMENTS_PER_PAGE = 10;
-
-export function getTotalPages(
-  totalAssignments,
-  pageSize = ASSIGNMENTS_PER_PAGE,
-) {
-  return Math.max(1, Math.ceil(totalAssignments / pageSize));
-}
-
-export function paginateAssignments(
-  assignments,
-  currentPage,
-  pageSize = ASSIGNMENTS_PER_PAGE,
-) {
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-
-  return assignments.slice(startIndex, endIndex);
-}

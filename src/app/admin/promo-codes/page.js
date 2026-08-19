@@ -6,12 +6,15 @@ import { Plus, Search } from "lucide-react";
 
 import { PromoCodeTable } from "@/components/admin/promo-code-table";
 import { DeletePromoCodeDialog } from "@/components/admin/delete-promo-code-dialog";
+import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
 import { getPromoCodes, searchPromoCodes } from "@/lib/promo-codes";
+import { getTotalPages, paginateItems } from "@/lib/pagination";
 
 export default function AdminPromoCodesPage() {
   const [promoCodes, setPromoCodes] = useState([]);
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [promoToDelete, setPromoToDelete] = useState(null);
@@ -44,13 +47,31 @@ export default function AdminPromoCodesPage() {
     [promoCodes, query],
   );
 
+  const totalPages = getTotalPages(visiblePromoCodes.length);
+
+  const paginatedPromoCodes = useMemo(
+    () => paginateItems(visiblePromoCodes, currentPage),
+    [visiblePromoCodes, currentPage],
+  );
+
+  function handleSearchChange(event) {
+    setQuery(event.target.value);
+    setCurrentPage(1);
+  }
+
   async function handleDelete() {
     if (!promoToDelete || isDeleting) return;
     setIsDeleting(true);
     try {
       const response = await fetch(`/api/admin/promo-codes/${promoToDelete.id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Failed to delete promo code.");
-      setPromoCodes((current) => current.filter((promo) => promo.id !== promoToDelete.id));
+
+      const remaining = promoCodes.filter((promo) => promo.id !== promoToDelete.id);
+
+      setPromoCodes(remaining);
+      setCurrentPage((page) =>
+        Math.min(page, getTotalPages(searchPromoCodes(remaining, query).length)),
+      );
       setPromoToDelete(null);
     } catch (error) {
       setErrorMessage(error.message);
@@ -70,7 +91,7 @@ export default function AdminPromoCodesPage() {
               data-slot="input"
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={handleSearchChange}
               placeholder="Search..."
               className="h-12 min-h-12 w-80 rounded-lg border border-gray-400 bg-white px-4 pr-11 text-body2"
             />
@@ -88,8 +109,17 @@ export default function AdminPromoCodesPage() {
       <section className="p-10">
         {errorMessage ? <p className="mb-4 text-body2 text-orange-500" role="alert">{errorMessage}</p> : null}
         <div className="overflow-hidden rounded-lg bg-white shadow-card">
-          <PromoCodeTable promoCodes={visiblePromoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
+          <PromoCodeTable promoCodes={paginatedPromoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
         </div>
+
+        {status === "ready" && visiblePromoCodes.length > 0 ? (
+          <AdminPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            label="Promo code pagination"
+          />
+        ) : null}
       </section>
       <DeletePromoCodeDialog open={Boolean(promoToDelete)} code={promoToDelete?.code} isDeleting={isDeleting} onOpenChange={(open) => !open && !isDeleting && setPromoToDelete(null)} onConfirm={handleDelete} />
     </main>
