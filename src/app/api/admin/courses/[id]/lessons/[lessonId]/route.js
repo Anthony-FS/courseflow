@@ -52,7 +52,6 @@ export async function GET(_request, { params }) {
         id,
         title,
         description,
-        description,
         sort_order,
         is_preview,
         materials (
@@ -170,7 +169,6 @@ export async function PUT(request, { params }) {
         course_id: courseId,
         lesson_id: lessonId,
         title: String(sub.title).trim(),
-        description: sub.description ? String(sub.description).trim() : null,
         description: sub.description ? String(sub.description).trim() : null,
         sort_order: i + 1,
         is_preview: Boolean(sub.isPreview),
