@@ -2,21 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Search,
-} from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import { AssignmentTable } from "@/components/admin/assignment-table";
+import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
-import {
-  getAssignments,
-  getTotalPages,
-  paginateAssignments,
-  searchAssignments,
-} from "@/lib/assignments";
+import { getAssignments, searchAssignments } from "@/lib/assignments";
+import { getTotalPages, paginateItems } from "@/lib/pagination";
 
 export default function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState([]);
@@ -62,21 +54,13 @@ export default function AdminAssignmentsPage() {
   const totalPages = getTotalPages(visibleAssignments.length);
 
   const paginatedAssignments = useMemo(
-    () => paginateAssignments(visibleAssignments, currentPage),
+    () => paginateItems(visibleAssignments, currentPage),
     [visibleAssignments, currentPage],
   );
 
   function handleSearchChange(event) {
     setQuery(event.target.value);
     setCurrentPage(1);
-  }
-
-  function goToPreviousPage() {
-    setCurrentPage((page) => Math.max(1, page - 1));
-  }
-
-  function goToNextPage() {
-    setCurrentPage((page) => Math.min(totalPages, page + 1));
   }
 
   return (
@@ -124,34 +108,12 @@ export default function AdminAssignmentsPage() {
         </div>
 
         {status === "ready" && visibleAssignments.length > 0 ? (
-          <nav
-            aria-label="Assignment pagination"
-            className="mt-6 flex items-center justify-end gap-3"
-          >
-            <button
-              type="button"
-              onClick={goToPreviousPage}
-              disabled={currentPage === 1}
-              className="flex size-10 items-center justify-center rounded-lg border border-gray-300 bg-white disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-
-            <span className="text-body2 text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-
-            <button
-              type="button"
-              onClick={goToNextPage}
-              disabled={currentPage === totalPages}
-              className="flex size-10 items-center justify-center rounded-lg border border-gray-300 bg-white disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <ChevronRight className="size-5" />
-            </button>
-          </nav>
+          <AdminPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            label="Assignment pagination"
+          />
         ) : null}
       </section>
     </main>

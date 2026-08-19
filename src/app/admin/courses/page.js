@@ -6,12 +6,19 @@ import { Plus, Search } from "lucide-react";
 
 import { CourseTable } from "@/components/admin/course-table";
 import { DeleteCourseDialog } from "@/components/admin/delete-course-dialog";
+import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
 import { deleteCourse, getCourses, searchCourses } from "@/lib/courses";
+import {
+  ITEMS_PER_PAGE,
+  getTotalPages,
+  paginateItems,
+} from "@/lib/pagination";
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState([]);
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -49,6 +56,18 @@ export default function AdminCoursesPage() {
     [courses, query],
   );
 
+  const totalPages = getTotalPages(visibleCourses.length);
+
+  const paginatedCourses = useMemo(
+    () => paginateItems(visibleCourses, currentPage),
+    [visibleCourses, currentPage],
+  );
+
+  function handleSearchChange(event) {
+    setQuery(event.target.value);
+    setCurrentPage(1);
+  }
+
   async function handleConfirmDelete() {
     if (!courseToDelete || isDeleting) {
       return;
@@ -58,8 +77,13 @@ export default function AdminCoursesPage() {
 
     try {
       await deleteCourse(courseToDelete.id);
-      setCourses((current) =>
-        current.filter((course) => course.id !== courseToDelete.id),
+      const remaining = courses.filter(
+        (course) => course.id !== courseToDelete.id,
+      );
+
+      setCourses(remaining);
+      setCurrentPage((page) =>
+        Math.min(page, getTotalPages(searchCourses(remaining, query).length)),
       );
       setCourseToDelete(null);
       setErrorMessage("");
@@ -81,7 +105,7 @@ export default function AdminCoursesPage() {
               data-slot="input"
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={handleSearchChange}
               placeholder="Search..."
               className="h-12 min-h-12 w-80 rounded-lg border border-gray-400 bg-white px-4 pr-11 text-body2"
             />
@@ -107,11 +131,21 @@ export default function AdminCoursesPage() {
         ) : null}
         <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-card">
           <CourseTable
-            courses={visibleCourses}
+            courses={paginatedCourses}
             isLoading={status === "loading"}
             onDelete={setCourseToDelete}
+            rowOffset={(currentPage - 1) * ITEMS_PER_PAGE}
           />
         </div>
+
+        {status === "ready" && visibleCourses.length > 0 ? (
+          <AdminPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            label="Course pagination"
+          />
+        ) : null}
       </section>
 
       <DeleteCourseDialog

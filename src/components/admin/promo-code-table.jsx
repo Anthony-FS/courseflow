@@ -57,7 +57,7 @@ export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
                 <td className="whitespace-nowrap px-4 py-4">{formatCreatedDate(promo)}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3 text-blue-300">
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Delete ${promo.code}`} onClick={() => onDelete?.(promo)}>
+                    <Button type="button" variant="ghost" size="icon-sm" className="cursor-pointer" aria-label={`Delete ${promo.code}`} onClick={() => onDelete?.(promo)}>
                       <Trash2 aria-hidden="true" className="size-5" />
                     </Button>
                     <Button asChild variant="ghost" size="icon-sm">

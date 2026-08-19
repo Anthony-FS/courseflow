@@ -7,7 +7,12 @@ import { SquarePen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCourseDate, formatPrice } from "@/lib/format";
 
-export function CourseTable({ courses, isLoading = false, onDelete }) {
+export function CourseTable({
+  courses,
+  isLoading = false,
+  onDelete,
+  rowOffset = 0,
+}) {
   const emptyMessage = isLoading ? "Loading courses..." : "No courses found.";
 
   return (
@@ -51,7 +56,7 @@ export function CourseTable({ courses, isLoading = false, onDelete }) {
           ) : (
             courses.map((course, index) => (
               <tr key={course.id} className="border-t border-gray-300">
-                <td className="px-6 py-4">{index + 1}</td>
+                <td className="px-6 py-4">{rowOffset + index + 1}</td>
                 <td className="px-6 py-4">
                   <Image
                     src={course.cover_file_url}
@@ -77,6 +82,7 @@ export function CourseTable({ courses, isLoading = false, onDelete }) {
                       type="button"
                       variant="ghost"
                       size="icon-sm"
+                      className="cursor-pointer"
                       aria-label={`Delete ${course.title}`}
                       onClick={() => onDelete(course)}
                     >

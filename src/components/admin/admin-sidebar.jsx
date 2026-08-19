@@ -85,7 +85,7 @@ export function AdminSidebar() {
         <button
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-body2 text-gray-700 transition-colors hover:bg-gray-100"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left text-body2 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <LogOut aria-hidden="true" className="size-5" />
           Log out
