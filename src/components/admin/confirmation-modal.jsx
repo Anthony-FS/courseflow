@@ -8,6 +8,7 @@ export default function ConfirmationModal({
   message = "Are you sure you want to delete this lesson?",
   confirmText = "Yes, I want to delete this lesson",
   cancelText = "No, keep it",
+  isConfirming = false,
 }) {
   if (!isOpen) return null;
 
@@ -18,8 +19,10 @@ export default function ConfirmationModal({
         <div className="flex items-center justify-between p-6 border-b border-[#F1F2F6]">
           <h3 className="text-lg font-bold text-[#2A2E3F]">{title}</h3>
           <button
+            type="button"
             onClick={onClose}
-            className="text-[#9AA1B9] hover:text-[#2A2E3F] transition-colors p-1 rounded-lg hover:bg-[#F6F7FC]"
+            disabled={isConfirming}
+            className="text-[#9AA1B9] hover:text-[#2A2E3F] transition-colors p-1 rounded-lg hover:bg-[#F6F7FC] disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -35,14 +38,16 @@ export default function ConfirmationModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="px-5 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-sm hover:bg-[#FFF7F0] transition-colors cursor-pointer"
+            disabled={isConfirming}
+            className="px-5 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-sm hover:bg-[#FFF7F0] transition-colors cursor-pointer disabled:opacity-50"
           >
-            {confirmText}
+            {isConfirming ? "Deleting..." : confirmText}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#2F5FAC] text-white font-bold text-sm hover:bg-[#234781] transition-colors cursor-pointer shadow-sm"
+            disabled={isConfirming}
+            className="px-5 py-2.5 rounded-xl bg-[#2F5FAC] text-white font-bold text-sm hover:bg-[#234781] transition-colors cursor-pointer shadow-sm disabled:opacity-50"
           >
             {cancelText}
           </button>

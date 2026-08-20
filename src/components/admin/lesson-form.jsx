@@ -268,11 +268,19 @@ export default function LessonForm({
 
     try {
       if (isNewCourseFlow) {
-        draftContent?.addLesson({
+        const lesson = {
           id: crypto.randomUUID(),
           name: lessonName.trim(),
           subLessons: subLessons.length,
-        });
+        };
+        if (draftContent?.addLesson) {
+          draftContent.addLesson(lesson);
+        } else if (draftContent?.setDraft) {
+          draftContent.setDraft((current) => ({
+            ...current,
+            lessons: [...current.lessons, lesson],
+          }));
+        }
         router.push("/admin/courses/new");
         return;
       }
@@ -613,6 +621,7 @@ export default function LessonForm({
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteLessonConfirm}
+        isConfirming={isDeleting}
         title="Confirmation"
         message="Are you sure you want to delete this lesson?"
         confirmText="Yes, I want to delete this lesson"

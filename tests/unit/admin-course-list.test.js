@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveCoverUrl, searchCourses } from "@/lib/courses";
+import { embeddedCount, resolveCoverUrl, searchCourses } from "@/lib/courses";
 import { formatCourseDate, formatPrice } from "@/lib/format";
 
 const FALLBACK_COVER = "/courses/service-design.svg";
@@ -79,5 +79,16 @@ describe("resolveCoverUrl", () => {
 
   it("uses the fallback cover for unsupported paths", () => {
     expect(resolveCoverUrl("course-covers/admin/cover.jpg")).toBe(FALLBACK_COVER);
+  });
+});
+
+describe("embeddedCount", () => {
+  it("reads a PostgREST embedded count from lessons", () => {
+    expect(embeddedCount([{ count: 2 }])).toBe(2);
+  });
+
+  it("returns 0 when there are no related rows", () => {
+    expect(embeddedCount([])).toBe(0);
+    expect(embeddedCount(undefined)).toBe(0);
   });
 });

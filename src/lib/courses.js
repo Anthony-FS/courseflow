@@ -14,18 +14,18 @@ export function resolveCoverUrl(coverFileUrl) {
   return FALLBACK_COVER;
 }
 
-function mapCourse(row) {
-  const lessonCount = Array.isArray(row.sub_lessons)
-    ? (row.sub_lessons[0]?.count ?? 0)
-    : 0;
+export function embeddedCount(value) {
+  return Array.isArray(value) ? (value[0]?.count ?? 0) : 0;
+}
 
+function mapCourse(row) {
   return {
     id: row.id,
     title: row.title,
-    cover_file_url: resolveCoverUrl(row.cover_file_url),
+    cover_file_url: resolveCoverUrl(row.cover_image_url || row.cover_file_url),
     cover_file_type: row.cover_file_type,
     price: row.price ?? 0,
-    lesson_count: lessonCount,
+    lesson_count: embeddedCount(row.lessons),
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
   };
@@ -36,7 +36,7 @@ export async function getCourses() {
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id, title, cover_file_url, cover_file_type, price, created_at, updated_at, sub_lessons(count)",
+      "id, title, cover_file_url, cover_file_type, cover_image_url, price, created_at, lessons(count)",
     )
     .order("created_at", { ascending: false });
 
@@ -60,10 +60,18 @@ export function searchCourses(courses, query) {
 }
 
 export async function deleteCourse(id) {
-  const supabase = createClient();
-  const { error } = await supabase.from("courses").delete().eq("id", id);
+  const response = await fetch(`/api/admin/courses/${id}`, {
+    method: "DELETE",
+  });
 
-  if (error) {
-    throw error;
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to delete this course.");
   }
 }

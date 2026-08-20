@@ -341,3 +341,53 @@ export async function PUT(request, { params }) {
 
   return jsonOk({ id: courseId, success: true });
 }
+
+
+async function deleteByCourseId(supabase, table, courseId) {
+  const { error } = await supabase.from(table).delete().eq("course_id", courseId);
+  if (error) {
+    return error;
+  }
+  return null;
+}
+
+export async function DELETE(_request, { params }) {
+  const { supabase, error } = await requireAdmin();
+  if (error) return error;
+
+  const { id: courseId } = await params;
+  if (!courseId) {
+    return jsonError("Course id is required", 400);
+  }
+
+  const subLessonError = await deleteByCourseId(
+    supabase,
+    "sub_lessons",
+    courseId,
+  );
+  if (subLessonError) {
+    return jsonError(
+      subLessonError.message || "Failed to delete course sub-lessons",
+      500,
+    );
+  }
+
+  const lessonError = await deleteByCourseId(supabase, "lessons", courseId);
+  if (lessonError) {
+    return jsonError(
+      lessonError.message || "Failed to delete course lessons",
+      500,
+    );
+  }
+
+  const { error: courseError } = await supabase
+    .from("courses")
+    .delete()
+    .eq("id", courseId);
+
+  if (courseError) {
+    return jsonError(courseError.message || "Failed to delete course", 500);
+  }
+
+  return jsonOk({ ok: true });
+}
