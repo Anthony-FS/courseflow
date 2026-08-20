@@ -1,20 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import {
-  ArrowLeft,
-  Plus,
-  X,
-  Play,
-  Loader2,
-  FileText,
-  Paperclip,
-  Eye,
-  Check,
-} from "lucide-react";
-import ConfirmationModal from "./confirmation-modal";
+import { useRouter, useParams, usePathname } from "next/navigation";
+import { ArrowLeft, Plus, X, Play, Loader2 } from "lucide-react";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   uploadAdminFile,
   createAdminLesson,
@@ -731,13 +721,12 @@ export default function LessonForm({
         )}
       </div>
 
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
+      <ConfirmationDialog
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
         onConfirm={handleDeleteLessonConfirm}
         isConfirming={isDeleting}
-        title="Confirmation"
+        confirmFirst
         message="Are you sure you want to delete this lesson?"
         confirmText="Yes, I want to delete this lesson"
         cancelText="No, keep it"

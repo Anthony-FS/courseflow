@@ -6,7 +6,7 @@ import Link from "next/link";
 import { GripVertical, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import ConfirmationModal from "@/components/admin/confirmation-modal";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { deleteAdminLesson, getAdminCourseLessons } from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
 
@@ -308,14 +308,16 @@ function CourseLessonsSection({
         </div>
       </div>
 
-      <ConfirmationModal
-        isOpen={Boolean(lessonToDelete)}
-        onClose={() => {
-          if (!isDeleting) setLessonToDelete(null);
+      <ConfirmationDialog
+        open={Boolean(lessonToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setLessonToDelete(null);
+          }
         }}
         onConfirm={handleConfirmDeleteLesson}
         isConfirming={isDeleting}
-        title="Confirmation"
+        confirmFirst
         message="Are you sure you want to delete this lesson?"
         confirmText="Yes, I want to delete this lesson"
         cancelText="No, keep it"

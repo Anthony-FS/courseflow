@@ -51,7 +51,7 @@ function FieldError({ id, message }) {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ nextPath = "/" }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -105,7 +105,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/");
+      router.push(nextPath || "/");
       router.refresh();
     } catch {
       const message = "Login failed. Please try again.";

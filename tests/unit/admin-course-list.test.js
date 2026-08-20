@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   embeddedCount,
   FALLBACK_COVER,
+  getCourseByCode,
+  mapCourseDetail,
   resolveCoverUrl,
+  resolveTrailerUrl,
   searchCourses,
 } from "@/lib/courses";
 import { formatCourseDate, formatPrice } from "@/lib/format";
@@ -119,5 +122,175 @@ describe("embeddedCount", () => {
   it("returns 0 when there are no related rows", () => {
     expect(embeddedCount([])).toBe(0);
     expect(embeddedCount(undefined)).toBe(0);
+  });
+});
+
+describe("resolveTrailerUrl", () => {
+  it("returns null when the trailer url is missing", () => {
+    expect(resolveTrailerUrl("")).toBeNull();
+    expect(resolveTrailerUrl(null)).toBeNull();
+  });
+
+  it("keeps http(s) and root-relative urls", () => {
+    expect(resolveTrailerUrl("https://cdn.example/trailer.mp4")).toBe(
+      "https://cdn.example/trailer.mp4",
+    );
+    expect(resolveTrailerUrl("/uploads/trailer.mp4")).toBe("/uploads/trailer.mp4");
+  });
+
+  it("builds a public storage url for trailer object paths", () => {
+    expect(
+      resolveTrailerUrl(
+        "course-trailers/admin/trailer.mp4",
+        "https://xyz.supabase.co",
+      ),
+    ).toBe(
+      "https://xyz.supabase.co/storage/v1/object/public/course-trailers/admin/trailer.mp4",
+    );
+  });
+});
+
+describe("mapCourseDetail", () => {
+  it("maps course fields and sorts lessons and sub-lessons", () => {
+    const detail = mapCourseDetail({
+      id: "course-1",
+      title: "Service Design Essentials",
+      summary: "Short summary",
+      description: "Long description",
+      price: 3559,
+      cover_image_url: "/courses/service-design.svg",
+      video_trailer_url: "/trailer.mp4",
+      lessons: [
+        {
+          id: "l2",
+          title: "Prototyping",
+          sort_order: 2,
+          sub_lessons: [],
+        },
+        {
+          id: "l1",
+          title: "Introduction",
+          sort_order: 1,
+          sub_lessons: [
+            { id: "s2", title: "Course Overview", sort_order: 2 },
+            { id: "s1", title: "Welcome to the Course", sort_order: 1 },
+          ],
+        },
+      ],
+    });
+
+    expect(detail).toMatchObject({
+      id: "course-1",
+      title: "Service Design Essentials",
+      summary: "Short summary",
+      description: "Long description",
+      price: 3559,
+      coverUrl: "/courses/service-design.svg",
+      trailerUrl: "/trailer.mp4",
+    });
+    expect(detail.lessons.map((lesson) => lesson.title)).toEqual([
+      "Introduction",
+      "Prototyping",
+    ]);
+    expect(detail.lessons[0].subLessons.map((item) => item.title)).toEqual([
+      "Welcome to the Course",
+      "Course Overview",
+    ]);
+  });
+});
+
+describe("getCourseByCode", () => {
+  it("returns null when the course code is empty", async () => {
+    expect(await getCourseByCode({}, "")).toBeNull();
+    expect(await getCourseByCode({}, "   ")).toBeNull();
+  });
+
+  it("loads a course by id and maps the detail", async () => {
+    const row = {
+      id: "abc",
+      title: "UX Research Basics",
+      summary: "",
+      description: "",
+      price: 10,
+      cover_image_url: "/courses/ux-ui-beginner.svg",
+      video_trailer_url: null,
+      lessons: [],
+    };
+    const supabase = {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle: async () => ({ data: row, error: null }),
+                  order: async () => ({ data: [], error: null }),
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    await expect(getCourseByCode(supabase, "abc")).resolves.toMatchObject({
+      id: "abc",
+      title: "UX Research Basics",
+      price: 10,
+      lessons: [],
+    });
+  });
+
+  it("loads lessons from the catalog client when the session cannot see them", async () => {
+    const courseRow = {
+      id: "abc",
+      title: "UX Research Basics",
+      summary: "",
+      description: "",
+      price: 10,
+      cover_image_url: "/courses/ux-ui-beginner.svg",
+      video_trailer_url: null,
+      lessons: [],
+    };
+    const catalogLessons = [
+      { id: "l1", title: "Introduction", sort_order: 1, sub_lessons: [] },
+    ];
+    const sessionSupabase = {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle: async () => ({ data: courseRow, error: null }),
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+    const catalogSupabase = {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  order: async () => ({ data: catalogLessons, error: null }),
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    await expect(
+      getCourseByCode(sessionSupabase, "abc", catalogSupabase),
+    ).resolves.toMatchObject({
+      id: "abc",
+      lessons: [{ id: "l1", title: "Introduction", subLessons: [] }],
+    });
   });
 });

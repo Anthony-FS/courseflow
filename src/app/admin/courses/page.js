@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
 import { CourseTable } from "@/components/admin/course-table";
-import { DeleteCourseDialog } from "@/components/admin/delete-course-dialog";
 import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { deleteCourse, getCourses, searchCourses } from "@/lib/courses";
 import {
   ITEMS_PER_PAGE,
@@ -148,15 +148,19 @@ export default function AdminCoursesPage() {
         ) : null}
       </section>
 
-      <DeleteCourseDialog
+      <ConfirmationDialog
         open={Boolean(courseToDelete)}
-        isDeleting={isDeleting}
+        isConfirming={isDeleting}
+        confirmFirst
         onOpenChange={(open) => {
           if (!open && !isDeleting) {
             setCourseToDelete(null);
           }
         }}
         onConfirm={handleConfirmDelete}
+        message="Are you sure you want to delete this course?"
+        confirmText="Yes, I want to delete this course"
+        cancelText="No, keep it"
       />
     </main>
   );
