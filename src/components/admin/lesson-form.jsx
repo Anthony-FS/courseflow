@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
-import { ArrowLeft, Plus, X, Play, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  Play,
+  Loader2,
+  Eye,
+  FileText,
+  Paperclip,
+} from "lucide-react";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
@@ -95,6 +104,14 @@ export default function LessonForm({
   const allowDragRef = useRef(false);
   const isDraggingRef = useRef(false);
   const isDragging = dragIndex !== null;
+
+  function leaveForm() {
+    if (isNewCourseFlow) {
+      router.push("/admin/courses/new");
+      return;
+    }
+    router.back();
+  }
 
   useEffect(() => {
     function clearAllowDrag() {
