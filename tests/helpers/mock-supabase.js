@@ -28,7 +28,6 @@ export function createMockSupabase({
     }
     return [];
   }
-  const deletes = [];
 
   function from(table) {
     const selectChain = {
@@ -134,12 +133,7 @@ export function createMockSupabase({
       delete() {
         const entry = { table, filters: [] };
         deletes.push(entry);
-        return {
-          async eq(column, value) {
-            entry.filters.push({ column, value });
-            return { error: null };
-          },
-        };
+        return deleteChain(entry);
       },
     };
   }
@@ -149,7 +143,6 @@ export function createMockSupabase({
     updates,
     deletes,
     uploads,
-    deletes,
     from,
     storage: {
       from(bucket) {

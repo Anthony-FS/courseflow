@@ -55,6 +55,9 @@ export function CourseTable({
               Image
             </th>
             <th scope="col" className="px-6 py-3 font-medium">
+              Course code
+            </th>
+            <th scope="col" className="px-6 py-3 font-medium">
               Course name
             </th>
             <th scope="col" className="px-6 py-3 font-medium">
@@ -77,7 +80,7 @@ export function CourseTable({
         <tbody className="text-body2 text-gray-800">
           {courses.length === 0 ? (
             <tr>
-              <td colSpan={8} className="px-6 py-10 text-center text-gray-600">
+              <td colSpan={9} className="px-6 py-10 text-center text-gray-600">
                 {emptyMessage}
               </td>
             </tr>
@@ -91,6 +94,7 @@ export function CourseTable({
                     alt={course.title || "Course cover"}
                   />
                 </td>
+                <td className="px-6 py-4">{course.course_code || "-"}</td>
                 <td className="px-6 py-4">{course.title}</td>
                 <td className="px-6 py-4">{course.lesson_count} Lessons</td>
                 <td className="px-6 py-4">{formatPrice(course.price)}</td>

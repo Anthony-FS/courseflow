@@ -49,6 +49,7 @@ function mapCourse(row) {
   return {
     id: row.id,
     title: row.title,
+    course_code: row.course_code ?? "",
     cover_file_url: resolveCoverUrl(row.cover_image_url || row.cover_file_url),
     cover_file_type: row.cover_file_type,
     price: row.price ?? 0,
@@ -63,7 +64,7 @@ export async function getCourses() {
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id, title, cover_file_url, cover_file_type, cover_image_url, price, created_at, lessons(count)",
+      "id, title, course_code, cover_file_url, cover_file_type, cover_image_url, price, created_at, updated_at, lessons(count)",
     )
     .order("created_at", { ascending: false });
 
@@ -81,9 +82,12 @@ export function searchCourses(courses, query) {
     return courses;
   }
 
-  return courses.filter((course) =>
-    course.title.toLowerCase().includes(normalizedQuery),
-  );
+  return courses.filter((course) => {
+    const title = course.title.toLowerCase();
+    const courseCode = (course.course_code ?? "").toLowerCase();
+
+    return title.includes(normalizedQuery) || courseCode.includes(normalizedQuery);
+  });
 }
 
 export async function deleteCourse(id) {

@@ -9,13 +9,13 @@ import {
 import { formatCourseDate, formatPrice } from "@/lib/format";
 
 const courses = [
-  { id: "1", title: "Service Design Essentials" },
-  { id: "2", title: "UX Research Basics" },
-  { id: "3", title: "service blueprint workshop" },
+  { id: "1", title: "Service Design Essentials", course_code: "SD101" },
+  { id: "2", title: "UX Research Basics", course_code: "UX201" },
+  { id: "3", title: "service blueprint workshop", course_code: "SD102" },
 ];
 
 describe("searchCourses", () => {
-  // ค้นหาจากชื่อคอร์สอย่างเดียว ไม่สนตัวพิมพ์
+  // ค้นหาจากชื่อคอร์ส ไม่สนตัวพิมพ์
   it("filters courses whose title contains the query", () => {
     expect(searchCourses(courses, "service").map((course) => course.id)).toEqual(
       ["1", "3"],
@@ -25,6 +25,18 @@ describe("searchCourses", () => {
   it("matches titles case-insensitively", () => {
     expect(searchCourses(courses, "UX RESEARCH").map((course) => course.id)).toEqual(
       ["2"],
+    );
+  });
+
+  it("filters courses whose course code contains the query", () => {
+    expect(searchCourses(courses, "SD101").map((course) => course.id)).toEqual(
+      ["1"],
+    );
+  });
+
+  it("matches course codes case-insensitively", () => {
+    expect(searchCourses(courses, "sd101").map((course) => course.id)).toEqual(
+      ["1"],
     );
   });
 
@@ -41,7 +53,7 @@ describe("searchCourses", () => {
     expect(searchCourses(courses, "   ")).toBe(courses);
   });
 
-  it("returns an empty list when no title matches", () => {
+  it("returns an empty list when no title or course code matches", () => {
     expect(searchCourses(courses, "zzzznotfound")).toEqual([]);
   });
 });
