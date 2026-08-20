@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Plus } from "lucide-react";
+import { CircleAlert, Plus, X } from "lucide-react";
 
+import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { Button } from "@/components/ui/button";
 import { CourseLessonsSection } from "@/components/course-lessons-section";
 import {
@@ -20,6 +21,11 @@ import {
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
+import {
+  clampPercentDiscount,
+  digitsOnly,
+  normalizePromoCode,
+} from "@/lib/promo-codes";
 import { cn } from "@/lib/utils";
 
 const ERROR_COLOR = "#9B2C6B";
@@ -167,36 +173,58 @@ function UploadBox({
 }) {
   const inputRef = useRef(null);
   const displayName = file?.name || existingName;
+  const hasMedia = Boolean(displayName);
+
+  function handleClear(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+    onChange(null);
+  }
 
   return (
     <div>
-      <input
-        ref={inputRef}
-        id={id}
-        type="file"
-        accept={accept}
-        className="sr-only"
-        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-      />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        aria-invalid={error || undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className={cn(
-          "flex flex-col items-center justify-center gap-2 rounded-lg border bg-gray-100 text-body3 text-blue-500 transition-colors",
-          "hover:border-blue-300 hover:bg-blue-100",
-          "focus-visible:outline-none focus-visible:shadow-focus",
-          size === "sm" ? "size-36" : "size-44",
-          !error && "border-gray-300"
-        )}
-        style={error ? { borderColor: ERROR_COLOR } : undefined}
-      >
-        <Plus className="size-6 stroke-[1.75]" aria-hidden />
-        <span className="max-w-32 truncate px-2">
-          {displayName || label}
-        </span>
-      </button>
+      <div className="relative inline-block">
+        <input
+          ref={inputRef}
+          id={id}
+          type="file"
+          accept={accept}
+          className="sr-only"
+          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          aria-invalid={error || undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={cn(
+            "flex flex-col items-center justify-center gap-2 rounded-lg border bg-gray-100 text-body3 text-blue-500 transition-colors",
+            "hover:border-blue-300 hover:bg-blue-100",
+            "focus-visible:outline-none focus-visible:shadow-focus",
+            size === "sm" ? "size-36" : "size-44",
+            !error && "border-gray-300"
+          )}
+          style={error ? { borderColor: ERROR_COLOR } : undefined}
+        >
+          <Plus className="size-6 stroke-[1.75]" aria-hidden />
+          <span className="max-w-32 truncate px-2">
+            {displayName || label}
+          </span>
+        </button>
+        {hasMedia ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label={`Remove ${displayName}`}
+            className="absolute -top-1.5 -right-1.5 z-10 flex size-6 items-center justify-center rounded-full border border-gray-400 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus-visible:outline-none focus-visible:shadow-focus"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
       <FieldError id={`${id}-error`} message={error || undefined} />
     </div>
   );
@@ -209,32 +237,51 @@ function AddCourseForm({
 }) {
   const router = useRouter();
   const isEdit = mode === "edit";
-  const [promoEnabled, setPromoEnabled] = useState(!isEdit);
-  const [discountType, setDiscountType] = useState("thb");
-  const [promo, setPromo] = useState({
+  const draftContent = useAddCourseDraft();
+  const useDraft = !isEdit && draftContent != null;
+  const clearDraft = draftContent?.clearDraft ?? (() => {});
+
+  const [promoEnabledState, setPromoEnabled] = useState(!isEdit);
+  const [discountTypeState, setDiscountType] = useState("thb");
+  const [promoState, setPromo] = useState({
     code: isEdit ? "" : "NEWYEAR200",
     minPurchase: "0",
     discountThb: isEdit ? "" : "200",
     discountPercent: "",
   });
-  const [values, setValues] = useState({
+  const [valuesState, setValues] = useState({
     courseName: "",
     price: "",
     learningTime: "",
     courseSummary: "",
     courseDetail: "",
   });
-  const [coverImage, setCoverImage] = useState(null);
-  const [videoTrailer, setVideoTrailer] = useState(null);
-  const [attachment, setAttachment] = useState(null);
+  const [coverImageState, setCoverImage] = useState(null);
+  const [videoTrailerState, setVideoTrailer] = useState(null);
+  const [attachmentState, setAttachment] = useState(null);
   const [existingCover, setExistingCover] = useState(null);
   const [existingTrailer, setExistingTrailer] = useState(null);
   const [existingAttachment, setExistingAttachment] = useState(null);
-  const [lessons, setLessons] = useState([]);
+  const [lessonsState, setLessons] = useState([]);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadStatus, setLoadStatus] = useState(isEdit ? "loading" : "ready");
+
+  const promoEnabled = useDraft
+    ? draftContent.draft.promoEnabled
+    : promoEnabledState;
+  const discountType = useDraft
+    ? draftContent.draft.discountType
+    : discountTypeState;
+  const promo = useDraft ? draftContent.draft.promo : promoState;
+  const values = useDraft ? draftContent.draft.values : valuesState;
+  const coverImage = useDraft ? draftContent.draft.coverImage : coverImageState;
+  const videoTrailer = useDraft
+    ? draftContent.draft.videoTrailer
+    : videoTrailerState;
+  const attachment = useDraft ? draftContent.draft.attachment : attachmentState;
+  const lessons = useDraft ? draftContent.draft.lessons : lessonsState;
 
   useEffect(() => {
     if (!isEdit || !courseId) return undefined;
@@ -318,6 +365,19 @@ function AddCourseForm({
     };
   }, [isEdit, courseId]);
 
+  function patchDraft(patch) {
+    if (useDraft) {
+      draftContent.setDraft((current) => ({ ...current, ...patch }));
+      return;
+    }
+    if ("promoEnabled" in patch) setPromoEnabled(patch.promoEnabled);
+    if ("discountType" in patch) setDiscountType(patch.discountType);
+    if ("coverImage" in patch) setCoverImage(patch.coverImage);
+    if ("videoTrailer" in patch) setVideoTrailer(patch.videoTrailer);
+    if ("attachment" in patch) setAttachment(patch.attachment);
+    if ("lessons" in patch) setLessons(patch.lessons);
+  }
+
   function clearError(field) {
     setErrors((current) => {
       if (!current[field]) return current;
@@ -328,12 +388,48 @@ function AddCourseForm({
   }
 
   function updateField(field, value) {
-    setValues((current) => ({ ...current, [field]: value }));
+    if (useDraft) {
+      draftContent.setDraft((current) => ({
+        ...current,
+        values: { ...current.values, [field]: value },
+      }));
+    } else {
+      setValues((current) => ({ ...current, [field]: value }));
+    }
     clearError(field);
   }
 
   function updatePromo(field, value) {
-    setPromo((current) => ({ ...current, [field]: value }));
+    if (useDraft) {
+      draftContent.setDraft((current) => ({
+        ...current,
+        promo: { ...current.promo, [field]: value },
+      }));
+    } else {
+      setPromo((current) => ({ ...current, [field]: value }));
+    }
+  }
+
+  function handleDiscountTypeChange(type) {
+    if (useDraft) {
+      draftContent.setDraft((current) => ({
+        ...current,
+        discountType: type,
+        promo: {
+          ...current.promo,
+          discountThb: "",
+          discountPercent: "",
+        },
+      }));
+    } else {
+      setDiscountType(type);
+      setPromo((current) => ({
+        ...current,
+        discountThb: "",
+        discountPercent: "",
+      }));
+    }
+    clearError("discountValue");
   }
 
   function validate() {
@@ -345,6 +441,7 @@ function AddCourseForm({
         discountType,
         discountValue:
           discountType === "thb" ? promo.discountThb : promo.discountPercent,
+        minPurchaseAmount: promo.minPurchase,
         price: values.price,
       }),
     };
@@ -435,6 +532,7 @@ function AddCourseForm({
             sortOrder: index,
           })),
         });
+        clearDraft();
         router.push(`/admin/courses?created=${created.id}`);
       }
       router.refresh();
@@ -455,7 +553,9 @@ function AddCourseForm({
         </h1>
         <div className="flex items-center gap-3">
           <Button asChild variant="secondary" size="sm">
-            <Link href={cancelHref}>Cancel</Link>
+            <Link href={cancelHref} onClick={clearDraft}>
+              Cancel
+            </Link>
           </Button>
           <Button
             type="submit"
@@ -554,7 +654,9 @@ function AddCourseForm({
                   type="checkbox"
                   name="promoEnabled"
                   checked={promoEnabled}
-                  onChange={(event) => setPromoEnabled(event.target.checked)}
+                  onChange={(event) =>
+                    patchDraft({ promoEnabled: event.target.checked })
+                  }
                   className="size-4 rounded border-gray-400 accent-blue-500"
                 />
                 Promo code
@@ -570,7 +672,7 @@ function AddCourseForm({
                         name="promoCode"
                         value={promo.code}
                         onChange={(event) => {
-                          updatePromo("code", event.target.value);
+                          updatePromo("code", normalizePromoCode(event.target.value));
                           clearError("promoCode");
                         }}
                         error={errors.promoCode}
@@ -585,12 +687,13 @@ function AddCourseForm({
                       <TextInput
                         id="min-purchase"
                         name="minPurchase"
-                        type="number"
-                        min="0"
+                        inputMode="numeric"
                         value={promo.minPurchase}
-                        onChange={(event) =>
-                          updatePromo("minPurchase", event.target.value)
-                        }
+                        onChange={(event) => {
+                          updatePromo("minPurchase", digitsOnly(event.target.value));
+                          clearError("minPurchase");
+                        }}
+                        error={errors.minPurchase}
                         placeholder="THB"
                       />
                     </div>
@@ -607,21 +710,17 @@ function AddCourseForm({
                           name="discountType"
                           value="thb"
                           checked={discountType === "thb"}
-                          onChange={() => {
-                            setDiscountType("thb");
-                            clearError("discountValue");
-                          }}
+                          onChange={() => handleDiscountTypeChange("thb")}
                           className="size-4 accent-blue-500"
                         />
                         Discount (THB)
                         <TextInput
                           id="discount-thb"
                           name="discountThb"
-                          type="number"
-                          min="0"
-                          value={promo.discountThb}
+                          inputMode="numeric"
+                          value={discountType === "thb" ? promo.discountThb : ""}
                           onChange={(event) => {
-                            updatePromo("discountThb", event.target.value);
+                            updatePromo("discountThb", digitsOnly(event.target.value));
                             clearError("discountValue");
                           }}
                           disabled={discountType !== "thb"}
@@ -641,23 +740,30 @@ function AddCourseForm({
                           name="discountType"
                           value="percent"
                           checked={discountType === "percent"}
-                          onChange={() => {
-                            setDiscountType("percent");
-                            clearError("discountValue");
-                          }}
+                          onChange={() => handleDiscountTypeChange("percent")}
                           className="size-4 accent-blue-500"
                         />
                         Discount (%)
                         <TextInput
                           id="discount-percent"
                           name="discountPercent"
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={promo.discountPercent}
+                          inputMode="numeric"
+                          value={
+                            discountType === "percent" ? promo.discountPercent : ""
+                          }
                           onChange={(event) => {
-                            updatePromo("discountPercent", event.target.value);
+                            updatePromo(
+                              "discountPercent",
+                              digitsOnly(event.target.value),
+                            );
                             clearError("discountValue");
+                          }}
+                          onBlur={() => {
+                            if (discountType !== "percent") return;
+                            updatePromo(
+                              "discountPercent",
+                              clampPercentDiscount(promo.discountPercent),
+                            );
                           }}
                           disabled={discountType !== "percent"}
                           error={
@@ -728,7 +834,8 @@ function AddCourseForm({
                 existingName={existingCover?.name}
                 error={errors.coverImage}
                 onChange={(file) => {
-                  setCoverImage(file);
+                  patchDraft({ coverImage: file });
+                  if (!file) setExistingCover(null);
                   clearError("coverImage");
                 }}
               />
@@ -751,7 +858,8 @@ function AddCourseForm({
                 existingName={existingTrailer?.name}
                 error={errors.videoTrailer}
                 onChange={(file) => {
-                  setVideoTrailer(file);
+                  patchDraft({ videoTrailer: file });
+                  if (!file) setExistingTrailer(null);
                   clearError("videoTrailer");
                 }}
               />
@@ -767,7 +875,10 @@ function AddCourseForm({
                 accept="*/*"
                 file={attachment}
                 existingName={existingAttachment?.name}
-                onChange={setAttachment}
+                onChange={(file) => {
+                  patchDraft({ attachment: file });
+                  if (!file) setExistingAttachment(null);
+                }}
                 size="sm"
               />
             </div>
@@ -782,7 +893,9 @@ function AddCourseForm({
         <CourseLessonsSection
           courseId={isEdit ? courseId : undefined}
           lessons={isEdit ? undefined : lessons}
-          onLessonsChange={isEdit ? undefined : setLessons}
+          onLessonsChange={isEdit ? undefined : (nextLessons) =>
+            patchDraft({ lessons: nextLessons })
+          }
         />
       </main>
     </div>

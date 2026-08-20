@@ -190,6 +190,18 @@ export async function DELETE(_request, { params }) {
     return jsonOk({ success: true });
   }
 
+  const { error: subLessonError } = await supabase
+    .from("sub_lessons")
+    .delete()
+    .eq("lesson_id", lessonId);
+
+  if (subLessonError) {
+    return jsonError(
+      subLessonError.message || "Failed to delete lesson sub-lessons",
+      500,
+    );
+  }
+
   const { error: deleteError } = await supabase
     .from("lessons")
     .delete()

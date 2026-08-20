@@ -36,7 +36,12 @@ export function validateUpload(kind, file) {
     };
   }
 
-  if (!(file instanceof File) || file.size === 0) {
+  if (
+    !(file instanceof Blob) ||
+    typeof file.name !== "string" ||
+    file.name.length === 0 ||
+    file.size === 0
+  ) {
     return {
       ok: false,
       status: 400,

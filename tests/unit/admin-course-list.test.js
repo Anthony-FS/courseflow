@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveCoverUrl, searchCourses } from "@/lib/courses";
+import {
+  embeddedCount,
+  FALLBACK_COVER,
+  resolveCoverUrl,
+  searchCourses,
+} from "@/lib/courses";
 import { formatCourseDate, formatPrice } from "@/lib/format";
-
-const FALLBACK_COVER = "/courses/service-design.svg";
 
 const courses = [
   { id: "1", title: "Service Design Essentials" },
@@ -67,6 +70,7 @@ describe("formatCourseDate", () => {
 describe("resolveCoverUrl", () => {
   it("uses the fallback cover when the url is missing", () => {
     expect(resolveCoverUrl("")).toBe(FALLBACK_COVER);
+    expect(resolveCoverUrl("   ")).toBe(FALLBACK_COVER);
     expect(resolveCoverUrl(null)).toBe(FALLBACK_COVER);
   });
 
@@ -77,7 +81,31 @@ describe("resolveCoverUrl", () => {
     expect(resolveCoverUrl("/uploads/cover.png")).toBe("/uploads/cover.png");
   });
 
-  it("uses the fallback cover for unsupported paths", () => {
-    expect(resolveCoverUrl("course-covers/admin/cover.jpg")).toBe(FALLBACK_COVER);
+  it("builds a public storage url for cover object paths", () => {
+    expect(
+      resolveCoverUrl(
+        "course-covers/admin/cover.jpg",
+        "https://xyz.supabase.co",
+      ),
+    ).toBe(
+      "https://xyz.supabase.co/storage/v1/object/public/course-covers/admin/cover.jpg",
+    );
+  });
+
+  it("uses the fallback cover when a storage path has no supabase url", () => {
+    expect(resolveCoverUrl("course-covers/admin/cover.jpg", "")).toBe(
+      FALLBACK_COVER,
+    );
+  });
+});
+
+describe("embeddedCount", () => {
+  it("reads a PostgREST embedded count from lessons", () => {
+    expect(embeddedCount([{ count: 2 }])).toBe(2);
+  });
+
+  it("returns 0 when there are no related rows", () => {
+    expect(embeddedCount([])).toBe(0);
+    expect(embeddedCount(undefined)).toBe(0);
   });
 });

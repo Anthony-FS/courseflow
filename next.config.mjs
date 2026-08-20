@@ -2,6 +2,9 @@
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+  experimental: {
+    proxyClientMaxBodySize: "25mb",
+  },
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",

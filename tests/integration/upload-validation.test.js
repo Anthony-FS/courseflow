@@ -77,6 +77,16 @@ describe("upload media type and size validation", () => {
     expect(result.config.bucket).toBe("course-covers");
   });
 
+  it("accepts a Blob with a file name (undici-style upload)", () => {
+    const blob = new Blob([new Uint8Array(2048)], { type: "image/jpeg" });
+    Object.defineProperty(blob, "name", { value: "ok.jpg" });
+
+    const result = validateUpload("cover", blob);
+
+    expect(result.ok).toBe(true);
+    expect(result.config.bucket).toBe("course-covers");
+  });
+
   it("POST /api/admin/uploads returns 400 for invalid mime before storage upload", async () => {
     const supabase = createMockSupabase();
     requireAdmin.mockResolvedValue({

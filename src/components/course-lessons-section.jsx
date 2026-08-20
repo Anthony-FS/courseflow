@@ -6,7 +6,8 @@ import Link from "next/link";
 import { GripVertical, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { getAdminCourseLessons } from "@/lib/admin-courses";
+import ConfirmationModal from "@/components/admin/confirmation-modal";
+import { deleteAdminLesson, getAdminCourseLessons } from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
 
 function CourseLessonsSection({
@@ -23,6 +24,9 @@ function CourseLessonsSection({
   const [dragIndex, setDragIndex] = useState(null);
   const [loadStatus, setLoadStatus] = useState(courseId ? "loading" : "ready");
   const [loadError, setLoadError] = useState("");
+  const [lessonToDelete, setLessonToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const isDragging = dragIndex !== null;
 
   const isControlled = controlledLessons !== undefined;
@@ -73,8 +77,31 @@ function CourseLessonsSection({
     setUncontrolledLessons(updater);
   }
 
-  function handleDeleteLesson(id) {
-    setLessons((current) => current.filter((lesson) => lesson.id !== id));
+  function handleDeleteLesson(lesson) {
+    setDeleteError("");
+    setLessonToDelete(lesson);
+  }
+
+  async function handleConfirmDeleteLesson() {
+    if (!lessonToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    setDeleteError("");
+
+    try {
+      if (courseId) {
+        await deleteAdminLesson(courseId, lessonToDelete.id);
+      }
+
+      setLessons((current) =>
+        current.filter((lesson) => lesson.id !== lessonToDelete.id),
+      );
+      setLessonToDelete(null);
+    } catch (error) {
+      setDeleteError(error.message || "Failed to delete lesson");
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function handleDragStart(event, index) {
@@ -124,6 +151,12 @@ function CourseLessonsSection({
           </Link>
         </Button>
       </div>
+
+      {deleteError ? (
+        <p className="mb-4 text-body3 text-orange-500" role="alert">
+          {deleteError}
+        </p>
+      ) : null}
 
       <div
         className={cn(
@@ -223,7 +256,9 @@ function CourseLessonsSection({
                           isLifted && "border-t-transparent bg-white"
                         )}
                       >
-                        {lesson.subLessons}
+                        {typeof lesson.subLessons === "number"
+                          ? lesson.subLessons
+                          : lesson.subLessons?.length ?? 0}
                       </td>
                       <td
                         className={cn(
@@ -235,7 +270,10 @@ function CourseLessonsSection({
                           <button
                             type="button"
                             aria-label={`Delete ${lesson.name}`}
-                            onClick={() => handleDeleteLesson(lesson.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteLesson(lesson);
+                            }}
                             className="rounded-md p-1.5 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:shadow-focus"
                           >
                             <Image
@@ -269,6 +307,19 @@ function CourseLessonsSection({
           </table>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={Boolean(lessonToDelete)}
+        onClose={() => {
+          if (!isDeleting) setLessonToDelete(null);
+        }}
+        onConfirm={handleConfirmDeleteLesson}
+        isConfirming={isDeleting}
+        title="Confirmation"
+        message="Are you sure you want to delete this lesson?"
+        confirmText="Yes, I want to delete this lesson"
+        cancelText="No, keep it"
+      />
     </section>
   );
 }
