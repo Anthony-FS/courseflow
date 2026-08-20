@@ -52,6 +52,7 @@ export async function GET(_request, { params }) {
         id,
         title,
         description,
+        description,
         sort_order,
         is_preview,
         materials (
@@ -86,13 +87,34 @@ export async function GET(_request, { params }) {
         ) || materials[0];
       const attachmentMaterial = materials.find((m) => m !== videoMaterial);
 
+      const materials = Array.isArray(sub.materials)
+        ? sub.materials
+        : sub.materials
+          ? [sub.materials]
+          : [];
+      const videoMaterial =
+        materials.find(
+          (m) =>
+            m.file_type?.startsWith("video/") ||
+            m.file_url?.includes("video") ||
+            m.file_url?.includes("trailer"),
+        ) || materials[0];
+      const attachmentMaterial = materials.find((m) => m !== videoMaterial);
+
       return {
         id: sub.id,
         title: sub.title,
         description: sub.description || "",
         videoUrl: videoMaterial?.file_url || null,
         videoName: videoMaterial?.name || "",
+        description: sub.description || "",
+        videoUrl: videoMaterial?.file_url || null,
+        videoName: videoMaterial?.name || "",
         videoFile: null,
+        attachmentUrl: attachmentMaterial?.file_url || null,
+        attachmentName: attachmentMaterial?.name || "",
+        attachmentType: attachmentMaterial?.file_type || null,
+        attachmentFile: null,
         attachmentUrl: attachmentMaterial?.file_url || null,
         attachmentName: attachmentMaterial?.name || "",
         attachmentType: attachmentMaterial?.file_type || null,
@@ -169,6 +191,7 @@ export async function PUT(request, { params }) {
         course_id: courseId,
         lesson_id: lessonId,
         title: String(sub.title).trim(),
+        description: sub.description ? String(sub.description).trim() : null,
         description: sub.description ? String(sub.description).trim() : null,
         sort_order: i + 1,
         is_preview: Boolean(sub.isPreview),

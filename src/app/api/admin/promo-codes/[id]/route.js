@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import { validatePromoCodeAmounts } from "@/lib/promo-code-validation";
 
 function normalize(body) {
   const code = String(body.code ?? "").trim().toUpperCase();
@@ -9,7 +10,12 @@ function normalize(body) {
   if (!/^[a-z0-9]+$/i.test(code)) return { error: "Promo code must contain alphabet and number characters only." };
   if (!Number.isInteger(minPurchaseAmount) || minPurchaseAmount < 0) return { error: "Minimum purchase amount must be a non-negative number." };
   if (!["fixed", "percent"].includes(discountType)) return { error: "Invalid discount type." };
-  if (!Number.isInteger(discountValue) || discountValue < 0 || (discountType === "percent" && discountValue > 100)) return { error: "Invalid discount value." };
+  const amountValidation = validatePromoCodeAmounts({
+    discountType,
+    discountValue,
+    minPurchaseAmount,
+  });
+  if (amountValidation.error) return { error: amountValidation.error };
   return { code, discountType, minPurchaseAmount, discountValue };
 }
 
@@ -27,6 +33,7 @@ export async function PATCH(request, { params }) {
   const normalized = normalize(await request.json());
   if (normalized.error) return jsonError(normalized.error, 400);
   const { data, error: updateError } = await supabase.from("promo_codes").update({ code: normalized.code, discount_type: normalized.discountType, discount_value: normalized.discountValue, min_purchase_amount: normalized.minPurchaseAmount }).eq("id", (await params).id).select("id").single();
+  if (updateError?.code === "23505") return jsonError("Promo code already exists.", 409);
   if (updateError) return jsonError(updateError.message, 500);
   return jsonOk(data);
 }
