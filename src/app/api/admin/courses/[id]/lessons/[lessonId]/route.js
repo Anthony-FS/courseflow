@@ -51,6 +51,8 @@ export async function GET(_request, { params }) {
       sub_lessons (
         id,
         title,
+        description,
+        description,
         sort_order,
         is_preview,
         materials (
@@ -71,13 +73,31 @@ export async function GET(_request, { params }) {
   const sortedSubLessons = (lesson.sub_lessons || [])
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((sub) => {
-      const material = Array.isArray(sub.materials) ? sub.materials[0] : sub.materials;
+      const materials = Array.isArray(sub.materials)
+        ? sub.materials
+        : sub.materials
+          ? [sub.materials]
+          : [];
+      const videoMaterial =
+        materials.find(
+          (m) =>
+            m.file_type?.startsWith("video/") ||
+            m.file_url?.includes("video") ||
+            m.file_url?.includes("trailer"),
+        ) || materials[0];
+      const attachmentMaterial = materials.find((m) => m !== videoMaterial);
+
       return {
         id: sub.id,
         title: sub.title,
-        videoUrl: material?.file_url || null,
-        videoName: material?.name || "",
+        description: sub.description || "",
+        videoUrl: videoMaterial?.file_url || null,
+        videoName: videoMaterial?.name || "",
         videoFile: null,
+        attachmentUrl: attachmentMaterial?.file_url || null,
+        attachmentName: attachmentMaterial?.name || "",
+        attachmentType: attachmentMaterial?.file_type || null,
+        attachmentFile: null,
         isPreview: Boolean(sub.is_preview),
       };
     });
@@ -150,6 +170,8 @@ export async function PUT(request, { params }) {
         course_id: courseId,
         lesson_id: lessonId,
         title: String(sub.title).trim(),
+        description: sub.description ? String(sub.description).trim() : null,
+        description: sub.description ? String(sub.description).trim() : null,
         sort_order: i + 1,
         is_preview: Boolean(sub.isPreview),
       })
@@ -167,6 +189,16 @@ export async function PUT(request, { params }) {
         name: String(sub.videoName || `${sub.title} Video`).trim(),
         file_url: String(sub.videoUrl),
         file_type: "video/mp4",
+      });
+    }
+
+    if (sub.attachmentUrl) {
+      await supabase.from("materials").insert({
+        course_id: courseId,
+        sub_lesson_id: subLesson.id,
+        name: String(sub.attachmentName || `${sub.title} Attachment`).trim(),
+        file_url: String(sub.attachmentUrl),
+        file_type: String(sub.attachmentType || "application/pdf"),
       });
     }
   }

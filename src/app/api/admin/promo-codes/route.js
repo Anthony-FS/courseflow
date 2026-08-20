@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import { validatePromoCodeAmounts } from "@/lib/promo-code-validation";
 
 const CODE_PATTERN = /^[a-z0-9]+$/i;
 
@@ -35,11 +36,13 @@ export async function POST(request) {
   if (!["fixed", "percent"].includes(discountType)) {
     return jsonError("Invalid discount type.", 400);
   }
-  if (!Number.isInteger(discountValue) || discountValue < 0) {
-    return jsonError("Discount value must be a non-negative number.", 400);
-  }
-  if (discountType === "percent" && discountValue > 100) {
-    return jsonError("Percent discount cannot exceed 100.", 400);
+  const amountValidation = validatePromoCodeAmounts({
+    discountType,
+    discountValue,
+    minPurchaseAmount,
+  });
+  if (amountValidation.error) {
+    return jsonError(amountValidation.error, 400);
   }
 
   const promoRows = (courseIds.length > 0 ? courseIds : [null]).map((courseId) => ({
@@ -59,6 +62,9 @@ export async function POST(request) {
     .limit(1);
 
   if (insertError) {
+    if (insertError.code === "23505") {
+      return jsonError("Promo code already exists.", 409);
+    }
     return jsonError(insertError.message || "Failed to create promo code.", 500);
   }
 

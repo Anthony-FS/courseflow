@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getPromoCourseOptions, digitsOnly, normalizePromoCode, clampPercentDiscount } from "@/lib/promo-codes";
+import { getRequiredMinimumPurchase } from "@/lib/promo-code-validation";
 
 const INITIAL_FORM = {
   code: "",
@@ -20,6 +21,7 @@ export default function AddPromoCodePage() {
   const router = useRouter();
   const [form, setForm] = useState(INITIAL_FORM);
   const [errorMessage, setErrorMessage] = useState("");
+  const [notices, setNotices] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courses, setCourses] = useState([]);
   const [isCourseMenuOpen, setIsCourseMenuOpen] = useState(false);
@@ -58,9 +60,44 @@ export default function AddPromoCodePage() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function setNotice(field, message) {
+    setNotices((current) => ({ ...current, [field]: message }));
+  }
+
   function handlePercentBlur() {
     if (form.discountType !== "percent" || form.discountValue === "") return;
-    setField("discountValue", clampPercentDiscount(form.discountValue));
+    if (Number(form.discountValue) > 100) {
+      setField("discountValue", "100");
+      setNotice("discountValue", "Percentage discount cannot exceed 100%. The value was adjusted to 100%.");
+      return;
+    }
+    setNotice("discountValue", "");
+  }
+
+  function handleFixedDiscountChange(value) {
+    const requiredMinimumPurchase = getRequiredMinimumPurchase("fixed", value);
+    setForm((current) => ({
+      ...current,
+      discountValue: value,
+      minPurchaseAmount:
+        requiredMinimumPurchase !== null &&
+        Number(current.minPurchaseAmount || 0) < requiredMinimumPurchase
+          ? String(requiredMinimumPurchase)
+          : current.minPurchaseAmount,
+    }));
+    if (requiredMinimumPurchase !== null && Number(form.minPurchaseAmount || 0) < requiredMinimumPurchase) {
+      setNotice("minPurchaseAmount", `Minimum purchase was adjusted to ${requiredMinimumPurchase} THB so the customer pays at least 100 THB.`);
+    }
+  }
+
+  function handleMinPurchaseBlur() {
+    const requiredMinimumPurchase = getRequiredMinimumPurchase("fixed", form.discountValue);
+    if (requiredMinimumPurchase !== null && Number(form.minPurchaseAmount || 0) < requiredMinimumPurchase) {
+      setField("minPurchaseAmount", String(requiredMinimumPurchase));
+      setNotice("minPurchaseAmount", `Minimum purchase was adjusted to ${requiredMinimumPurchase} THB so the customer pays at least 100 THB.`);
+      return;
+    }
+    setNotice("minPurchaseAmount", "");
   }
 
   function handleTypeChange(type) {
@@ -136,13 +173,15 @@ export default function AddPromoCodePage() {
           </label>
           <label className="block">
             <span className="mb-1.5 block text-body2">Minimum purchase amount (THB)*</span>
-            <input
-              required
-              inputMode="numeric"
-              value={form.minPurchaseAmount}
-              onChange={(event) => setField("minPurchaseAmount", digitsOnly(event.target.value))}
-              className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100"
-            />
+              <input
+                required
+                inputMode="numeric"
+                value={form.minPurchaseAmount}
+                onChange={(event) => setField("minPurchaseAmount", digitsOnly(event.target.value))}
+                onBlur={handleMinPurchaseBlur}
+                className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100"
+              />
+              {notices.minPurchaseAmount ? <p className="mt-1.5 text-sm text-blue-600">{notices.minPurchaseAmount}</p> : null}
           </label>
 
           <fieldset className="col-span-2">
@@ -151,12 +190,13 @@ export default function AddPromoCodePage() {
               <label className="flex items-center gap-3">
                 <input type="radio" name="discountType" checked={form.discountType === "thb"} onChange={() => handleTypeChange("thb")} className="size-5 accent-blue-500" />
                 <span className="whitespace-nowrap text-gray-800">Fixed amount (THB)</span>
-                <input required={form.discountType === "thb"} inputMode="numeric" placeholder="THB" value={form.discountType === "thb" ? form.discountValue : ""} onChange={(event) => setField("discountValue", digitsOnly(event.target.value))} className="h-12 w-32 rounded-lg border border-gray-400 px-3 text-body2" />
+                <input required={form.discountType === "thb"} inputMode="numeric" placeholder="THB" value={form.discountType === "thb" ? form.discountValue : ""} onChange={(event) => handleFixedDiscountChange(digitsOnly(event.target.value))} className="h-12 w-32 rounded-lg border border-gray-400 px-3 text-body2" />
               </label>
               <label className="flex items-center gap-3">
                 <input type="radio" name="discountType" checked={form.discountType === "percent"} onChange={() => handleTypeChange("percent")} className="size-5 accent-blue-500" />
                 <span className="whitespace-nowrap text-gray-800">Percent (%)</span>
                 <input required={form.discountType === "percent"} inputMode="numeric" placeholder="Percent" value={form.discountType === "percent" ? form.discountValue : ""} onChange={(event) => setField("discountValue", digitsOnly(event.target.value))} onBlur={handlePercentBlur} className="h-12 w-48 rounded-lg border border-gray-400 px-3 text-body2 placeholder:text-gray-500" />
+                {notices.discountValue ? <p className="mt-1.5 text-sm text-blue-600">{notices.discountValue}</p> : null}
               </label>
             </div>
           </fieldset>

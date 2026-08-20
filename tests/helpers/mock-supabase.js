@@ -130,6 +130,16 @@ export function createMockSupabase({
         updates.push(entry);
         return updateChain(entry);
       },
+      update() {
+        return {
+          eq: async () => ({ error: null }),
+        };
+      },
+      update() {
+        return {
+          eq: async () => ({ error: null }),
+        };
+      },
       delete() {
         const entry = { table, filters: [] };
         deletes.push(entry);
