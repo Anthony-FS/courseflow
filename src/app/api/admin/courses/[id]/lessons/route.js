@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import { touchCourseUpdatedAt } from "@/lib/touch-course";
 
 function mapLesson(row) {
   const subLessonCount = Array.isArray(row.sub_lessons)
@@ -193,6 +194,8 @@ export async function POST(request, { params }) {
       });
     }
   }
+
+  await touchCourseUpdatedAt(supabase, courseId);
 
   return jsonOk({ success: true, id: lesson.id }, { status: 201 });
 }

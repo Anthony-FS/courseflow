@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { createMockSupabase, insertsFor } from "../helpers/mock-supabase.js";
+import { createMockSupabase, insertsFor, updatesFor } from "../helpers/mock-supabase.js";
 
 vi.mock("@/lib/auth", () => ({
   requireAdmin: vi.fn(),
@@ -69,6 +69,11 @@ describe("Lesson Management API", () => {
 
       const materialInserts = insertsFor(supabase, "materials");
       expect(materialInserts.length).toBe(1);
+
+      const courseTouch = updatesFor(supabase, "courses").find((entry) =>
+        Object.prototype.hasOwnProperty.call(entry.payload, "updated_at"),
+      );
+      expect(courseTouch).toBeTruthy();
     });
 
     it("rejects invalid payload when lesson name is missing", async () => {

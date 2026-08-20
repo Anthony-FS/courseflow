@@ -39,6 +39,35 @@ export async function createAdminCourse(payload) {
   return data;
 }
 
+export async function getAdminCourse(courseId) {
+  const response = await fetch(`/api/admin/courses/${courseId}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to load course");
+  }
+
+  return data;
+}
+
+export async function updateAdminCourse(courseId, payload) {
+  const response = await fetch(`/api/admin/courses/${courseId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to update course");
+  }
+
+  return data;
+}
+
 export async function getAdminCourseLessons(courseId) {
   const response = await fetch(`/api/admin/courses/${courseId}/lessons`, {
     method: "GET",

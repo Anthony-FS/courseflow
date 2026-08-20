@@ -94,6 +94,12 @@ export function isFreePrice(price) {
   return Number.isFinite(n) && n === 0;
 }
 
+/** UI uses `thb`; the promo_codes check constraint stores `fixed`. */
+export function mapDiscountTypeForDb(value) {
+  const type = String(value ?? "").trim().toLowerCase();
+  return type === "thb" ? "fixed" : type;
+}
+
 /**
  * Validate promo fields when promo is enabled.
  * @returns {Record<string, string>} map of field key → error message

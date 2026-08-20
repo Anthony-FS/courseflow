@@ -94,7 +94,7 @@ describe("POST /api/admin/courses integration", () => {
     expect(promoInsert.rows[0]).toMatchObject({
       course_id: "course-created-1",
       code: "NEWYEAR200",
-      discount_type: "thb",
+      discount_type: "fixed",
       discount_value: 200,
       min_purchase_amount: 0,
       is_active: true,

@@ -27,7 +27,7 @@ function mapCourse(row) {
     price: row.price ?? 0,
     lesson_count: lessonCount,
     created_at: row.created_at,
-    updated_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
   };
 }
 
@@ -36,7 +36,7 @@ export async function getCourses() {
   const { data, error } = await supabase
     .from("courses")
     .select(
-      "id, title, cover_file_url, cover_file_type, price, created_at, sub_lessons(count)",
+      "id, title, cover_file_url, cover_file_type, price, created_at, updated_at, sub_lessons(count)",
     )
     .order("created_at", { ascending: false });
 

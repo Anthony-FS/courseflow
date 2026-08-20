@@ -61,6 +61,7 @@ erDiagram
     string video_trailer_url
     numeric price
     timestamptz created_at
+    timestamptz updated_at
   }
 
   lessons {

@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from "@/lib/api";
 import {
   parseCoursePrice,
   parseLearningTime,
+  mapDiscountTypeForDb,
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
@@ -130,7 +131,7 @@ export async function POST(request) {
     const { error: promoError } = await supabase.from("promo_codes").insert({
       course_id: courseId,
       code: String(promo.code).trim(),
-      discount_type: promo.discountType,
+      discount_type: mapDiscountTypeForDb(promo.discountType),
       discount_value: asNumber(promo.discountValue),
       min_purchase_amount: asNumber(promo.minPurchaseAmount ?? 0),
       is_active: true,
