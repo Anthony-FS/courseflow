@@ -75,21 +75,23 @@ export async function POST(request) {
   const attachment = body.attachment ?? null;
 
   if (promo) {
-    const code = String(promo.code ?? "").trim();
-    const discountType = String(promo.discountType ?? "").trim();
+    const code = String(promo.code ?? "").trim().toUpperCase();
+    const requestedDiscountType = String(promo.discountType ?? "").trim();
+    const discountType =
+      requestedDiscountType === "thb" ? "fixed" : requestedDiscountType;
     const discountValue = asNumber(promo.discountValue);
     const minPurchaseAmount = asNumber(promo.minPurchaseAmount ?? 0);
     const promoErrors = validatePromoFields({
       enabled: true,
       code,
-      discountType,
+      discountType: requestedDiscountType,
       discountValue: promo.discountValue,
       price,
     });
 
     if (
       Object.keys(promoErrors).length > 0 ||
-      !["thb", "percent"].includes(discountType) ||
+      !["fixed", "percent"].includes(discountType) ||
       !Number.isFinite(discountValue) ||
       discountValue < 0 ||
       !Number.isFinite(minPurchaseAmount) ||
@@ -130,10 +132,11 @@ export async function POST(request) {
   if (promo) {
     const { error: promoError } = await supabase.from("promo_codes").insert({
       course_id: courseId,
-      code: String(promo.code).trim(),
+      code: String(promo.code ?? "").trim().toUpperCase(),
       discount_type: mapDiscountTypeForDb(promo.discountType),
       discount_value: asNumber(promo.discountValue),
       min_purchase_amount: asNumber(promo.minPurchaseAmount ?? 0),
+      starts_at: new Date().toISOString(),
       is_active: true,
     });
 

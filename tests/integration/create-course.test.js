@@ -99,6 +99,7 @@ describe("POST /api/admin/courses integration", () => {
       min_purchase_amount: 0,
       is_active: true,
     });
+    expect(promoInsert.rows[0].starts_at).toEqual(expect.any(String));
 
     const lessonInsert = insertsFor(supabase, "lessons")[0];
     expect(lessonInsert.rows).toHaveLength(3);
