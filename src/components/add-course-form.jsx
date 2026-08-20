@@ -5,10 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleAlert, Plus } from "lucide-react";
 
-import {
-  INITIAL_DRAFT,
-  useAddCourseDraft,
-} from "@/components/admin/add-course-draft-content";
+import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { Button } from "@/components/ui/button";
 import { CourseLessonsSection } from "@/components/course-lessons-section";
 import {
@@ -213,32 +210,51 @@ function AddCourseForm({
 }) {
   const router = useRouter();
   const isEdit = mode === "edit";
-  const [promoEnabled, setPromoEnabled] = useState(!isEdit);
-  const [discountType, setDiscountType] = useState("thb");
-  const [promo, setPromo] = useState({
+  const draftContent = useAddCourseDraft();
+  const useDraft = !isEdit && draftContent != null;
+  const clearDraft = draftContent?.clearDraft ?? (() => {});
+
+  const [promoEnabledState, setPromoEnabled] = useState(!isEdit);
+  const [discountTypeState, setDiscountType] = useState("thb");
+  const [promoState, setPromo] = useState({
     code: isEdit ? "" : "NEWYEAR200",
     minPurchase: "0",
     discountThb: isEdit ? "" : "200",
     discountPercent: "",
   });
-  const [values, setValues] = useState({
+  const [valuesState, setValues] = useState({
     courseName: "",
     price: "",
     learningTime: "",
     courseSummary: "",
     courseDetail: "",
   });
-  const [coverImage, setCoverImage] = useState(null);
-  const [videoTrailer, setVideoTrailer] = useState(null);
-  const [attachment, setAttachment] = useState(null);
+  const [coverImageState, setCoverImage] = useState(null);
+  const [videoTrailerState, setVideoTrailer] = useState(null);
+  const [attachmentState, setAttachment] = useState(null);
   const [existingCover, setExistingCover] = useState(null);
   const [existingTrailer, setExistingTrailer] = useState(null);
   const [existingAttachment, setExistingAttachment] = useState(null);
-  const [lessons, setLessons] = useState([]);
+  const [lessonsState, setLessons] = useState([]);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadStatus, setLoadStatus] = useState(isEdit ? "loading" : "ready");
+
+  const promoEnabled = useDraft
+    ? draftContent.draft.promoEnabled
+    : promoEnabledState;
+  const discountType = useDraft
+    ? draftContent.draft.discountType
+    : discountTypeState;
+  const promo = useDraft ? draftContent.draft.promo : promoState;
+  const values = useDraft ? draftContent.draft.values : valuesState;
+  const coverImage = useDraft ? draftContent.draft.coverImage : coverImageState;
+  const videoTrailer = useDraft
+    ? draftContent.draft.videoTrailer
+    : videoTrailerState;
+  const attachment = useDraft ? draftContent.draft.attachment : attachmentState;
+  const lessons = useDraft ? draftContent.draft.lessons : lessonsState;
 
   useEffect(() => {
     if (!isEdit || !courseId) return undefined;
@@ -323,7 +339,16 @@ function AddCourseForm({
   }, [isEdit, courseId]);
 
   function patchDraft(patch) {
-    setDraft((current) => ({ ...current, ...patch }));
+    if (useDraft) {
+      draftContent.setDraft((current) => ({ ...current, ...patch }));
+      return;
+    }
+    if ("promoEnabled" in patch) setPromoEnabled(patch.promoEnabled);
+    if ("discountType" in patch) setDiscountType(patch.discountType);
+    if ("coverImage" in patch) setCoverImage(patch.coverImage);
+    if ("videoTrailer" in patch) setVideoTrailer(patch.videoTrailer);
+    if ("attachment" in patch) setAttachment(patch.attachment);
+    if ("lessons" in patch) setLessons(patch.lessons);
   }
 
   function clearError(field) {
@@ -336,18 +361,26 @@ function AddCourseForm({
   }
 
   function updateField(field, value) {
-    setDraft((current) => ({
-      ...current,
-      values: { ...current.values, [field]: value },
-    }));
+    if (useDraft) {
+      draftContent.setDraft((current) => ({
+        ...current,
+        values: { ...current.values, [field]: value },
+      }));
+    } else {
+      setValues((current) => ({ ...current, [field]: value }));
+    }
     clearError(field);
   }
 
   function updatePromo(field, value) {
-    setDraft((current) => ({
-      ...current,
-      promo: { ...current.promo, [field]: value },
-    }));
+    if (useDraft) {
+      draftContent.setDraft((current) => ({
+        ...current,
+        promo: { ...current.promo, [field]: value },
+      }));
+    } else {
+      setPromo((current) => ({ ...current, [field]: value }));
+    }
   }
 
   function validate() {
@@ -450,7 +483,7 @@ function AddCourseForm({
           })),
         });
         clearDraft();
-      router.push(`/admin/courses?created=${created.id}`);
+        router.push(`/admin/courses?created=${created.id}`);
       }
       router.refresh();
     } catch (err) {
