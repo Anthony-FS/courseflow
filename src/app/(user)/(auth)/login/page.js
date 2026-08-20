@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { safeNextPath } from "@/lib/safe-next-path";
 
 export const metadata = {
   title: "Log in | CourseFlow",
@@ -52,13 +53,16 @@ function LoginDecorations() {
   );
 }
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }) {
+  const params = await searchParams;
+  const nextPath = safeNextPath(params?.next);
+
   return (
     <div className="relative min-h-[calc(100vh-5.5rem)] overflow-hidden bg-white">
       <LoginDecorations />
       <main className="relative z-10 min-h-[calc(100vh-5.5rem)] w-full">
         <div className="mx-auto flex w-full max-w-[1440px] justify-center px-4 pt-[157px] pb-16 xl:justify-start xl:px-0 xl:pl-[494px]">
-          <LoginForm />
+          <LoginForm nextPath={nextPath} />
         </div>
       </main>
     </div>

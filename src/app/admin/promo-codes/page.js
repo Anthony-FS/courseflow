@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
 import { PromoCodeTable } from "@/components/admin/promo-code-table";
-import { DeletePromoCodeDialog } from "@/components/admin/delete-promo-code-dialog";
 import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getPromoCodes, searchPromoCodes } from "@/lib/promo-codes";
 import { getTotalPages, paginateItems } from "@/lib/pagination";
 
@@ -121,7 +121,24 @@ export default function AdminPromoCodesPage() {
           />
         ) : null}
       </section>
-      <DeletePromoCodeDialog open={Boolean(promoToDelete)} code={promoToDelete?.code} isDeleting={isDeleting} onOpenChange={(open) => !open && !isDeleting && setPromoToDelete(null)} onConfirm={handleDelete} />
+      <ConfirmationDialog
+        open={Boolean(promoToDelete)}
+        isConfirming={isDeleting}
+        confirmFirst
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setPromoToDelete(null);
+          }
+        }}
+        onConfirm={handleDelete}
+        message={
+          promoToDelete?.code
+            ? `Are you sure you want to delete this code (${promoToDelete.code})?`
+            : "Are you sure you want to delete this code?"
+        }
+        confirmText="Yes, I want to delete the code"
+        cancelText="No, keep it"
+      />
     </main>
   );
 }

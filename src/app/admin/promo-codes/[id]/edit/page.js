@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-react";
 
-import { DeletePromoCodeDialog } from "@/components/admin/delete-promo-code-dialog";
 import { Button } from "@/components/ui/button";
 import { getRequiredMinimumPurchase } from "@/lib/promo-code-validation";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { digitsOnly, getPromoCourseOptions, normalizePromoCode } from "@/lib/promo-codes";
 
 export default function EditPromoCodePage() {
@@ -239,7 +239,20 @@ export default function EditPromoCodePage() {
         {errorMessage ? <p role="alert" className="mt-6 text-body2 text-orange-500">{errorMessage}</p> : null}
       </form>
       <button type="button" onClick={() => setShowDelete(true)} className="self-end px-10 text-body2 font-medium text-blue-500 hover:text-blue-400">Delete Promo code</button>
-      <DeletePromoCodeDialog open={showDelete} code={promo?.code} isDeleting={isDeleting} onOpenChange={setShowDelete} onConfirm={handleDelete} />
+      <ConfirmationDialog
+        open={showDelete}
+        isConfirming={isDeleting}
+        confirmFirst
+        onOpenChange={setShowDelete}
+        onConfirm={handleDelete}
+        message={
+          promo?.code
+            ? `Are you sure you want to delete this code (${promo.code})?`
+            : "Are you sure you want to delete this code?"
+        }
+        confirmText="Yes, I want to delete the code"
+        cancelText="No, keep it"
+      />
     </main>
   );
 }
