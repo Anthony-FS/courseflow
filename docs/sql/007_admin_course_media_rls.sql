@@ -1,42 +1,50 @@
--- CourseFlow: storage buckets for add-course media
--- Cover image, video trailer, and optional attached file.
+-- CourseFlow: let signed-in admins upload cover, trailer, and attachment
+-- files with the anon/publishable key (no service role).
 -- Apply in Supabase Dashboard → SQL Editor (or via apply-supabase-sql.mjs).
--- Admin upload/update/delete policies use private.is_admin() from
--- docs/sql/007_admin_course_media_rls.sql — apply 007 if those helpers
--- are not already in the database.
+--
+-- Why: storage policies that SELECT public.profiles are evaluated under
+-- profiles RLS and often fail. private.is_admin() is SECURITY DEFINER
+-- (same pattern as 004_lessons_select_policy.sql).
 
 begin;
 
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values
-  (
-    'course-covers',
-    'course-covers',
-    true,
-    5242880,
-    array['image/jpeg', 'image/png', 'image/jpg']
-  ),
-  (
-    'course-trailers',
-    'course-trailers',
-    true,
-    20971520,
-    array['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/avi']
-  ),
-  (
-    'course-attachments',
-    'course-attachments',
-    false,
-    20971520,
-    null
-  )
-on conflict (id) do update
-set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
+create schema if not exists private;
 
-alter table storage.objects enable row level security;
+create or replace function private.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role = 'admin'
+      and p.is_active = true
+  );
+$$;
+
+create or replace function private.is_active_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.is_active = true
+  );
+$$;
+
+revoke all on function private.is_admin() from public;
+revoke all on function private.is_active_user() from public;
+grant execute on function private.is_admin() to authenticated;
+grant execute on function private.is_active_user() to authenticated;
 
 drop policy if exists "course_covers_public_read" on storage.objects;
 create policy "course_covers_public_read"

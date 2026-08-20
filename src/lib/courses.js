@@ -1,18 +1,45 @@
 import { createClient } from "@/lib/supabase/client";
 
 const FALLBACK_COVER = "/courses/service-design.svg";
+const COVER_BUCKET = "course-covers";
 
-export function resolveCoverUrl(coverFileUrl) {
-  if (!coverFileUrl) {
+function toPublicStorageUrl(objectPath, supabaseUrl) {
+  const base = String(supabaseUrl ?? "").replace(/\/$/, "");
+  if (!base || !objectPath) {
+    return null;
+  }
+
+  const encodedPath = String(objectPath)
+    .split("/")
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join("/");
+
+  return `${base}/storage/v1/object/public/${encodedPath}`;
+}
+
+export function resolveCoverUrl(
+  coverFileUrl,
+  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL,
+) {
+  const value = String(coverFileUrl ?? "").trim();
+  if (!value) {
     return FALLBACK_COVER;
   }
 
-  if (/^https?:\/\//i.test(coverFileUrl) || coverFileUrl.startsWith("/")) {
-    return coverFileUrl;
+  if (/^https?:\/\//i.test(value) || value.startsWith("/")) {
+    return value;
   }
 
-  return FALLBACK_COVER;
+  const objectPath = value.startsWith(`${COVER_BUCKET}/`)
+    ? value
+    : `${COVER_BUCKET}/${value}`;
+  const publicUrl = toPublicStorageUrl(objectPath, supabaseUrl);
+
+  return publicUrl || FALLBACK_COVER;
 }
+
+export { FALLBACK_COVER };
 
 export function embeddedCount(value) {
   return Array.isArray(value) ? (value[0]?.count ?? 0) : 0;

@@ -41,6 +41,10 @@ export async function requireAdmin() {
   const session = await getSessionUser();
 
   if (TEMP_DISABLE_ADMIN_API_PROTECTION) {
+    if (session.user) {
+      return { ...session, error: null };
+    }
+
     const service = createServiceClient();
     if (service) {
       const { data: admin } = await service

@@ -1,11 +1,39 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { SquarePen, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FALLBACK_COVER } from "@/lib/courses";
 import { formatCourseDate, formatPrice } from "@/lib/format";
+
+function CourseCover({ src, alt }) {
+  const [imageSrc, setImageSrc] = useState(src || FALLBACK_COVER);
+
+  useEffect(() => {
+    setImageSrc(src || FALLBACK_COVER);
+  }, [src]);
+
+  return (
+    <div className="relative h-10 w-14 shrink-0 overflow-hidden rounded">
+      <Image
+        src={imageSrc}
+        alt={alt}
+        fill
+        sizes="56px"
+        className="object-cover"
+        unoptimized
+        onError={() => {
+          if (imageSrc !== FALLBACK_COVER) {
+            setImageSrc(FALLBACK_COVER);
+          }
+        }}
+      />
+    </div>
+  );
+}
 
 export function CourseTable({
   courses,
@@ -58,13 +86,9 @@ export function CourseTable({
               <tr key={course.id} className="border-t border-gray-300">
                 <td className="px-6 py-4">{rowOffset + index + 1}</td>
                 <td className="px-6 py-4">
-                  <Image
+                  <CourseCover
                     src={course.cover_file_url}
                     alt={course.title || "Course cover"}
-                    width={56}
-                    height={40}
-                    className="h-10 w-14 rounded object-cover"
-                    unoptimized
                   />
                 </td>
                 <td className="px-6 py-4">{course.title}</td>
