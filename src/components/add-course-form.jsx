@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleAlert, Plus } from "lucide-react";
 
+import {
+  INITIAL_DRAFT,
+  useAddCourseDraft,
+} from "@/components/admin/add-course-draft-content";
 import { Button } from "@/components/ui/button";
 import { CourseLessonsSection } from "@/components/course-lessons-section";
 import {
@@ -318,6 +322,10 @@ function AddCourseForm({
     };
   }, [isEdit, courseId]);
 
+  function patchDraft(patch) {
+    setDraft((current) => ({ ...current, ...patch }));
+  }
+
   function clearError(field) {
     setErrors((current) => {
       if (!current[field]) return current;
@@ -328,12 +336,18 @@ function AddCourseForm({
   }
 
   function updateField(field, value) {
-    setValues((current) => ({ ...current, [field]: value }));
+    setDraft((current) => ({
+      ...current,
+      values: { ...current.values, [field]: value },
+    }));
     clearError(field);
   }
 
   function updatePromo(field, value) {
-    setPromo((current) => ({ ...current, [field]: value }));
+    setDraft((current) => ({
+      ...current,
+      promo: { ...current.promo, [field]: value },
+    }));
   }
 
   function validate() {
@@ -435,7 +449,8 @@ function AddCourseForm({
             sortOrder: index,
           })),
         });
-        router.push(`/admin/courses?created=${created.id}`);
+        clearDraft();
+      router.push(`/admin/courses?created=${created.id}`);
       }
       router.refresh();
     } catch (err) {
@@ -455,7 +470,9 @@ function AddCourseForm({
         </h1>
         <div className="flex items-center gap-3">
           <Button asChild variant="secondary" size="sm">
-            <Link href={cancelHref}>Cancel</Link>
+            <Link href={cancelHref} onClick={clearDraft}>
+              Cancel
+            </Link>
           </Button>
           <Button
             type="submit"
@@ -554,7 +571,9 @@ function AddCourseForm({
                   type="checkbox"
                   name="promoEnabled"
                   checked={promoEnabled}
-                  onChange={(event) => setPromoEnabled(event.target.checked)}
+                  onChange={(event) =>
+                    patchDraft({ promoEnabled: event.target.checked })
+                  }
                   className="size-4 rounded border-gray-400 accent-blue-500"
                 />
                 Promo code
@@ -608,7 +627,7 @@ function AddCourseForm({
                           value="thb"
                           checked={discountType === "thb"}
                           onChange={() => {
-                            setDiscountType("thb");
+                            patchDraft({ discountType: "thb" });
                             clearError("discountValue");
                           }}
                           className="size-4 accent-blue-500"
@@ -642,7 +661,7 @@ function AddCourseForm({
                           value="percent"
                           checked={discountType === "percent"}
                           onChange={() => {
-                            setDiscountType("percent");
+                            patchDraft({ discountType: "percent" });
                             clearError("discountValue");
                           }}
                           className="size-4 accent-blue-500"
@@ -728,7 +747,7 @@ function AddCourseForm({
                 existingName={existingCover?.name}
                 error={errors.coverImage}
                 onChange={(file) => {
-                  setCoverImage(file);
+                  patchDraft({ coverImage: file });
                   clearError("coverImage");
                 }}
               />
@@ -751,7 +770,7 @@ function AddCourseForm({
                 existingName={existingTrailer?.name}
                 error={errors.videoTrailer}
                 onChange={(file) => {
-                  setVideoTrailer(file);
+                  patchDraft({ videoTrailer: file });
                   clearError("videoTrailer");
                 }}
               />
@@ -767,7 +786,7 @@ function AddCourseForm({
                 accept="*/*"
                 file={attachment}
                 existingName={existingAttachment?.name}
-                onChange={setAttachment}
+                onChange={(file) => patchDraft({ attachment: file })}
                 size="sm"
               />
             </div>
@@ -782,7 +801,9 @@ function AddCourseForm({
         <CourseLessonsSection
           courseId={isEdit ? courseId : undefined}
           lessons={isEdit ? undefined : lessons}
-          onLessonsChange={isEdit ? undefined : setLessons}
+          onLessonsChange={isEdit ? undefined : (nextLessons) =>
+            patchDraft({ lessons: nextLessons })
+          }
         />
       </main>
     </div>

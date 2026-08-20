@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { ArrowLeft, Plus, X, Play, Loader2 } from "lucide-react";
 import ConfirmationModal from "./confirmation-modal";
+import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import {
   uploadAdminFile,
   createAdminLesson,
@@ -63,7 +64,10 @@ export default function LessonForm({
 }) {
   const router = useRouter();
   const params = useParams();
-  const courseId = params?.id || "1";
+  const pathname = usePathname();
+  const draftContent = useAddCourseDraft();
+  const isNewCourseFlow = pathname?.startsWith("/admin/courses/new");
+  const courseId = isNewCourseFlow ? "new" : params?.id;
   const lessonId = params?.lessonId;
 
   // Form State
@@ -105,6 +109,14 @@ export default function LessonForm({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  function leaveForm() {
+    if (isNewCourseFlow) {
+      router.push("/admin/courses/new");
+      return;
+    }
+    router.back();
+  }
 
   useEffect(() => {
     function clearAllowDrag() {
@@ -255,6 +267,16 @@ export default function LessonForm({
     setSubmitError("");
 
     try {
+      if (isNewCourseFlow) {
+        draftContent?.addLesson({
+          id: crypto.randomUUID(),
+          name: lessonName.trim(),
+          subLessons: subLessons.length,
+        });
+        router.push("/admin/courses/new");
+        return;
+      }
+
       // 1. Upload any newly selected video files to Supabase Storage
       const preparedSubLessons = await Promise.all(
         subLessons.map(async (sub) => {
@@ -327,7 +349,7 @@ export default function LessonForm({
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={leaveForm}
             className="text-[#9AA1B9] hover:text-[#2A2E3F] transition-colors p-1 cursor-pointer"
             aria-label="Back"
           >
@@ -347,7 +369,7 @@ export default function LessonForm({
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={leaveForm}
             disabled={isSaving}
             className="min-w-[110px] px-7 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-base hover:bg-[#FFF7F0] active:scale-[0.98] transition-all cursor-pointer bg-white disabled:opacity-50"
           >
