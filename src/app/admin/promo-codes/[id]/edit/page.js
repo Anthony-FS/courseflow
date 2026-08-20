@@ -7,10 +7,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { DeletePromoCodeDialog } from "@/components/admin/delete-promo-code-dialog";
 import { Button } from "@/components/ui/button";
-
-function digitsOnly(value) {
-  return value.replace(/[^0-9]/g, "");
-}
+import { digitsOnly, normalizePromoCode, clampPercentDiscount } from "@/lib/promo-codes";
 
 export default function EditPromoCodePage() {
   const { id } = useParams();
@@ -90,11 +87,11 @@ export default function EditPromoCodePage() {
 
       <form id="edit-promo-code-form" onSubmit={handleSave} className="m-10 rounded-2xl border border-gray-300 bg-white p-10 shadow-card">
         <div className="grid grid-cols-2 gap-x-10 gap-y-8">
-          <label className="block"><span className="mb-1.5 block text-body2">Set promo code*</span><input required value={form.code} onChange={(event) => setField("code", event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase())} className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2" /></label>
+          <label className="block"><span className="mb-1.5 block text-body2">Set promo code*</span><input required value={form.code} onChange={(event) => setField("code", normalizePromoCode(event.target.value))} className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2" /></label>
           <label className="block"><span className="mb-1.5 block text-body2">Minimum purchase amount (THB)*</span><input required inputMode="numeric" value={form.minPurchaseAmount} onChange={(event) => setField("minPurchaseAmount", digitsOnly(event.target.value))} className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2" /></label>
           <fieldset className="col-span-2"><legend className="mb-3 text-body2">Select discount type*</legend><div className="grid grid-cols-2 gap-10">
             <label className="flex items-center gap-3"><input type="radio" checked={form.discountType === "thb"} onChange={() => setField("discountType", "thb")} className="size-5 accent-blue-500" /><span className="whitespace-nowrap text-gray-800">Discount (THB)</span><input required={form.discountType === "thb"} inputMode="numeric" value={form.discountType === "thb" ? form.discountValue : ""} onChange={(event) => setField("discountValue", digitsOnly(event.target.value))} className="h-12 w-32 rounded-lg border border-gray-400 px-3 text-body2" /></label>
-            <label className="flex items-center gap-3"><input type="radio" checked={form.discountType === "percent"} onChange={() => setField("discountType", "percent")} className="size-5 accent-blue-500" /><span className="whitespace-nowrap text-gray-800">Discount (%)</span><input required={form.discountType === "percent"} inputMode="numeric" placeholder="Percent" value={form.discountType === "percent" ? form.discountValue : ""} onChange={(event) => setField("discountValue", digitsOnly(event.target.value))} onBlur={() => form.discountType === "percent" && setField("discountValue", String(Math.min(Number(form.discountValue || 0), 100)))} className="h-12 w-48 rounded-lg border border-gray-400 px-3 text-body2 placeholder:text-gray-500" /></label>
+            <label className="flex items-center gap-3"><input type="radio" checked={form.discountType === "percent"} onChange={() => setField("discountType", "percent")} className="size-5 accent-blue-500" /><span className="whitespace-nowrap text-gray-800">Discount (%)</span><input required={form.discountType === "percent"} inputMode="numeric" placeholder="Percent" value={form.discountType === "percent" ? form.discountValue : ""} onChange={(event) => setField("discountValue", digitsOnly(event.target.value))} onBlur={() => form.discountType === "percent" && setField("discountValue", clampPercentDiscount(form.discountValue))} className="h-12 w-48 rounded-lg border border-gray-400 px-3 text-body2 placeholder:text-gray-500" /></label>
           </div></fieldset>
           <label className="col-span-2 block"><span className="mb-1.5 block text-body2">Courses Included</span><select disabled defaultValue="all" className="h-12 w-full rounded-lg border border-gray-400 bg-white px-3 text-body2"><option value="all">All courses</option></select></label>
         </div>

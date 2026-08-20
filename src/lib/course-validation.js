@@ -1,3 +1,5 @@
+import { PROMO_CODE_PATTERN } from "@/lib/promo-codes";
+
 export const COURSE_LIMITS = {
   title: 50,
   summary: 200,
@@ -109,6 +111,7 @@ export function validatePromoFields({
   code,
   discountType,
   discountValue,
+  minPurchaseAmount = "0",
   price,
 }) {
   if (!enabled) return {};
@@ -117,16 +120,35 @@ export function validatePromoFields({
 
   if (isBlank(code)) {
     errors.promoCode = EMPTY_FIELD_MESSAGE;
+  } else if (!PROMO_CODE_PATTERN.test(String(code).trim())) {
+    errors.promoCode =
+      "Promo code must contain alphabet and number characters only.";
+  }
+
+  if (isBlank(minPurchaseAmount)) {
+    errors.minPurchase = EMPTY_FIELD_MESSAGE;
+  } else {
+    const minPurchaseNumber = asNumber(minPurchaseAmount);
+    if (
+      !Number.isFinite(minPurchaseNumber) ||
+      !Number.isInteger(minPurchaseNumber) ||
+      minPurchaseNumber < 0
+    ) {
+      errors.minPurchase =
+        "Minimum purchase amount must be a non-negative number.";
+    }
   }
 
   if (isBlank(discountValue)) {
     errors.discountValue = EMPTY_FIELD_MESSAGE;
   } else {
     const discountNumber = asNumber(discountValue);
-    if (!Number.isFinite(discountNumber)) {
-      errors.discountValue = "Discount must be a number";
+    if (!Number.isFinite(discountNumber) || !Number.isInteger(discountNumber)) {
+      errors.discountValue = "Discount value must be a non-negative number.";
     } else if (discountNumber < 0) {
       errors.discountValue = "Discount cannot be negative";
+    } else if (String(discountType) === "percent" && discountNumber > 100) {
+      errors.discountValue = "Percent discount cannot exceed 100.";
     } else if (String(discountType) === "thb") {
       const priceNumber = asNumber(price);
       if (Number.isFinite(priceNumber) && discountNumber > priceNumber) {

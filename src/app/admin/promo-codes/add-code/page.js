@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { getPromoCourseOptions } from "@/lib/promo-codes";
+import { getPromoCourseOptions, digitsOnly, normalizePromoCode, clampPercentDiscount } from "@/lib/promo-codes";
 
 const INITIAL_FORM = {
   code: "",
@@ -15,10 +15,6 @@ const INITIAL_FORM = {
   discountValue: "",
   courseIds: [],
 };
-
-function digitsOnly(value) {
-  return value.replace(/[^0-9]/g, "");
-}
 
 export default function AddPromoCodePage() {
   const router = useRouter();
@@ -64,7 +60,7 @@ export default function AddPromoCodePage() {
 
   function handlePercentBlur() {
     if (form.discountType !== "percent" || form.discountValue === "") return;
-    setField("discountValue", String(Math.min(Number(form.discountValue), 100)));
+    setField("discountValue", clampPercentDiscount(form.discountValue));
   }
 
   function handleTypeChange(type) {
@@ -134,7 +130,7 @@ export default function AddPromoCodePage() {
             <input
               required
               value={form.code}
-              onChange={(event) => setField("code", event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase())}
+              onChange={(event) => setField("code", normalizePromoCode(event.target.value))}
               className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100"
             />
           </label>

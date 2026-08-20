@@ -122,4 +122,28 @@ describe("promo field validation", () => {
       }),
     ).toEqual({});
   });
+
+  it("rejects promo codes with non-alphanumeric characters", () => {
+    expect(
+      validatePromoFields({
+        enabled: true,
+        code: "SAVE-50",
+        discountType: "percent",
+        discountValue: "50",
+        price: "100",
+      }).promoCode,
+    ).toMatch(/alphabet and number/i);
+  });
+
+  it("rejects percent discounts over 100", () => {
+    expect(
+      validatePromoFields({
+        enabled: true,
+        code: "SAVE50",
+        discountType: "percent",
+        discountValue: "101",
+        price: "100",
+      }).discountValue,
+    ).toMatch(/cannot exceed 100/i);
+  });
 });
