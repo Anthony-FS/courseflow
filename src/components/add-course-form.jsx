@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleAlert, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CourseLessonsSection } from "@/components/course-lessons-section";
-import { createAdminCourse, uploadAdminFile } from "@/lib/admin-courses";
+import {
+  createAdminCourse,
+  getAdminCourse,
+  updateAdminCourse,
+  uploadAdminFile,
+} from "@/lib/admin-courses";
 import {
   COURSE_LIMITS,
   EMPTY_FIELD_MESSAGE,
@@ -139,16 +144,29 @@ function TextArea({
   );
 }
 
+function fileNameFromUrl(url) {
+  const path = String(url ?? "").split("?")[0];
+  const name = path.split("/").filter(Boolean).pop();
+  if (!name) return "file";
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
 function UploadBox({
   id,
   label,
   accept,
   file,
+  existingName,
   onChange,
   error,
   size = "default",
 }) {
   const inputRef = useRef(null);
+  const displayName = file?.name || existingName;
 
   return (
     <div>
@@ -176,7 +194,7 @@ function UploadBox({
       >
         <Plus className="size-6 stroke-[1.75]" aria-hidden />
         <span className="max-w-32 truncate px-2">
-          {file ? file.name : label}
+          {displayName || label}
         </span>
       </button>
       <FieldError id={`${id}-error`} message={error || undefined} />
@@ -184,14 +202,19 @@ function UploadBox({
   );
 }
 
-function AddCourseForm({ cancelHref = "/admin/courses" }) {
+function AddCourseForm({
+  cancelHref = "/admin/courses",
+  mode = "create",
+  courseId = null,
+}) {
   const router = useRouter();
-  const [promoEnabled, setPromoEnabled] = useState(true);
+  const isEdit = mode === "edit";
+  const [promoEnabled, setPromoEnabled] = useState(!isEdit);
   const [discountType, setDiscountType] = useState("thb");
   const [promo, setPromo] = useState({
-    code: "NEWYEAR200",
+    code: isEdit ? "" : "NEWYEAR200",
     minPurchase: "0",
-    discountThb: "200",
+    discountThb: isEdit ? "" : "200",
     discountPercent: "",
   });
   const [values, setValues] = useState({
@@ -204,10 +227,96 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
   const [coverImage, setCoverImage] = useState(null);
   const [videoTrailer, setVideoTrailer] = useState(null);
   const [attachment, setAttachment] = useState(null);
+  const [existingCover, setExistingCover] = useState(null);
+  const [existingTrailer, setExistingTrailer] = useState(null);
+  const [existingAttachment, setExistingAttachment] = useState(null);
   const [lessons, setLessons] = useState([]);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadStatus, setLoadStatus] = useState(isEdit ? "loading" : "ready");
+
+  useEffect(() => {
+    if (!isEdit || !courseId) return undefined;
+
+    let cancelled = false;
+
+    async function loadCourse() {
+      setLoadStatus("loading");
+      setSubmitError("");
+
+      try {
+        const data = await getAdminCourse(courseId);
+        if (cancelled) return;
+
+        setValues({
+          courseName: data.title ?? "",
+          price: data.price == null ? "" : String(data.price),
+          learningTime: data.totalLearningTime ?? "",
+          courseSummary: data.summary ?? "",
+          courseDetail: data.description ?? "",
+        });
+
+        setExistingCover(
+          data.coverImageUrl
+            ? { url: data.coverImageUrl, name: fileNameFromUrl(data.coverImageUrl) }
+            : null,
+        );
+        setExistingTrailer(
+          data.videoTrailerUrl
+            ? {
+                url: data.videoTrailerUrl,
+                name: fileNameFromUrl(data.videoTrailerUrl),
+              }
+            : null,
+        );
+        setExistingAttachment(
+          data.attachment?.fileUrl
+            ? {
+                url: data.attachment.fileUrl,
+                name: data.attachment.name || fileNameFromUrl(data.attachment.fileUrl),
+                fileType: data.attachment.fileType ?? "",
+              }
+            : null,
+        );
+
+        if (data.promo) {
+          const type = data.promo.discountType === "percent" ? "percent" : "thb";
+          setPromoEnabled(true);
+          setDiscountType(type);
+          setPromo({
+            code: data.promo.code ?? "",
+            minPurchase: String(data.promo.minPurchaseAmount ?? 0),
+            discountThb: type === "thb" ? String(data.promo.discountValue ?? "") : "",
+            discountPercent:
+              type === "percent" ? String(data.promo.discountValue ?? "") : "",
+          });
+        } else {
+          setPromoEnabled(false);
+          setDiscountType("thb");
+          setPromo({
+            code: "",
+            minPurchase: "0",
+            discountThb: "",
+            discountPercent: "",
+          });
+        }
+
+        setLoadStatus("ready");
+      } catch (error) {
+        if (!cancelled) {
+          setSubmitError(error.message || "Failed to load course");
+          setLoadStatus("error");
+        }
+      }
+    }
+
+    loadCourse();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, courseId]);
 
   function clearError(field) {
     setErrors((current) => {
@@ -240,8 +349,10 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
       }),
     };
 
-    if (!coverImage) nextErrors.coverImage = EMPTY_FIELD_MESSAGE;
-    if (!videoTrailer) nextErrors.videoTrailer = EMPTY_FIELD_MESSAGE;
+    if (!coverImage && !existingCover) nextErrors.coverImage = EMPTY_FIELD_MESSAGE;
+    if (!videoTrailer && !existingTrailer) {
+      nextErrors.videoTrailer = EMPTY_FIELD_MESSAGE;
+    }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -255,10 +366,25 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
     setIsSubmitting(true);
 
     try {
-      const [coverUpload, trailerUpload] = await Promise.all([
-        uploadAdminFile("cover", coverImage),
-        uploadAdminFile("trailer", videoTrailer),
-      ]);
+      let coverImageUrl = existingCover?.url ?? "";
+      let videoTrailerUrl = existingTrailer?.url ?? "";
+
+      const uploads = [];
+      if (coverImage) {
+        uploads.push(
+          uploadAdminFile("cover", coverImage).then((uploaded) => {
+            coverImageUrl = uploaded.fileUrl;
+          }),
+        );
+      }
+      if (videoTrailer) {
+        uploads.push(
+          uploadAdminFile("trailer", videoTrailer).then((uploaded) => {
+            videoTrailerUrl = uploaded.fileUrl;
+          }),
+        );
+      }
+      await Promise.all(uploads);
 
       let attachmentPayload = null;
       if (attachment) {
@@ -268,19 +394,25 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
           fileUrl: uploaded.fileUrl,
           fileType: uploaded.fileType,
         };
+      } else if (existingAttachment?.url) {
+        attachmentPayload = {
+          name: existingAttachment.name,
+          fileUrl: existingAttachment.url,
+          fileType: existingAttachment.fileType,
+        };
       }
 
       const discountValue =
         discountType === "thb" ? promo.discountThb : promo.discountPercent;
 
-      const created = await createAdminCourse({
+      const payload = {
         title: values.courseName.trim(),
         summary: values.courseSummary.trim(),
         description: values.courseDetail.trim(),
         price: Number(values.price),
         totalLearningTime: values.learningTime.trim(),
-        coverImageUrl: coverUpload.fileUrl,
-        videoTrailerUrl: trailerUpload.fileUrl,
+        coverImageUrl,
+        videoTrailerUrl,
         attachment: attachmentPayload,
         promo: promoEnabled
           ? {
@@ -290,16 +422,26 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
               discountValue: Number(discountValue),
             }
           : null,
-        lessons: lessons.map((lesson, index) => ({
-          title: lesson.name,
-          sortOrder: index,
-        })),
-      });
+      };
 
-      router.push(`/admin/courses?created=${created.id}`);
+      if (isEdit) {
+        await updateAdminCourse(courseId, payload);
+        router.push("/admin/courses");
+      } else {
+        const created = await createAdminCourse({
+          ...payload,
+          lessons: lessons.map((lesson, index) => ({
+            title: lesson.name,
+            sortOrder: index,
+          })),
+        });
+        router.push(`/admin/courses?created=${created.id}`);
+      }
       router.refresh();
     } catch (err) {
-      setSubmitError(err.message || "Failed to create course");
+      setSubmitError(
+        err.message || (isEdit ? "Failed to update course" : "Failed to create course"),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -308,7 +450,9 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
   return (
     <div className="flex min-h-full flex-col">
       <header className="flex items-center justify-between border-b border-gray-300 bg-white px-10 py-5">
-        <h1 className="text-headline3 text-gray-900">Add Course</h1>
+        <h1 className="text-headline3 text-gray-900">
+          {isEdit ? "Edit course" : "Add Course"}
+        </h1>
         <div className="flex items-center gap-3">
           <Button asChild variant="secondary" size="sm">
             <Link href={cancelHref}>Cancel</Link>
@@ -317,9 +461,15 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
             type="submit"
             form="add-course-form"
             size="sm"
-            disabled={isSubmitting}
+            disabled={isSubmitting || (isEdit && loadStatus !== "ready")}
           >
-            {isSubmitting ? "Creating..." : "Create"}
+            {isSubmitting
+              ? isEdit
+                ? "Saving..."
+                : "Creating..."
+              : isEdit
+                ? "Save"
+                : "Create"}
           </Button>
         </div>
       </header>
@@ -335,6 +485,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
           </p>
         ) : null}
 
+        {!isEdit || loadStatus === "ready" ? (
         <form
           id="add-course-form"
           onSubmit={handleSubmit}
@@ -574,6 +725,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 label="Upload Image"
                 accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 file={coverImage}
+                existingName={existingCover?.name}
                 error={errors.coverImage}
                 onChange={(file) => {
                   setCoverImage(file);
@@ -596,6 +748,7 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 label="Upload Video"
                 accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
                 file={videoTrailer}
+                existingName={existingTrailer?.name}
                 error={errors.videoTrailer}
                 onChange={(file) => {
                   setVideoTrailer(file);
@@ -613,16 +766,23 @@ function AddCourseForm({ cancelHref = "/admin/courses" }) {
                 label="Upload file"
                 accept="*/*"
                 file={attachment}
+                existingName={existingAttachment?.name}
                 onChange={setAttachment}
                 size="sm"
               />
             </div>
           </div>
         </form>
+        ) : loadStatus === "loading" ? (
+          <p className="mx-auto max-w-5xl text-body3 text-gray-700">
+            Loading course...
+          </p>
+        ) : null}
 
         <CourseLessonsSection
-          lessons={lessons}
-          onLessonsChange={setLessons}
+          courseId={isEdit ? courseId : undefined}
+          lessons={isEdit ? undefined : lessons}
+          onLessonsChange={isEdit ? undefined : setLessons}
         />
       </main>
     </div>

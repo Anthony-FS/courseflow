@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import { touchCourseUpdatedAt } from "@/lib/touch-course";
 
 function isValidUUID(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -170,6 +171,8 @@ export async function PUT(request, { params }) {
     }
   }
 
+  await touchCourseUpdatedAt(supabase, courseId);
+
   return jsonOk({ success: true });
 }
 
@@ -195,6 +198,8 @@ export async function DELETE(_request, { params }) {
   if (deleteError) {
     return jsonError(deleteError.message || "Failed to delete lesson", 500);
   }
+
+  await touchCourseUpdatedAt(supabase, courseId);
 
   return jsonOk({ success: true });
 }
