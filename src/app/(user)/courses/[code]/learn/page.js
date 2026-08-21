@@ -91,16 +91,15 @@ export default async function CourseLearnPage({ params, searchParams }) {
           activeSubLessonId={active.id}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <LessonContent
-            title={active.title}
-            coverUrl={course.coverUrl}
-            videoUrl={null}
-            assignment={MOCK_ASSIGNMENT}
-          />
-          <LessonNav courseCode={courseCode} previous={prev} next={next} />
-        </div>
+        <LessonContent
+          title={active.title}
+          coverUrl={course.coverUrl}
+          videoUrl={null}
+          assignment={MOCK_ASSIGNMENT}
+        />
       </div>
+
+      <LessonNav courseCode={courseCode} previous={prev} next={next} />
     </main>
   );
 }

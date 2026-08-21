@@ -4,7 +4,7 @@ import { MOCK_ASSIGNMENT } from "@/lib/course-learn";
 
 function LessonContent({ title, coverUrl, videoUrl = null, assignment = MOCK_ASSIGNMENT }) {
   return (
-    <article className="flex flex-1 flex-col px-6 py-8 sm:px-10 lg:px-12">
+    <article className="flex min-w-0 flex-1 flex-col px-6 py-8 sm:px-10 lg:px-12">
       <h1 className="text-headline2 font-medium tracking-[-0.02em] text-black">
         {title}
       </h1>
