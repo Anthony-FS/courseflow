@@ -159,9 +159,17 @@ export function createMockSupabase({
           select() {
             return {
               single: async () => ({
-                data: error ? null : { id: courseId },
+                data: error ? null : (rows[0]?.id ? rows[0] : { id: courseId, ...rows[0] }),
                 error,
               }),
+              then(onFulfilled, onRejected) {
+                return Promise.resolve({
+                  data: error
+                    ? null
+                    : rows.map((r, i) => ({ id: r.id || `mock-id-${i}`, ...r })),
+                  error,
+                }).then(onFulfilled, onRejected);
+              },
             };
           },
           then(onFulfilled, onRejected) {

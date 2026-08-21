@@ -8,6 +8,7 @@ vi.mock("@/lib/auth", () => ({
 import { requireAdmin } from "@/lib/auth";
 import { POST as createLesson } from "@/app/api/admin/courses/[id]/lessons/route";
 import {
+  GET as getLessonDetail,
   PUT as updateLesson,
   DELETE as deleteLesson,
 } from "@/app/api/admin/courses/[id]/lessons/[lessonId]/route";
@@ -190,6 +191,61 @@ describe("Lesson Management API", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.success).toBe(true);
+    });
+  });
+
+  describe("GET /api/admin/courses/[id]/lessons/[lessonId]", () => {
+    it("returns lesson detail with sub-lessons and materials", async () => {
+      const supabase = createMockSupabase({
+        lessonsSelect: [
+          {
+            id: "l-1",
+            title: "Lesson 1",
+            sort_order: 0,
+            sub_lessons: [
+              {
+                id: "sub-1",
+                title: "Sub 1",
+                description: "Sub 1 desc",
+                sort_order: 1,
+                is_preview: true,
+                materials: [
+                  {
+                    id: "m-1",
+                    name: "video.mp4",
+                    file_url: "course-trailers/user/video.mp4",
+                    file_type: "video/mp4",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      requireAdmin.mockResolvedValue({
+        supabase,
+        user: ADMIN_USER,
+        profile: { id: ADMIN_USER.id, role: "admin", is_active: true },
+        error: null,
+      });
+
+      const response = await getLessonDetail(
+        new Request("http://localhost/api/admin/courses/c-1/lessons/l-1"),
+        { params: Promise.resolve({ id: "c-1", lessonId: "l-1" }) },
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.lesson).toBeTruthy();
+      expect(body.lesson.name).toBe("Lesson 1");
+      expect(body.lesson.subLessons).toHaveLength(1);
+      expect(body.lesson.subLessons[0].title).toBe("Sub 1");
+      expect(body.lesson.subLessons[0].description).toBe("Sub 1 desc");
+      expect(body.lesson.subLessons[0].isPreview).toBe(true);
+      expect(body.lesson.subLessons[0].videoUrl).toBe(
+        "course-trailers/user/video.mp4",
+      );
     });
   });
 });
