@@ -35,6 +35,7 @@ export function ConfirmationDialog({
       type="button"
       variant={confirmFirst ? "secondary" : "default"}
       disabled={isConfirming}
+      className="w-full sm:w-auto"
       onClick={onConfirm}
     >
       {isConfirming ? confirmingText : confirmText}
@@ -46,6 +47,7 @@ export function ConfirmationDialog({
       type="button"
       variant={confirmFirst ? "default" : "secondary"}
       disabled={isConfirming}
+      className="w-full sm:w-auto"
       onClick={() => handleOpenChange(false)}
     >
       {cancelText}
@@ -54,13 +56,16 @@ export function ConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent aria-describedby="confirmation-dialog-description">
+      <DialogContent
+        aria-describedby="confirmation-dialog-description"
+        className="max-sm:border max-sm:border-gray-300"
+      >
         <header className="flex items-center justify-between border-b border-gray-300 px-6 py-4">
           <DialogTitle>{title}</DialogTitle>
           <DialogClose
             aria-label="Close"
             disabled={isConfirming}
-            className="rounded-md p-1 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50"
+            className="rounded-md p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50"
           >
             <X aria-hidden="true" className="size-6" />
           </DialogClose>
@@ -68,12 +73,12 @@ export function ConfirmationDialog({
 
         <DialogDescription
           id="confirmation-dialog-description"
-          className="px-6 py-6"
+          className="px-6 py-8 text-center sm:py-6 sm:text-left"
         >
           {message}
         </DialogDescription>
 
-        <footer className="flex flex-wrap items-center justify-end gap-4 px-6 pb-6">
+        <footer className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {confirmFirst ? (
             <>
               {confirmButton}

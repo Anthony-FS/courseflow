@@ -4,8 +4,9 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { addCourseToWishlist } from "@/lib/wishlist";
+import { cn } from "@/lib/utils";
 
-function WishlistButton({ courseId, initiallySaved = false }) {
+function WishlistButton({ courseId, initiallySaved = false, className }) {
   const [saved, setSaved] = useState(initiallySaved);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -33,7 +34,7 @@ function WishlistButton({ courseId, initiallySaved = false }) {
       <Button
         variant="secondary"
         type="button"
-        className="w-full"
+        className={cn("w-full", className)}
         onClick={handleClick}
         disabled={saved || isSaving}
       >

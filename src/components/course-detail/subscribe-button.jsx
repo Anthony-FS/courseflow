@@ -6,8 +6,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { enrollInCourse } from "@/lib/enrollments";
+import { cn } from "@/lib/utils";
 
-function SubscribeButton({ courseId, courseTitle }) {
+function SubscribeButton({
+  courseId,
+  courseTitle,
+  className,
+  label = "Subscribe To This Course",
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -31,8 +37,8 @@ function SubscribeButton({ courseId, courseTitle }) {
   return (
     <>
       <div className="grid gap-2">
-        <Button type="button" className="w-full" onClick={() => setOpen(true)}>
-          Subscribe To This Course
+        <Button type="button" className={cn("w-full", className)} onClick={() => setOpen(true)}>
+          {label}
         </Button>
         {errorMessage ? (
           <p className="text-body3 text-orange-500" role="alert">
@@ -51,7 +57,7 @@ function SubscribeButton({ courseId, courseTitle }) {
         onConfirm={handleConfirm}
         isConfirming={isConfirming}
         confirmingText="Subscribing..."
-        message={`Do you sure to subscribe ${courseTitle} Course?`}
+        message={`Are you sure you want to subscribe to ${courseTitle} Course?`}
         confirmText="Yes, I want to subscribe"
         cancelText="No, I don't"
       />

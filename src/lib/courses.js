@@ -98,6 +98,42 @@ async function resolveAttachmentHref(supabase, fileUrl) {
   );
 }
 
+function attachmentObjectPath(fileUrl) {
+  const value = String(fileUrl ?? "").trim();
+  if (!value || /^https?:\/\//i.test(value) || value.startsWith("/")) {
+    return null;
+  }
+
+  return value.startsWith(`${ATTACHMENT_BUCKET}/`)
+    ? value.slice(ATTACHMENT_BUCKET.length + 1)
+    : value;
+}
+
+async function getAttachmentFileSize(supabase, fileUrl) {
+  const objectPath = attachmentObjectPath(fileUrl);
+  if (!objectPath || typeof supabase?.storage?.from !== "function") {
+    return null;
+  }
+
+  const slash = objectPath.lastIndexOf("/");
+  const folder = slash === -1 ? "" : objectPath.slice(0, slash);
+  const fileName = slash === -1 ? objectPath : objectPath.slice(slash + 1);
+
+  try {
+    const { data } = await supabase.storage.from(ATTACHMENT_BUCKET).list(folder, {
+      search: fileName,
+      limit: 20,
+    });
+    const match = Array.isArray(data)
+      ? data.find((item) => item.name === fileName)
+      : null;
+    const size = match?.metadata?.size ?? match?.size;
+    return Number.isFinite(Number(size)) ? Number(size) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCourseAttachment(supabase, courseId) {
   if (!courseId) {
     return null;
@@ -128,6 +164,7 @@ export async function getCourseAttachment(supabase, courseId) {
     name: row.name ?? "Attachment",
     fileUrl: await resolveAttachmentHref(supabase, row.file_url),
     fileType: row.file_type ?? "",
+    fileSize: await getAttachmentFileSize(supabase, row.file_url),
   };
 }
 
