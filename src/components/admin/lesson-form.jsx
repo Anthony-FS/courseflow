@@ -19,6 +19,7 @@ import {
   createAdminLesson,
   updateAdminLesson,
   deleteAdminLesson,
+  getAdminLessonDetail,
 } from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
 
@@ -110,6 +111,10 @@ export default function LessonForm({
       router.push("/admin/courses/new");
       return;
     }
+    if (courseId && courseId !== "new") {
+      router.push(`/admin/courses/${courseId}/edit`);
+      return;
+    }
     router.back();
   }
 
@@ -132,6 +137,60 @@ export default function LessonForm({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  // Load lesson detail in edit mode
+  useEffect(() => {
+    if (mode !== "edit") return;
+
+    if (initialData) {
+      setLessonName(initialData.name || initialData.title || "");
+      if (Array.isArray(initialData.subLessons) && initialData.subLessons.length > 0) {
+        setSubLessons(initialData.subLessons);
+      }
+      return;
+    }
+
+    if (isNewCourseFlow) {
+      const found = draftContent?.draft?.lessons?.find(
+        (l) => String(l.id) === String(lessonId),
+      );
+      if (found) {
+        setLessonName(found.name || found.title || "");
+        if (Array.isArray(found.subLessons) && found.subLessons.length > 0) {
+          setSubLessons(found.subLessons);
+        }
+      }
+      return;
+    }
+
+    if (courseId && courseId !== "new" && lessonId) {
+      let cancelled = false;
+      setIsLoading(true);
+
+      getAdminLessonDetail(courseId, lessonId)
+        .then((detail) => {
+          if (cancelled || !detail) return;
+          setLessonName(detail.name || detail.title || "");
+          if (Array.isArray(detail.subLessons) && detail.subLessons.length > 0) {
+            setSubLessons(detail.subLessons);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setSubmitError(err.message || "Failed to load lesson details");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoading(false);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [mode, initialData, isNewCourseFlow, draftContent, courseId, lessonId]);
 
   // Sub-lesson Handlers
   const handleAddSubLesson = () => {
@@ -342,6 +401,22 @@ export default function LessonForm({
 
       if (onSave) {
         await onSave(payload);
+      } else if (isNewCourseFlow) {
+        if (mode === "add") {
+          draftContent?.addLesson?.({
+            id: `draft-lesson-${Date.now()}`,
+            name: payload.lessonName,
+            subLessons: payload.subLessons,
+          });
+        } else {
+          draftContent?.updateLesson?.(lessonId, {
+            id: lessonId,
+            name: payload.lessonName,
+            subLessons: payload.subLessons,
+          });
+        }
+        router.push("/admin/courses/new");
+        return;
       } else if (mode === "add") {
         await createAdminLesson(courseId, payload);
       } else {
@@ -363,6 +438,13 @@ export default function LessonForm({
   const handleDeleteLessonConfirm = async () => {
     setIsDeleting(true);
     try {
+      if (isNewCourseFlow) {
+        draftContent?.deleteLesson?.(lessonId);
+        setIsDeleteModalOpen(false);
+        router.push("/admin/courses/new");
+        return;
+      }
+
       if (lessonId) {
         await deleteAdminLesson(courseId, lessonId);
       }
@@ -426,6 +508,13 @@ export default function LessonForm({
 
       {/* Main Content Body */}
       <div className="flex-1 p-8 sm:p-10 max-w-5xl w-full mx-auto">
+        {isLoading ? (
+          <div className="bg-white rounded-2xl border border-[#E4E6ED] p-12 flex flex-col items-center justify-center gap-3 text-[#646D89]">
+            <Loader2 className="w-8 h-8 animate-spin text-[#2F5FAC]" />
+            <p className="text-sm font-medium">Loading lesson details...</p>
+          </div>
+        ) : (
+        <>
         <form
           onSubmit={handleSubmit}
           className="bg-white rounded-2xl border border-[#E4E6ED] p-8 sm:p-10 space-y-8"
@@ -735,6 +824,8 @@ export default function LessonForm({
               Delete Lesson
             </button>
           </div>
+        )}
+        </>
         )}
       </div>
 

@@ -168,19 +168,74 @@ export async function POST(request) {
   if (lessons.length > 0) {
     const lessonRows = lessons.map((lesson, index) => ({
       course_id: courseId,
-      title: String(lesson.title ?? "").trim() || `Lesson ${index + 1}`,
+      title:
+        String(lesson.title ?? lesson.name ?? "").trim() ||
+        `Lesson ${index + 1}`,
       sort_order: Number.isFinite(Number(lesson.sortOrder))
         ? Number(lesson.sortOrder)
         : index,
     }));
 
-    const { error: lessonsError } = await supabase
+    const { data: createdLessons, error: lessonsError } = await supabase
       .from("lessons")
-      .insert(lessonRows);
+      .insert(lessonRows)
+      .select("id, sort_order");
 
     if (lessonsError) {
       await rollbackCourse();
       return jsonError(lessonsError.message || "Failed to create lessons", 500);
+    }
+
+    if (Array.isArray(createdLessons) && createdLessons.length > 0) {
+      for (let i = 0; i < lessons.length; i++) {
+        const lesson = lessons[i];
+        const matchingCreated =
+          createdLessons.find((cl) => cl.sort_order === i) || createdLessons[i];
+        const subLessons = Array.isArray(lesson.subLessons)
+          ? lesson.subLessons
+          : [];
+
+        if (!matchingCreated?.id) continue;
+
+        for (let subIdx = 0; subIdx < subLessons.length; subIdx++) {
+          const sub = subLessons[subIdx];
+          const { data: subLesson, error: subError } = await supabase
+            .from("sub_lessons")
+            .insert({
+              course_id: courseId,
+              lesson_id: matchingCreated.id,
+              title:
+                String(sub.title ?? "").trim() || `Sub-lesson ${subIdx + 1}`,
+              description: sub.description ? String(sub.description).trim() : null,
+              sort_order: subIdx + 1,
+              is_preview: Boolean(sub.isPreview),
+            })
+            .select("id")
+            .single();
+
+          if (subError || !subLesson) continue;
+
+          if (sub.videoUrl) {
+            await supabase.from("materials").insert({
+              course_id: courseId,
+              sub_lesson_id: subLesson.id,
+              name: String(sub.videoName || `${sub.title} Video`).trim(),
+              file_url: String(sub.videoUrl),
+              file_type: "video/mp4",
+            });
+          }
+
+          if (sub.attachmentUrl) {
+            await supabase.from("materials").insert({
+              course_id: courseId,
+              sub_lesson_id: subLesson.id,
+              name: String(sub.attachmentName || `${sub.title} Attachment`).trim(),
+              file_url: String(sub.attachmentUrl),
+              file_type: String(sub.attachmentType || "application/pdf"),
+            });
+          }
+        }
+      }
     }
   }
 

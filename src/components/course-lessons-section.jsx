@@ -258,7 +258,9 @@ function CourseLessonsSection({
                       >
                         {typeof lesson.subLessons === "number"
                           ? lesson.subLessons
-                          : lesson.subLessons?.length ?? 0}
+                          : Array.isArray(lesson.subLessons)
+                            ? lesson.subLessons.length
+                            : 0}
                       </td>
                       <td
                         className={cn(
@@ -285,7 +287,11 @@ function CourseLessonsSection({
                             />
                           </button>
                           <Link
-                            href={`/admin/courses/${courseId || "1"}/lessons/${lesson.id}/edit`}
+                            href={
+                              courseId
+                                ? `/admin/courses/${courseId}/lessons/${lesson.id}/edit`
+                                : `/admin/courses/new/lessons/${lesson.id}/edit`
+                            }
                             aria-label={`Edit ${lesson.name}`}
                             className="rounded-md p-1.5 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:shadow-focus inline-flex items-center justify-center"
                           >

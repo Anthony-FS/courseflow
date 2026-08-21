@@ -18,14 +18,14 @@ async function resolveLessonId(supabase, lessonId) {
     const result = typeof query?.limit === "function" ? await query.limit(1) : await query;
     const firstLesson = Array.isArray(result?.data) ? result.data[0] : result?.data;
 
-    if (firstLesson?.id && isValidUUID(firstLesson.id)) {
+    if (firstLesson?.id) {
       return firstLesson.id;
     }
   } catch {
     // Ignore fallback errors
   }
 
-  return "00000000-0000-0000-0000-000000000001";
+  return lessonId || "00000000-0000-0000-0000-000000000001";
 }
 
 export async function GET(_request, { params }) {

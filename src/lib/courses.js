@@ -134,7 +134,17 @@ export async function getCourseAttachment(supabase, courseId) {
 export { FALLBACK_COVER };
 
 export function embeddedCount(value) {
-  return Array.isArray(value) ? (value[0]?.count ?? 0) : 0;
+  if (typeof value === "number") return value;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return 0;
+    if (typeof value[0] === "number") return value[0];
+    if (typeof value[0]?.count === "number") return value[0].count;
+    return value.length;
+  }
+  if (value && typeof value === "object") {
+    if (typeof value.count === "number") return value.count;
+  }
+  return 0;
 }
 
 function mapCourse(row) {

@@ -51,7 +51,9 @@ function toSerializable(draft) {
     lessons: (draft.lessons ?? []).map((lesson) => ({
       id: lesson.id,
       name: lesson.name,
-      subLessons: lessonCount(lesson.subLessons),
+      subLessons: Array.isArray(lesson.subLessons)
+        ? lesson.subLessons
+        : lessonCount(lesson.subLessons),
     })),
   };
 }
@@ -127,17 +129,49 @@ function AddCourseDraftProvider({ children }) {
       lessons: [
         ...current.lessons,
         {
-          id: lesson.id,
+          id: lesson.id || `draft-lesson-${Date.now()}`,
           name: lesson.name,
-          subLessons: lessonCount(lesson.subLessons),
+          subLessons: lesson.subLessons ?? [],
         },
       ],
     }));
   }, [setDraft]);
 
+  const updateLesson = useCallback((lessonId, updatedLesson) => {
+    setDraft((current) => ({
+      ...current,
+      lessons: (current.lessons ?? []).map((l) =>
+        String(l.id) === String(lessonId)
+          ? {
+              ...l,
+              id: lessonId,
+              name: updatedLesson.name,
+              subLessons: updatedLesson.subLessons ?? [],
+            }
+          : l,
+      ),
+    }));
+  }, [setDraft]);
+
+  const deleteLesson = useCallback((lessonId) => {
+    setDraft((current) => ({
+      ...current,
+      lessons: (current.lessons ?? []).map((l) => l).filter(
+        (l) => String(l.id) !== String(lessonId),
+      ),
+    }));
+  }, [setDraft]);
+
   const value = useMemo(
-    () => ({ draft, setDraft, clearDraft, addLesson }),
-    [draft, setDraft, clearDraft, addLesson],
+    () => ({
+      draft,
+      setDraft,
+      clearDraft,
+      addLesson,
+      updateLesson,
+      deleteLesson,
+    }),
+    [draft, setDraft, clearDraft, addLesson, updateLesson, deleteLesson],
   );
 
   return (

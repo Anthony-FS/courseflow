@@ -534,6 +534,7 @@ function AddCourseForm({
           lessons: lessons.map((lesson, index) => ({
             title: lesson.name,
             sortOrder: index,
+            subLessons: lesson.subLessons,
           })),
         });
         clearDraft();
