@@ -180,6 +180,55 @@ describe("PUT /api/admin/courses/[id]", () => {
     expect(courseUpdate.payload.updated_at).toEqual(expect.any(String));
   });
 
+  it("removes previous media from storage when cover/trailer/attachment change", async () => {
+    const supabase = createMockSupabase({
+      courseSelect: COURSE_ROW,
+      materialsSelect: [
+        {
+          id: "mat-1",
+          name: "syllabus.pdf",
+          file_url: "course-attachments/admin/old-notes.pdf",
+          file_type: "application/pdf",
+          sub_lesson_id: null,
+          course_id: COURSE_ID,
+        },
+      ],
+    });
+    mockAdmin(supabase);
+
+    const response = await putCourse(
+      COURSE_ID,
+      validUpdateBody({
+        coverImageUrl: "course-covers/admin/new-cover.jpg",
+        videoTrailerUrl: "course-trailers/admin/new-trailer.mp4",
+        attachment: {
+          name: "new-notes.pdf",
+          fileUrl: "course-attachments/admin/new-notes.pdf",
+          fileType: "application/pdf",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(supabase.storageRemoves).toEqual(
+      expect.arrayContaining([
+        { bucket: "course-covers", paths: ["admin/cover.jpg"] },
+        { bucket: "course-trailers", paths: ["admin/trailer.mp4"] },
+        { bucket: "course-attachments", paths: ["admin/old-notes.pdf"] },
+      ]),
+    );
+  });
+
+  it("does not remove media when urls stay the same", async () => {
+    const supabase = createMockSupabase({ courseSelect: COURSE_ROW });
+    mockAdmin(supabase);
+
+    const response = await putCourse(COURSE_ID, validUpdateBody());
+
+    expect(response.status).toBe(200);
+    expect(supabase.storageRemoves).toEqual([]);
+  });
+
   it("allows keeping the same course code with different casing", async () => {
     const supabase = createMockSupabase({ courseSelect: COURSE_ROW });
     mockAdmin(supabase);
