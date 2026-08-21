@@ -4,12 +4,29 @@ export const COURSE_LIMITS = {
   title: 50,
   summary: 200,
   description: 400,
+  courseCode: 32,
 };
 
 export const EMPTY_FIELD_MESSAGE = "Please fill out this field";
+export const COURSE_CODE_TAKEN_MESSAGE = "Course code already exists.";
+export const COURSE_CODE_PATTERN = /^[a-z0-9]+$/i;
 
 function isBlank(value) {
   return String(value ?? "").trim() === "";
+}
+
+/** Trim only — keeps the user's casing for display/storage (e.g. LOL404). */
+export function trimCourseCode(value) {
+  return String(value ?? "").trim();
+}
+
+/** Lowercase form used only for uniqueness checks (LOL404 === lol404). */
+export function normalizeCourseCode(value) {
+  return trimCourseCode(value).toLowerCase();
+}
+
+export function isUniqueViolation(error) {
+  return error?.code === "23505";
 }
 
 function asNumber(value) {
@@ -33,6 +50,7 @@ function asNumber(value) {
  */
 export function validateCourseFields({
   courseName,
+  courseCode,
   price,
   learningTime,
   courseSummary,
@@ -44,6 +62,17 @@ export function validateCourseFields({
     errors.courseName = EMPTY_FIELD_MESSAGE;
   } else if (String(courseName).trim().length > COURSE_LIMITS.title) {
     errors.courseName = `Course name cannot exceed ${COURSE_LIMITS.title} characters`;
+  }
+
+  // Empty or whitespace-only is invalid (add + edit). Casing is preserved.
+  const trimmedCode = trimCourseCode(courseCode);
+  if (!trimmedCode) {
+    errors.courseCode = EMPTY_FIELD_MESSAGE;
+  } else if (!COURSE_CODE_PATTERN.test(trimmedCode)) {
+    errors.courseCode =
+      "Course code must contain alphabet and number characters only.";
+  } else if (trimmedCode.length > COURSE_LIMITS.courseCode) {
+    errors.courseCode = `Course code cannot exceed ${COURSE_LIMITS.courseCode} characters`;
   }
 
   if (isBlank(price)) {
@@ -81,6 +110,37 @@ export function validateCourseFields({
   }
 
   return errors;
+}
+
+/**
+ * Find another course that already uses this code (case-insensitive).
+ * @returns {Promise<{ id: string } | null>}
+ */
+export async function findCourseWithCode(
+  supabase,
+  courseCode,
+  { excludeId } = {},
+) {
+  const normalized = normalizeCourseCode(courseCode);
+  if (!normalized) return null;
+
+  let query = supabase
+    .from("courses")
+    .select("id, course_code")
+    .ilike("course_code", normalized)
+    .limit(1);
+
+  if (excludeId) {
+    query = query.neq("id", excludeId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  if (!data?.id) return null;
+
+  // Defense in depth: confirm lower() match (ilike treats _/% as wildcards).
+  if (normalizeCourseCode(data.course_code) !== normalized) return null;
+  return { id: data.id };
 }
 
 export function parseCoursePrice(price) {

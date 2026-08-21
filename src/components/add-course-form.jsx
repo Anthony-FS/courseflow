@@ -18,6 +18,7 @@ import {
   COURSE_LIMITS,
   EMPTY_FIELD_MESSAGE,
   isFreePrice,
+  trimCourseCode,
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
@@ -251,6 +252,7 @@ function AddCourseForm({
   });
   const [valuesState, setValues] = useState({
     courseName: "",
+    courseCode: "",
     price: "",
     learningTime: "",
     courseSummary: "",
@@ -298,6 +300,7 @@ function AddCourseForm({
 
         setValues({
           courseName: data.title ?? "",
+          courseCode: data.courseCode ?? "",
           price: data.price == null ? "" : String(data.price),
           learningTime: data.totalLearningTime ?? "",
           courseSummary: data.summary ?? "",
@@ -504,6 +507,7 @@ function AddCourseForm({
 
       const payload = {
         title: values.courseName.trim(),
+        courseCode: trimCourseCode(values.courseCode),
         summary: values.courseSummary.trim(),
         description: values.courseDetail.trim(),
         price: Number(values.price),
@@ -537,6 +541,9 @@ function AddCourseForm({
       }
       router.refresh();
     } catch (err) {
+      if (err?.fields && typeof err.fields === "object") {
+        setErrors((current) => ({ ...current, ...err.fields }));
+      }
       setSubmitError(
         err.message || (isEdit ? "Failed to update course" : "Failed to create course"),
       );
@@ -607,6 +614,24 @@ function AddCourseForm({
                 }
                 error={errors.courseName}
                 placeholder="Enter course name"
+              />
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="course-code" required>
+                Course code
+              </FieldLabel>
+              <TextInput
+                id="course-code"
+                name="courseCode"
+                value={values.courseCode}
+                maxLength={COURSE_LIMITS.courseCode}
+                required
+                onChange={(event) =>
+                  updateField("courseCode", event.target.value)
+                }
+                error={errors.courseCode}
+                placeholder="Enter course code"
               />
             </div>
 

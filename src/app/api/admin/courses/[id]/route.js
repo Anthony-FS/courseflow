@@ -1,9 +1,13 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import {
+  COURSE_CODE_TAKEN_MESSAGE,
+  findCourseWithCode,
+  isUniqueViolation,
   parseCoursePrice,
   parseLearningTime,
   mapDiscountTypeForDb,
+  trimCourseCode,
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
@@ -27,6 +31,7 @@ function mapCourse(row) {
   return {
     id: row.id,
     title: row.title ?? "",
+    courseCode: row.course_code ?? "",
     summary: row.summary ?? "",
     description: row.description ?? "",
     price: row.price ?? 0,
@@ -61,6 +66,7 @@ function mapAttachment(row) {
 
 function parseCourseUpdate(body) {
   const title = String(body.title ?? "").trim();
+  const courseCode = trimCourseCode(body.courseCode);
   const summary = String(body.summary ?? "").trim();
   const description = String(body.description ?? "").trim();
   const coverImageUrl = String(body.coverImageUrl ?? "").trim();
@@ -70,6 +76,7 @@ function parseCourseUpdate(body) {
 
   const fieldErrors = validateCourseFields({
     courseName: title,
+    courseCode,
     price: body.price,
     learningTime: body.totalLearningTime,
     courseSummary: summary,
@@ -88,6 +95,7 @@ function parseCourseUpdate(body) {
         fields: fieldErrors,
         required: [
           "title",
+          "courseCode",
           "summary",
           "description",
           "price",
@@ -129,6 +137,7 @@ function parseCourseUpdate(body) {
 
   return {
     title,
+    courseCode,
     summary,
     description,
     price,
@@ -189,7 +198,7 @@ export async function GET(_request, { params }) {
   const { data: course, error: courseError } = await supabase
     .from("courses")
     .select(
-      "id, title, summary, description, price, total_learning_time, cover_image_url, video_trailer_url",
+      "id, title, course_code, summary, description, price, total_learning_time, cover_image_url, video_trailer_url",
     )
     .eq("id", courseId)
     .maybeSingle();
@@ -243,10 +252,27 @@ export async function PUT(request, { params }) {
   const parsed = parseCourseUpdate(body);
   if (parsed.error) return parsed.error;
 
+  try {
+    const existing = await findCourseWithCode(supabase, parsed.courseCode, {
+      excludeId: courseId,
+    });
+    if (existing) {
+      return jsonError(COURSE_CODE_TAKEN_MESSAGE, 409, {
+        fields: { courseCode: COURSE_CODE_TAKEN_MESSAGE },
+      });
+    }
+  } catch (lookupError) {
+    return jsonError(
+      lookupError?.message || "Failed to validate course code",
+      500,
+    );
+  }
+
   const { error: updateError } = await supabase
     .from("courses")
     .update({
       title: parsed.title,
+      course_code: parsed.courseCode,
       summary: parsed.summary,
       description: parsed.description,
       price: parsed.price,
@@ -258,6 +284,11 @@ export async function PUT(request, { params }) {
     .eq("id", courseId);
 
   if (updateError) {
+    if (isUniqueViolation(updateError)) {
+      return jsonError(COURSE_CODE_TAKEN_MESSAGE, 409, {
+        fields: { courseCode: COURSE_CODE_TAKEN_MESSAGE },
+      });
+    }
     return jsonError(updateError.message || "Failed to update course", 500);
   }
 

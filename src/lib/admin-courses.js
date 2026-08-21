@@ -6,6 +6,14 @@ async function parseJson(response) {
   }
 }
 
+function createApiError(data, fallback) {
+  const error = new Error(data?.error || fallback);
+  if (data?.fields && typeof data.fields === "object") {
+    error.fields = data.fields;
+  }
+  return error;
+}
+
 export async function uploadAdminFile(kind, file) {
   const formData = new FormData();
   formData.set("kind", kind);
@@ -18,7 +26,7 @@ export async function uploadAdminFile(kind, file) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Upload failed");
+    throw createApiError(data, "Upload failed");
   }
 
   return data;
@@ -33,7 +41,7 @@ export async function createAdminCourse(payload) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to create course");
+    throw createApiError(data, "Failed to create course");
   }
 
   return data;
@@ -47,7 +55,7 @@ export async function getAdminCourse(courseId) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to load course");
+    throw createApiError(data, "Failed to load course");
   }
 
   return data;
@@ -62,7 +70,7 @@ export async function updateAdminCourse(courseId, payload) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to update course");
+    throw createApiError(data, "Failed to update course");
   }
 
   return data;
@@ -76,7 +84,7 @@ export async function getAdminCourseLessons(courseId) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to load lessons");
+    throw createApiError(data, "Failed to load lessons");
   }
 
   return Array.isArray(data?.lessons) ? data.lessons : [];
@@ -91,7 +99,7 @@ export async function createAdminLesson(courseId, payload) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to create lesson");
+    throw createApiError(data, "Failed to create lesson");
   }
 
   return data;
@@ -108,7 +116,7 @@ export async function getAdminLessonDetail(courseId, lessonId) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to load lesson detail");
+    throw createApiError(data, "Failed to load lesson detail");
   }
 
   return data?.lesson || null;
@@ -126,7 +134,7 @@ export async function updateAdminLesson(courseId, lessonId, payload) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to update lesson");
+    throw createApiError(data, "Failed to update lesson");
   }
 
   return data;
@@ -142,7 +150,7 @@ export async function deleteAdminLesson(courseId, lessonId) {
   const data = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to delete lesson");
+    throw createApiError(data, "Failed to delete lesson");
   }
 
   return data;

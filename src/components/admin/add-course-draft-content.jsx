@@ -22,6 +22,7 @@ const INITIAL_DRAFT = {
   },
   values: {
     courseName: "",
+    courseCode: "",
     price: "",
     learningTime: "",
     courseSummary: "",

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COURSE_CODE_TAKEN_MESSAGE,
   COURSE_LIMITS,
   isFreePrice,
+  normalizeCourseCode,
+  trimCourseCode,
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
@@ -10,6 +13,7 @@ import {
 describe("course field validation", () => {
   const valid = {
     courseName: "Service Design",
+    courseCode: "SD101",
     price: "100",
     learningTime: "12",
     courseSummary: "A short summary",
@@ -18,6 +22,38 @@ describe("course field validation", () => {
 
   it("accepts valid course fields", () => {
     expect(validateCourseFields(valid)).toEqual({});
+  });
+
+  it("trims course codes but preserves casing for storage", () => {
+    expect(trimCourseCode(" LOL404 ")).toBe("LOL404");
+    expect(trimCourseCode("lol404")).toBe("lol404");
+  });
+
+  it("normalizes course codes to lowercase only for uniqueness checks", () => {
+    expect(normalizeCourseCode("LOL404")).toBe("lol404");
+    expect(normalizeCourseCode(" lol404 ")).toBe("lol404");
+    expect(normalizeCourseCode("LOL404")).toBe(normalizeCourseCode("lol404"));
+  });
+
+  it("rejects an empty course code", () => {
+    expect(validateCourseFields({ ...valid, courseCode: "" }).courseCode).toBe(
+      "Please fill out this field",
+    );
+  });
+
+  it("rejects a whitespace-only course code", () => {
+    expect(
+      validateCourseFields({ ...valid, courseCode: "   " }).courseCode,
+    ).toBe("Please fill out this field");
+    expect(
+      validateCourseFields({ ...valid, courseCode: "\t\n" }).courseCode,
+    ).toBe("Please fill out this field");
+  });
+
+  it("rejects course codes with non-alphanumeric characters", () => {
+    expect(
+      validateCourseFields({ ...valid, courseCode: "FSD-12" }).courseCode,
+    ).toMatch(/alphabet and number/i);
   });
 
   it("rejects course name over 50 characters", () => {
@@ -94,9 +130,7 @@ describe("promo field validation", () => {
       discountValue: "201",
       price: "200",
     });
-    expect(errors.discountValue).toMatch(
-      /cannot exceed course price/i,
-    );
+    expect(errors.discountValue).toMatch(/cannot exceed course price/i);
   });
 
   it("allows THB discount equal to course price", () => {
@@ -145,5 +179,11 @@ describe("promo field validation", () => {
         price: "100",
       }).discountValue,
     ).toMatch(/cannot exceed 100/i);
+  });
+});
+
+describe("course code taken message", () => {
+  it("exports a stable duplicate message", () => {
+    expect(COURSE_CODE_TAKEN_MESSAGE).toMatch(/already exists/i);
   });
 });

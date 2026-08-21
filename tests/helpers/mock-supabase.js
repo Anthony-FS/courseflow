@@ -7,6 +7,8 @@ export function createMockSupabase({
   courseSelect = null,
   promoSelect = null,
   materialsSelect = null,
+  insertErrors = {},
+  updateErrors = {},
 } = {}) {
   const inserts = [];
   const updates = [];
@@ -29,35 +31,80 @@ export function createMockSupabase({
     return [];
   }
 
+  function matchesFilter(row, filter) {
+    // Fixtures often omit join/filter columns; only enforce when present.
+    if (!Object.prototype.hasOwnProperty.call(row ?? {}, filter.column)) {
+      return true;
+    }
+
+    const value = row[filter.column];
+    if (filter.op === "eq") return value === filter.value;
+    if (filter.op === "neq") return value !== filter.value;
+    if (filter.op === "ilike") {
+      return (
+        String(value ?? "").toLowerCase() ===
+        String(filter.value ?? "").toLowerCase()
+      );
+    }
+    if (filter.op === "is") {
+      return filter.value === null ? value == null : value === filter.value;
+    }
+    return true;
+  }
+
+  function applyFilters(rows, filters) {
+    return rows.filter((row) =>
+      filters.every((filter) => matchesFilter(row, filter)),
+    );
+  }
+
   function from(table) {
-    const selectChain = {
-      eq() {
-        return selectChain;
-      },
-      is() {
-        return selectChain;
-      },
-      limit() {
-        return selectChain;
-      },
-      order() {
-        return Promise.resolve({ data: selectRows(table), error: null });
-      },
-      maybeSingle: async () => ({
-        data: selectRows(table)[0] ?? null,
-        error: null,
-      }),
-      single: async () => ({
-        data: selectRows(table)[0] ?? { id: courseId },
-        error: null,
-      }),
-      then(onFulfilled, onRejected) {
-        return Promise.resolve({
-          data: selectRows(table),
+    function selectChain() {
+      const filters = [];
+      const chain = {
+        eq(column, value) {
+          filters.push({ op: "eq", column, value });
+          return chain;
+        },
+        neq(column, value) {
+          filters.push({ op: "neq", column, value });
+          return chain;
+        },
+        ilike(column, value) {
+          filters.push({ op: "ilike", column, value });
+          return chain;
+        },
+        is(column, value) {
+          filters.push({ op: "is", column, value });
+          return chain;
+        },
+        limit() {
+          return chain;
+        },
+        order() {
+          return Promise.resolve({
+            data: applyFilters(selectRows(table), filters),
+            error: null,
+          });
+        },
+        maybeSingle: async () => ({
+          data: applyFilters(selectRows(table), filters)[0] ?? null,
           error: null,
-        }).then(onFulfilled, onRejected);
-      },
-    };
+        }),
+        single: async () => ({
+          data:
+            applyFilters(selectRows(table), filters)[0] ?? { id: courseId },
+          error: null,
+        }),
+        then(onFulfilled, onRejected) {
+          return Promise.resolve({
+            data: applyFilters(selectRows(table), filters),
+            error: null,
+          }).then(onFulfilled, onRejected);
+        },
+      };
+      return chain;
+    }
 
     function updateChain(entry) {
       const chain = {
@@ -69,12 +116,13 @@ export function createMockSupabase({
           return {
             single: async () => ({
               data: { id: courseId },
-              error: null,
+              error: updateErrors[table] ?? null,
             }),
           };
         },
         then(onFulfilled, onRejected) {
-          return Promise.resolve({ data: null, error: null }).then(
+          const error = updateErrors[table] ?? null;
+          return Promise.resolve({ data: null, error }).then(
             onFulfilled,
             onRejected,
           );
@@ -101,17 +149,18 @@ export function createMockSupabase({
         const rows = Array.isArray(payload) ? payload : [payload];
         inserts.push({ table, rows });
 
+        const error = insertErrors[table] ?? null;
         const result = {
-          data: table === "courses" ? { id: courseId } : rows,
-          error: null,
+          data: error ? null : table === "courses" ? { id: courseId } : rows,
+          error,
         };
 
         const chain = {
           select() {
             return {
               single: async () => ({
-                data: { id: courseId },
-                error: null,
+                data: error ? null : { id: courseId },
+                error,
               }),
             };
           },
@@ -123,22 +172,12 @@ export function createMockSupabase({
         return chain;
       },
       select() {
-        return selectChain;
+        return selectChain();
       },
       update(payload) {
         const entry = { table, payload, filters: [] };
         updates.push(entry);
         return updateChain(entry);
-      },
-      update() {
-        return {
-          eq: async () => ({ error: null }),
-        };
-      },
-      update() {
-        return {
-          eq: async () => ({ error: null }),
-        };
       },
       delete() {
         const entry = { table, filters: [] };
