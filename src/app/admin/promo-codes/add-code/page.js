@@ -215,7 +215,7 @@ export default function AddPromoCodePage() {
                 <span className="flex flex-wrap gap-2 pr-2">
                   {selectedCourses.map((course) => (
                     <span key={course.id} onClick={(event) => { event.stopPropagation(); toggleCourse(course.id); }} className="inline-flex items-center gap-2 rounded-lg border border-blue-300 bg-blue-100 px-3 py-1 text-body4 font-medium text-gray-900">
-                      {course.title}
+                      {course.course_code}
                       <X aria-hidden="true" className="size-4 text-blue-500" />
                     </span>
                   ))}
@@ -237,7 +237,7 @@ export default function AddPromoCodePage() {
                 {courses.map((course) => (
                   <label key={course.id} className="flex cursor-pointer items-center gap-3 px-2 py-2 text-gray-700">
                     <input type="checkbox" checked={form.courseIds.includes(course.id)} onChange={() => toggleCourse(course.id)} className="size-5 accent-blue-500" />
-                    <span>{course.title}</span>
+                    <span>{course.course_code}</span>
                   </label>
                 ))}
                 {courses.length === 0 ? <p className="px-2 py-2 text-body3 text-gray-600">No courses found.</p> : null}

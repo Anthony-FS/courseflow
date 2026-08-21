@@ -4,22 +4,33 @@ export async function getPromoCodes() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, courses(title)")
+    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, promo_code_courses(course_id, courses(course_code))")
     .order("code");
 
   if (error) {
     throw new Error(error.message || "Failed to load promo codes.");
   }
 
-  return data ?? [];
+  return (data ?? []).map((promo) => {
+    const linkedCourseCodes = (promo.promo_code_courses ?? [])
+      .map((link) => link.courses?.course_code)
+      .filter(Boolean);
+    const courseCodes = [...new Set(linkedCourseCodes)];
+
+    return {
+      ...promo,
+      courseCodes,
+      appliesToAllCourses: !promo.course_id && courseCodes.length === 0,
+    };
+  });
 }
 
 export async function getPromoCourseOptions() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("courses")
-    .select("id, title")
-    .order("title");
+    .select("id, course_code")
+    .order("course_code");
 
   if (error) {
     throw new Error(error.message || "Failed to load courses.");
@@ -36,8 +47,8 @@ export function searchPromoCodes(promoCodes, query) {
   }
 
   return promoCodes.filter((promo) => {
-    const courseTitle = promo.courses?.title ?? "All";
-    return `${promo.code} ${promo.discount_type} ${courseTitle}`
+    const courseCodes = promo.courseCodes?.join(" ") || "All";
+    return `${promo.code} ${promo.discount_type} ${courseCodes}`
       .toLowerCase()
       .includes(normalizedQuery);
   });
