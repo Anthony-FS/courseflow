@@ -1,6 +1,10 @@
+import Link from "next/link";
+import { Pencil, Trash2 } from "lucide-react";
+
 export function AssignmentTable({
   assignments = [],
   isLoading = false,
+  onDelete,
 }) {
   const emptyMessage = isLoading
     ? "Loading assignments..."
@@ -49,11 +53,44 @@ export function AssignmentTable({
                 className="border-t border-gray-300"
               >
                 <td className="px-6 py-4">{assignment.title}</td>
-                <td className="px-6 py-4">{assignment.courseTitle}</td>
-                <td className="px-6 py-4">{assignment.lessonTitle}</td>
-                <td className="px-6 py-4">{assignment.subLessonTitle}</td>
-                <td className="px-6 py-4">{assignment.dateLabel}</td>
-                <td className="px-6 py-4">-</td>
+                <td className="px-6 py-4">
+                  {assignment.courseTitle}
+                </td>
+                <td className="px-6 py-4">
+                  {assignment.lessonTitle}
+                </td>
+                <td className="px-6 py-4">
+                  {assignment.subLessonTitle}
+                </td>
+                <td className="px-6 py-4">
+                  {assignment.dateLabel}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/admin/assignments/${assignment.id}/edit`}
+                      aria-label={`Edit ${assignment.title}`}
+                      className="inline-flex size-10 items-center justify-center rounded-lg text-blue-500 hover:bg-blue-100"
+                    >
+                      <Pencil
+                        aria-hidden="true"
+                        className="size-5"
+                      />
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => onDelete(assignment)}
+                      aria-label={`Delete ${assignment.title}`}
+                      className="inline-flex size-10 items-center justify-center rounded-lg text-orange-500 hover:bg-orange-100"
+                    >
+                      <Trash2
+                        aria-hidden="true"
+                        className="size-5"
+                      />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))
           )}

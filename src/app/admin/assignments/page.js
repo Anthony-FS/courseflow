@@ -7,6 +7,8 @@ import { Plus, Search } from "lucide-react";
 import { AssignmentTable } from "@/components/admin/assignment-table";
 import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { deleteAdminAssignment } from "@/lib/admin-assignments";
 import { getAssignments, searchAssignments } from "@/lib/assignments";
 import { getTotalPages, paginateItems } from "@/lib/pagination";
 
@@ -16,6 +18,8 @@ export default function AdminAssignmentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [assignmentToDelete, setAssignmentToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +67,43 @@ export default function AdminAssignmentsPage() {
     setCurrentPage(1);
   }
 
+  function handleDeleteRequest(assignment) {
+    setAssignmentToDelete(assignment);
+    setErrorMessage("");
+  }
+
+  function handleDeleteCancel() {
+    if (!isDeleting) {
+      setAssignmentToDelete(null);
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!assignmentToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    setErrorMessage("");
+
+    try {
+      await deleteAdminAssignment(assignmentToDelete.id);
+
+      setAssignments((current) =>
+        current.filter(
+          (assignment) => assignment.id !== assignmentToDelete.id,
+        ),
+      );
+
+      setAssignmentToDelete(null);
+      setCurrentPage(1);
+    } catch (error) {
+      setErrorMessage(
+        error.message ?? "Failed to delete assignment.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <main className="flex min-h-full flex-col">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-300 bg-white px-10 py-4">
@@ -95,7 +136,10 @@ export default function AdminAssignmentsPage() {
 
       <section className="p-10">
         {errorMessage ? (
-          <p className="mb-4 text-body2 text-orange-500" role="alert">
+          <p
+            className="mb-4 text-body2 text-orange-500"
+            role="alert"
+          >
             {errorMessage}
           </p>
         ) : null}
@@ -104,6 +148,7 @@ export default function AdminAssignmentsPage() {
           <AssignmentTable
             assignments={paginatedAssignments}
             isLoading={status === "loading"}
+            onDelete={handleDeleteRequest}
           />
         </div>
 
@@ -116,6 +161,25 @@ export default function AdminAssignmentsPage() {
           />
         ) : null}
       </section>
+
+      <ConfirmationDialog
+        open={Boolean(assignmentToDelete)}
+        onOpenChange={(open) => {
+          if (!open) handleDeleteCancel();
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete assignment"
+        message={
+          assignmentToDelete
+            ? `Are you sure you want to delete "${assignmentToDelete.title}"?`
+            : ""
+        }
+        confirmText="Yes, delete assignment"
+        cancelText="No, keep it"
+        isConfirming={isDeleting}
+        confirmingText="Deleting..."
+        confirmFirst
+      />
     </main>
   );
 }

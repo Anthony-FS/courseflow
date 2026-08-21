@@ -4,6 +4,7 @@
 export function createMockSupabase({
   courseId = "course-test-id",
   lessonsSelect = null,
+  assignmentsSelect = null,
   courseSelect = null,
   promoSelect = null,
   materialsSelect = null,
@@ -28,6 +29,11 @@ export function createMockSupabase({
     }
     if (table === "lessons") {
       return lessonsSelect ?? [];
+    }
+    if (table === "assignments" && assignmentsSelect !== null) {
+      return Array.isArray(assignmentsSelect)
+        ? assignmentsSelect
+        : [assignmentsSelect];
     }
     return [];
   }
@@ -92,11 +98,18 @@ export function createMockSupabase({
           data: applyFilters(selectRows(table), filters)[0] ?? null,
           error: null,
         }),
-        single: async () => ({
-          data:
-            applyFilters(selectRows(table), filters)[0] ?? { id: courseId },
-          error: null,
-        }),
+        single: async () => {
+          const row = applyFilters(selectRows(table), filters)[0];
+
+          return {
+            data:
+              row ??
+              (table === "assignments" && assignmentsSelect !== null
+                ? null
+                : { id: courseId }),
+            error: null,
+          };
+        },
         then(onFulfilled, onRejected) {
           return Promise.resolve({
             data: applyFilters(selectRows(table), filters),
@@ -160,14 +173,21 @@ export function createMockSupabase({
           select() {
             return {
               single: async () => ({
-                data: error ? null : (rows[0]?.id ? rows[0] : { id: courseId, ...rows[0] }),
+                data: error
+                  ? null
+                  : rows[0]?.id
+                    ? rows[0]
+                    : { id: courseId, ...rows[0] },
                 error,
               }),
               then(onFulfilled, onRejected) {
                 return Promise.resolve({
                   data: error
                     ? null
-                    : rows.map((r, i) => ({ id: r.id || `mock-id-${i}`, ...r })),
+                    : rows.map((r, i) => ({
+                        id: r.id || `mock-id-${i}`,
+                        ...r,
+                      })),
                   error,
                 }).then(onFulfilled, onRejected);
               },

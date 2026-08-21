@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, CircleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { createAdminAssignment } from "@/lib/admin-assignments";
+import {
+  createAdminAssignment,
+  getAdminAssignment,
+  updateAdminAssignment,
+} from "@/lib/admin-assignments";
 import {
   getAdminCourseLessons,
   getAdminLessonDetail,
@@ -133,7 +137,6 @@ function MenuSelect({
           disabled={disabled}
           aria-expanded={open}
           aria-haspopup="listbox"
-          aria-invalid={hasError || undefined}
           aria-describedby={hasError ? `${id}-error` : undefined}
           onClick={() => {
             if (!disabled) onOpenChange(!open);
@@ -209,7 +212,7 @@ function MenuSelect({
   );
 }
 
-export default function AssignmentForm() {
+export default function AssignmentForm({ assignmentId = null }) {
   const router = useRouter();
   const [form, setForm] = useState(INITIAL_FORM);
   const [courses, setCourses] = useState([]);
@@ -218,7 +221,42 @@ export default function AssignmentForm() {
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingAssignment, setIsLoadingAssignment] = useState(
+    Boolean(assignmentId),
+  );
   const [openMenu, setOpenMenu] = useState(null);
+
+  useEffect(() => {
+    if (!assignmentId) return;
+
+    let cancelled = false;
+
+    getAdminAssignment(assignmentId)
+      .then((assignment) => {
+        if (cancelled) return;
+
+        setForm({
+          courseId: assignment.courseId,
+          lessonId: assignment.lessonId,
+          subLessonId: assignment.subLessonId,
+          title: assignment.title,
+          description: assignment.description,
+          submissionType: assignment.submissionType,
+          allowedFileTypes: assignment.allowedFileTypes,
+          maxFileSizeMb: assignment.maxFileSizeMb,
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) setSubmitError(error.message);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingAssignment(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,7 +276,6 @@ export default function AssignmentForm() {
 
   useEffect(() => {
     if (!form.courseId) {
-      setLessons([]);
       return;
     }
 
@@ -259,7 +296,6 @@ export default function AssignmentForm() {
 
   useEffect(() => {
     if (!form.courseId || !form.lessonId) {
-      setSubLessons([]);
       return;
     }
 
@@ -350,20 +386,27 @@ export default function AssignmentForm() {
     setSubmitError("");
     if (!validate()) return;
 
+    const payload = {
+      courseId: form.courseId,
+      lessonId: form.lessonId,
+      subLessonId: form.subLessonId,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      submissionType: form.submissionType,
+      allowedFileTypes:
+        form.submissionType === "file" ? form.allowedFileTypes : [],
+      maxFileSizeMb:
+        form.submissionType === "file" ? Number(form.maxFileSizeMb) : null,
+    };
+
     setIsSubmitting(true);
     try {
-      await createAdminAssignment({
-        courseId: form.courseId,
-        lessonId: form.lessonId,
-        subLessonId: form.subLessonId,
-        title: form.title.trim(),
-        description: form.description.trim(),
-        submissionType: form.submissionType,
-        allowedFileTypes:
-          form.submissionType === "file" ? form.allowedFileTypes : [],
-        maxFileSizeMb:
-          form.submissionType === "file" ? Number(form.maxFileSizeMb) : null,
-      });
+      if (assignmentId) {
+        await updateAdminAssignment(assignmentId, payload);
+      } else {
+        await createAdminAssignment(payload);
+      }
+
       router.push("/admin/assignments");
       router.refresh();
     } catch (error) {
@@ -379,7 +422,9 @@ export default function AssignmentForm() {
   return (
     <main className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-300 bg-white px-10 py-4">
-        <h1 className="text-headline3">Add Assignment</h1>
+        <h1 className="text-headline3">
+          {assignmentId ? "Edit Assignment" : "Add Assignment"}
+        </h1>
         <div className="flex items-center gap-4">
           <Button asChild variant="secondary" className="min-h-12 px-8 py-3">
             <Link href="/admin/assignments">Cancel</Link>
@@ -387,10 +432,18 @@ export default function AssignmentForm() {
           <Button
             type="submit"
             form="assignment-form"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingAssignment}
             className="min-h-12 px-8 py-3"
           >
-            {isSubmitting ? "Creating..." : "Create"}
+            {isLoadingAssignment
+              ? "Loading..."
+              : isSubmitting
+                ? assignmentId
+                  ? "Saving..."
+                  : "Creating..."
+                : assignmentId
+                  ? "Save"
+                  : "Create"}
           </Button>
         </div>
       </header>
