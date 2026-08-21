@@ -50,9 +50,49 @@ describe("DELETE /api/admin/courses/[id]", () => {
     ]);
 
     expect(supabase.deletes.map((entry) => entry.table)).toEqual([
+      "materials",
       "sub_lessons",
       "lessons",
       "courses",
     ]);
+  });
+
+  it("removes unreferenced course media from storage", async () => {
+    const supabase = createMockSupabase({
+      courseSelect: {
+        id: "course-1",
+        cover_image_url: "course-covers/admin/cover.jpg",
+        video_trailer_url: "course-trailers/admin/trailer.mp4",
+      },
+      materialsSelect: [
+        {
+          id: "mat-1",
+          file_url: "course-attachments/admin/notes.pdf",
+          sub_lesson_id: null,
+        },
+      ],
+    });
+    requireAdmin.mockResolvedValue({
+      supabase,
+      user: ADMIN_USER,
+      profile: { id: ADMIN_USER.id, role: "admin", is_active: true },
+      error: null,
+    });
+
+    const response = await deleteCourse(
+      new Request("http://localhost/api/admin/courses/course-1", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ id: "course-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(supabase.storageRemoves).toEqual(
+      expect.arrayContaining([
+        { bucket: "course-covers", paths: ["admin/cover.jpg"] },
+        { bucket: "course-trailers", paths: ["admin/trailer.mp4"] },
+        { bucket: "course-attachments", paths: ["admin/notes.pdf"] },
+      ]),
+    );
   });
 });
