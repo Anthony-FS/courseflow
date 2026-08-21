@@ -14,6 +14,7 @@ export function createMockSupabase({
   const updates = [];
   const deletes = [];
   const uploads = [];
+  const storageRemoves = [];
 
   function selectRows(table) {
     if (table === "courses" && courseSelect) {
@@ -179,8 +180,34 @@ export function createMockSupabase({
 
         return chain;
       },
-      select() {
-        return selectChain();
+      select(_columns, options = {}) {
+        const chain = selectChain();
+        if (options?.head && options?.count === "exact") {
+          const withCount = {
+            ...chain,
+            async maybeSingle() {
+              return { data: null, error: null, count: 0 };
+            },
+            then(onFulfilled, onRejected) {
+              return Promise.resolve({
+                data: null,
+                error: null,
+                count: 0,
+              }).then(onFulfilled, onRejected);
+            },
+          };
+          // Preserve filter chaining for count queries.
+          withCount.eq = (column, value) => {
+            chain.eq(column, value);
+            return withCount;
+          };
+          withCount.neq = (column, value) => {
+            chain.neq(column, value);
+            return withCount;
+          };
+          return withCount;
+        }
+        return chain;
       },
       update(payload) {
         const entry = { table, payload, filters: [] };
@@ -200,6 +227,7 @@ export function createMockSupabase({
     updates,
     deletes,
     uploads,
+    storageRemoves,
     from,
     storage: {
       from(bucket) {
@@ -207,6 +235,10 @@ export function createMockSupabase({
           async upload(path, file, options) {
             uploads.push({ bucket, path, file, options });
             return { error: null };
+          },
+          async remove(paths) {
+            storageRemoves.push({ bucket, paths });
+            return { data: paths, error: null };
           },
         };
       },

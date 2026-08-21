@@ -1,6 +1,10 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import {
+  cleanupCourseMediaOnDelete,
+  cleanupReplacedCourseMedia,
+} from "@/lib/course-media-storage";
+import {
   COURSE_CODE_TAKEN_MESSAGE,
   findCourseWithCode,
   isUniqueViolation,
@@ -234,13 +238,15 @@ export async function PUT(request, { params }) {
 
   const { data: existingCourse } = await supabase
     .from("courses")
-    .select("id")
+    .select("id, cover_image_url, video_trailer_url")
     .eq("id", courseId)
     .maybeSingle();
 
   if (!existingCourse?.id) {
     return jsonError("Course not found", 404);
   }
+
+  const existingAttachment = await getCourseLevelAttachment(supabase, courseId);
 
   let body;
   try {
@@ -334,7 +340,6 @@ export async function PUT(request, { params }) {
   }
 
   if (parsed.attachment?.fileUrl) {
-    const existingAttachment = await getCourseLevelAttachment(supabase, courseId);
     const materialRow = {
       name: String(parsed.attachment.name ?? "Attachment").trim() || "Attachment",
       file_url: String(parsed.attachment.fileUrl),
@@ -370,6 +375,15 @@ export async function PUT(request, { params }) {
     }
   }
 
+  await cleanupReplacedCourseMedia(supabase, courseId, {
+    previousCoverUrl: existingCourse.cover_image_url,
+    previousTrailerUrl: existingCourse.video_trailer_url,
+    previousAttachmentUrl: existingAttachment?.file_url,
+    nextCoverUrl: parsed.coverImageUrl,
+    nextTrailerUrl: parsed.videoTrailerUrl,
+    nextAttachmentUrl: parsed.attachment?.fileUrl,
+  });
+
   return jsonOk({ id: courseId, success: true });
 }
 
@@ -389,6 +403,17 @@ export async function DELETE(_request, { params }) {
   const { id: courseId } = await params;
   if (!courseId) {
     return jsonError("Course id is required", 400);
+  }
+
+  // Collect + remove Storage objects before DB rows cascade away.
+  await cleanupCourseMediaOnDelete(supabase, courseId);
+
+  const materialsError = await deleteByCourseId(supabase, "materials", courseId);
+  if (materialsError) {
+    return jsonError(
+      materialsError.message || "Failed to delete course materials",
+      500,
+    );
   }
 
   const subLessonError = await deleteByCourseId(
