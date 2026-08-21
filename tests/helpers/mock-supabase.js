@@ -10,6 +10,7 @@ export function createMockSupabase({
   courseSelect = null,
   promoSelect = null,
   materialsSelect = null,
+  wishlistsSelect = null,
   insertErrors = {},
   updateErrors = {},
 } = {}) {
@@ -20,6 +21,9 @@ export function createMockSupabase({
   const storageRemoves = [];
 
   function selectRows(table) {
+    if (table === "wishlists" && wishlistsSelect) {
+      return Array.isArray(wishlistsSelect) ? wishlistsSelect : [wishlistsSelect];
+    }
     if (table === "courses" && courseSelect) {
       return Array.isArray(courseSelect) ? courseSelect : [courseSelect];
     }
