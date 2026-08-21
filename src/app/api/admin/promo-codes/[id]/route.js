@@ -19,15 +19,23 @@ function normalize(body) {
     minPurchaseAmount,
   });
   if (amountValidation.error) return { error: amountValidation.error };
-  return { code, discountType, minPurchaseAmount, discountValue, courseId: courseIds[0] ?? null };
+  return { code, discountType, minPurchaseAmount, discountValue, courseIds: [...new Set(courseIds)] };
 }
 
 export async function GET(_request, { params }) {
   const { supabase, error } = await requireAdmin();
   if (error) return error;
-  const { data, error: queryError } = await supabase.from("promo_codes").select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at").eq("id", (await params).id).single();
+  const { data, error: queryError } = await supabase
+    .from("promo_codes")
+    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, promo_code_courses(course_id, courses(course_code))")
+    .eq("id", (await params).id)
+    .single();
   if (queryError) return jsonError(queryError.message, 404);
-  return jsonOk(data);
+  const courseIds = (data.promo_code_courses ?? []).map((link) => link.course_id);
+  return jsonOk({
+    ...data,
+    courseIds: courseIds.length > 0 ? courseIds : (data.course_id ? [data.course_id] : []),
+  });
 }
 
 export async function PATCH(request, { params }) {
@@ -35,9 +43,38 @@ export async function PATCH(request, { params }) {
   if (error) return error;
   const normalized = normalize(await request.json());
   if (normalized.error) return jsonError(normalized.error, 400);
-  const { data, error: updateError } = await supabase.from("promo_codes").update({ code: normalized.code, discount_type: normalized.discountType, discount_value: normalized.discountValue, min_purchase_amount: normalized.minPurchaseAmount, course_id: normalized.courseId }).eq("id", (await params).id).select("id").single();
+  const promoId = (await params).id;
+  const { data, error: updateError } = await supabase
+    .from("promo_codes")
+    .update({
+      code: normalized.code,
+      discount_type: normalized.discountType,
+      discount_value: normalized.discountValue,
+      min_purchase_amount: normalized.minPurchaseAmount,
+      course_id: null,
+    })
+    .eq("id", promoId)
+    .select("id")
+    .single();
   if (updateError?.code === "23505") return jsonError("Promo code already exists.", 409);
   if (updateError) return jsonError(updateError.message, 500);
+
+  const { error: deleteRelationsError } = await supabase
+    .from("promo_code_courses")
+    .delete()
+    .eq("promo_code_id", promoId);
+  if (deleteRelationsError) return jsonError(deleteRelationsError.message, 500);
+
+  if (normalized.courseIds.length > 0) {
+    const { error: relationError } = await supabase
+      .from("promo_code_courses")
+      .insert(normalized.courseIds.map((courseId) => ({
+        promo_code_id: promoId,
+        course_id: courseId,
+      })));
+    if (relationError) return jsonError(relationError.message, 500);
+  }
+
   return jsonOk(data);
 }
 

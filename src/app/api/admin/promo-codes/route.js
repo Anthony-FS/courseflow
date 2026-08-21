@@ -45,21 +45,23 @@ export async function POST(request) {
     return jsonError(amountValidation.error, 400);
   }
 
-  const promoRows = (courseIds.length > 0 ? courseIds : [null]).map((courseId) => ({
-    course_id: courseId,
+  const promoRow = {
+    // A null legacy course_id means the code is not restricted to one course.
+    // Specific course scope is stored in promo_code_courses below.
+    course_id: null,
     code,
     discount_type: discountType,
     discount_value: discountValue,
     min_purchase_amount: minPurchaseAmount,
     starts_at: new Date().toISOString(),
     is_active: true,
-  }));
+  };
 
   const { data, error: insertError } = await supabase
     .from("promo_codes")
-    .insert(promoRows)
+    .insert(promoRow)
     .select("id")
-    .limit(1);
+    .single();
 
   if (insertError) {
     if (insertError.code === "23505") {
@@ -68,5 +70,19 @@ export async function POST(request) {
     return jsonError(insertError.message || "Failed to create promo code.", 500);
   }
 
-  return jsonOk({ id: data?.[0]?.id ?? null }, { status: 201 });
+  if (courseIds.length > 0) {
+    const { error: relationError } = await supabase
+      .from("promo_code_courses")
+      .insert(courseIds.map((courseId) => ({
+        promo_code_id: data.id,
+        course_id: courseId,
+      })));
+
+    if (relationError) {
+      await supabase.from("promo_codes").delete().eq("id", data.id);
+      return jsonError(relationError.message || "Failed to assign promo code to courses.", 500);
+    }
+  }
+
+  return jsonOk({ id: data?.id ?? null }, { status: 201 });
 }

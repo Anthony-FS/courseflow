@@ -51,8 +51,8 @@ export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
                 <td className="px-4 py-4">
                   {promo.discount_type === "percent" ? "Percent" : "Fixed amount"}
                 </td>
-                <td className="max-w-[200px] truncate px-4 py-4" title={promo.courses?.title ?? "All"}>
-                  {promo.courses?.title ?? "All"}
+                <td className="max-w-[240px] truncate px-4 py-4" title={promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}>
+                  {promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}
                 </td>
                 <td className="whitespace-nowrap px-4 py-4">{formatCreatedDate(promo)}</td>
                 <td className="px-4 py-4">
