@@ -17,6 +17,7 @@ const ADMIN_USER = { id: "11111111-1111-1111-1111-111111111111" };
 function validCourseBody(overrides = {}) {
   return {
     title: "Service Design Essentials",
+    courseCode: "SD101",
     summary: "Learn service design fundamentals",
     description: "Detailed course content",
     price: 3559,
@@ -82,6 +83,7 @@ describe("POST /api/admin/courses integration", () => {
     expect(courseInsert.rows[0]).toMatchObject({
       created_by: ADMIN_USER.id,
       title: "Service Design Essentials",
+      course_code: "SD101",
       summary: "Learn service design fundamentals",
       description: "Detailed course content",
       price: 3559,
@@ -180,6 +182,7 @@ describe("POST /api/admin/courses integration", () => {
 
     const response = await postCreateCourse({
       title: "",
+      courseCode: "",
       summary: "",
       description: "",
       price: -1,
@@ -193,5 +196,65 @@ describe("POST /api/admin/courses integration", () => {
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/missing or invalid required course fields/i);
     expect(insertsFor(supabase, "courses")).toHaveLength(0);
+  });
+
+  it("returns 400 when course code is whitespace only", async () => {
+    const supabase = createMockSupabase();
+    requireAdmin.mockResolvedValue({
+      supabase,
+      user: ADMIN_USER,
+      profile: { id: ADMIN_USER.id, role: "admin", is_active: true },
+      error: null,
+    });
+
+    const response = await postCreateCourse(
+      validCourseBody({ courseCode: "   " }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.fields.courseCode).toMatch(/fill out this field/i);
+    expect(insertsFor(supabase, "courses")).toHaveLength(0);
+  });
+
+  it("returns 409 when course code already exists case-insensitively", async () => {
+    const supabase = createMockSupabase({
+      courseSelect: { id: "existing-1", course_code: "FSD12" },
+    });
+    requireAdmin.mockResolvedValue({
+      supabase,
+      user: ADMIN_USER,
+      profile: { id: ADMIN_USER.id, role: "admin", is_active: true },
+      error: null,
+    });
+
+    const response = await postCreateCourse(
+      validCourseBody({ courseCode: "fsd12" }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toMatch(/already exists/i);
+    expect(body.fields.courseCode).toMatch(/already exists/i);
+    expect(insertsFor(supabase, "courses")).toHaveLength(0);
+  });
+
+  it("preserves course code casing when storing", async () => {
+    const supabase = createMockSupabase({ courseId: "course-code-1" });
+    requireAdmin.mockResolvedValue({
+      supabase,
+      user: ADMIN_USER,
+      profile: { id: ADMIN_USER.id, role: "admin", is_active: true },
+      error: null,
+    });
+
+    const response = await postCreateCourse(
+      validCourseBody({ courseCode: "LOL404" }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(insertsFor(supabase, "courses")[0].rows[0].course_code).toBe(
+      "LOL404",
+    );
   });
 });

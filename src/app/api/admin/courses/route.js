@@ -1,9 +1,13 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import {
+  COURSE_CODE_TAKEN_MESSAGE,
+  findCourseWithCode,
+  isUniqueViolation,
   parseCoursePrice,
   parseLearningTime,
   mapDiscountTypeForDb,
+  trimCourseCode,
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
@@ -29,9 +33,9 @@ export async function POST(request) {
   }
 
   const title = String(body.title ?? "").trim();
+  const courseCode = trimCourseCode(body.courseCode);
   const summary = String(body.summary ?? "").trim();
   const description = String(body.description ?? "").trim();
-  const totalLearningTime = String(body.totalLearningTime ?? "").trim();
   const coverImageUrl = String(body.coverImageUrl ?? "").trim();
   const videoTrailerUrl = String(body.videoTrailerUrl ?? "").trim();
   const price = parseCoursePrice(body.price);
@@ -39,6 +43,7 @@ export async function POST(request) {
 
   const fieldErrors = validateCourseFields({
     courseName: title,
+    courseCode,
     price: body.price,
     learningTime: body.totalLearningTime,
     courseSummary: summary,
@@ -52,21 +57,32 @@ export async function POST(request) {
     !Number.isFinite(price) ||
     !Number.isFinite(learningTimeNumber)
   ) {
+    return jsonError("Missing or invalid required course fields", 400, {
+      fields: fieldErrors,
+      required: [
+        "title",
+        "courseCode",
+        "summary",
+        "description",
+        "price",
+        "totalLearningTime",
+        "coverImageUrl",
+        "videoTrailerUrl",
+      ],
+    });
+  }
+
+  try {
+    const existing = await findCourseWithCode(supabase, courseCode);
+    if (existing) {
+      return jsonError(COURSE_CODE_TAKEN_MESSAGE, 409, {
+        fields: { courseCode: COURSE_CODE_TAKEN_MESSAGE },
+      });
+    }
+  } catch (lookupError) {
     return jsonError(
-      "Missing or invalid required course fields",
-      400,
-      {
-        fields: fieldErrors,
-        required: [
-          "title",
-          "summary",
-          "description",
-          "price",
-          "totalLearningTime",
-          "coverImageUrl",
-          "videoTrailerUrl",
-        ],
-      },
+      lookupError?.message || "Failed to validate course code",
+      500,
     );
   }
 
@@ -106,6 +122,7 @@ export async function POST(request) {
     .insert({
       created_by: user.id,
       title,
+      course_code: courseCode,
       summary,
       description,
       price,
@@ -117,10 +134,12 @@ export async function POST(request) {
     .single();
 
   if (courseError || !course) {
-    return jsonError(
-      courseError?.message || "Failed to create course",
-      500,
-    );
+    if (isUniqueViolation(courseError)) {
+      return jsonError(COURSE_CODE_TAKEN_MESSAGE, 409, {
+        fields: { courseCode: COURSE_CODE_TAKEN_MESSAGE },
+      });
+    }
+    return jsonError(courseError?.message || "Failed to create course", 500);
   }
 
   const courseId = course.id;
@@ -150,10 +169,9 @@ export async function POST(request) {
     const lessonRows = lessons.map((lesson, index) => ({
       course_id: courseId,
       title: String(lesson.title ?? "").trim() || `Lesson ${index + 1}`,
-      sort_order:
-        Number.isFinite(Number(lesson.sortOrder))
-          ? Number(lesson.sortOrder)
-          : index,
+      sort_order: Number.isFinite(Number(lesson.sortOrder))
+        ? Number(lesson.sortOrder)
+        : index,
     }));
 
     const { error: lessonsError } = await supabase

@@ -27,6 +27,7 @@ const LESSON_ID = "11111111-1111-1111-1111-111111111111";
 const COURSE_ROW = {
   id: COURSE_ID,
   title: "Service Design Essentials",
+  course_code: "SD101",
   summary: "Learn service design fundamentals",
   description: "Detailed course content",
   price: 3559,
@@ -38,6 +39,7 @@ const COURSE_ROW = {
 function validUpdateBody(overrides = {}) {
   return {
     title: "Service Design Essentials",
+    courseCode: "SD101",
     summary: "Learn service design fundamentals",
     description: "Detailed course content",
     price: 3559,
@@ -114,6 +116,7 @@ describe("GET /api/admin/courses/[id]", () => {
     expect(body).toMatchObject({
       id: COURSE_ID,
       title: "Service Design Essentials",
+      courseCode: "SD101",
       summary: "Learn service design fundamentals",
       totalLearningTime: "12",
       coverImageUrl: "course-covers/admin/cover.jpg",
@@ -169,11 +172,81 @@ describe("PUT /api/admin/courses/[id]", () => {
     const courseUpdate = updatesFor(supabase, "courses")[0];
     expect(courseUpdate.payload).toMatchObject({
       title: "Updated Course",
+      course_code: "SD101",
       price: 1999,
       cover_image_url: "course-covers/admin/cover.jpg",
       video_trailer_url: "course-trailers/admin/trailer.mp4",
     });
     expect(courseUpdate.payload.updated_at).toEqual(expect.any(String));
+  });
+
+  it("allows keeping the same course code with different casing", async () => {
+    const supabase = createMockSupabase({ courseSelect: COURSE_ROW });
+    mockAdmin(supabase);
+
+    const response = await putCourse(
+      COURSE_ID,
+      validUpdateBody({ courseCode: "sd101" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updatesFor(supabase, "courses")[0].payload.course_code).toBe(
+      "sd101",
+    );
+  });
+
+  it("preserves mixed casing when updating course code", async () => {
+    const supabase = createMockSupabase({ courseSelect: COURSE_ROW });
+    mockAdmin(supabase);
+
+    const response = await putCourse(
+      COURSE_ID,
+      validUpdateBody({ courseCode: "LOL404" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updatesFor(supabase, "courses")[0].payload.course_code).toBe(
+      "LOL404",
+    );
+  });
+
+  it("returns 400 when clearing course code to empty or whitespace", async () => {
+    const supabase = createMockSupabase({ courseSelect: COURSE_ROW });
+    mockAdmin(supabase);
+
+    for (const courseCode of ["", "   ", "\t"]) {
+      const response = await putCourse(
+        COURSE_ID,
+        validUpdateBody({ courseCode }),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.fields.courseCode).toMatch(/fill out this field/i);
+    }
+
+    expect(updatesFor(supabase, "courses")).toHaveLength(0);
+  });
+
+  it("returns 409 when course code collides with another course", async () => {
+    const supabase = createMockSupabase({
+      courseSelect: [
+        COURSE_ROW,
+        { id: "other-course", course_code: "FSD12" },
+      ],
+    });
+    mockAdmin(supabase);
+
+    const response = await putCourse(
+      COURSE_ID,
+      validUpdateBody({ courseCode: "fsd12" }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toMatch(/already exists/i);
+    expect(body.fields.courseCode).toMatch(/already exists/i);
+    expect(updatesFor(supabase, "courses")).toHaveLength(0);
   });
 
   it("upserts an existing promo and keeps existing media urls", async () => {
@@ -246,6 +319,7 @@ describe("PUT /api/admin/courses/[id]", () => {
 
     const response = await putCourse(COURSE_ID, {
       title: "",
+      courseCode: "",
       summary: "",
       description: "",
       price: -1,
