@@ -13,7 +13,7 @@ export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
 
   return (
     <section className="overflow-x-auto bg-white">
-      <table className="w-full min-w-[1000px] border-collapse text-left">
+      <table className="w-full min-w-250 border-collapse text-left">
         <thead className="bg-gray-300/70 text-body3 text-gray-700">
           <tr>
             <th scope="col" className="px-4 py-3 font-medium">Promo code</th>
@@ -32,13 +32,13 @@ export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
             </tr>
           ) : (
             promoCodes.map((promo) => (
-              <tr key={promo.id} className="h-[88px] border-t border-gray-200">
+              <tr key={promo.id} className="h-22 border-t border-gray-200">
                 <td className="px-4 py-4">{promo.code}</td>
                 <td className="px-4 py-4">{formatAmount(promo.min_purchase_amount)}</td>
                 <td className="px-4 py-4">
                   {promo.discount_type === "percent" ? "Percent" : "Fixed amount"}
                 </td>
-                <td className="max-w-[240px] truncate px-4 py-4" title={promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}>
+                <td className="max-w-60 truncate px-4 py-4" title={promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}>
                   {promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}
                 </td>
                 <td className="whitespace-nowrap px-4 py-4">{formatCourseDate(promo.starts_at)}</td>
