@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { enrollInCourse } from "@/lib/enrollments";
 import { cn } from "@/lib/utils";
 
 function SubscribeButton({
@@ -16,47 +15,26 @@ function SubscribeButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  async function handleConfirm() {
-    setIsConfirming(true);
-    setErrorMessage("");
-
-    try {
-      await enrollInCourse(courseId);
-      setOpen(false);
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(error.message || "Failed to subscribe to this course.");
-    } finally {
-      setIsConfirming(false);
-    }
+  function handleConfirm() {
+    setOpen(false);
+    router.push(`/payment?courseId=${encodeURIComponent(courseId)}`);
   }
 
   return (
     <>
-      <div className="grid gap-2">
-        <Button type="button" className={cn("w-full", className)} onClick={() => setOpen(true)}>
-          {label}
-        </Button>
-        {errorMessage ? (
-          <p className="text-body3 text-orange-500" role="alert">
-            {errorMessage}
-          </p>
-        ) : null}
-      </div>
+      <Button
+        type="button"
+        className={cn("w-full", className)}
+        onClick={() => setOpen(true)}
+      >
+        {label}
+      </Button>
 
       <ConfirmationDialog
         open={open}
-        onOpenChange={(nextOpen) => {
-          if (!isConfirming) {
-            setOpen(nextOpen);
-          }
-        }}
+        onOpenChange={setOpen}
         onConfirm={handleConfirm}
-        isConfirming={isConfirming}
-        confirmingText="Subscribing..."
         message={`Are you sure you want to subscribe to ${courseTitle} Course?`}
         confirmText="Yes, I want to subscribe"
         cancelText="No, I don't"

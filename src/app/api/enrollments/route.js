@@ -1,9 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
-
-function isUniqueViolation(error) {
-  return error?.code === "23505";
-}
+import { enrollUserInCourse } from "@/lib/enrollments";
 
 export async function POST(request) {
   const { supabase, user, error } = await requireUser();
@@ -35,37 +32,13 @@ export async function POST(request) {
     return jsonError("Course not found", 404);
   }
 
-  const { data: existing, error: existingError } = await supabase
-    .from("enrollments")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("course_id", courseId)
-    .maybeSingle();
-
-  if (existingError) {
-    return jsonError(existingError.message || "Failed to load enrollment", 500);
+  try {
+    const enrollment = await enrollUserInCourse(supabase, user.id, courseId);
+    return jsonOk(
+      { ok: true, already: enrollment.already, id: enrollment.id },
+      { status: enrollment.already ? 200 : 201 },
+    );
+  } catch (enrollError) {
+    return jsonError(enrollError.message || "Failed to subscribe to this course", 500);
   }
-
-  if (existing?.id) {
-    return jsonOk({ ok: true, already: true, id: existing.id });
-  }
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("enrollments")
-    .insert({
-      user_id: user.id,
-      course_id: courseId,
-    })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    if (isUniqueViolation(insertError)) {
-      return jsonOk({ ok: true, already: true });
-    }
-
-    return jsonError(insertError.message || "Failed to subscribe to this course", 500);
-  }
-
-  return jsonOk({ ok: true, already: false, id: inserted?.id ?? null }, { status: 201 });
 }
