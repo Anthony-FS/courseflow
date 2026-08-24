@@ -6,6 +6,7 @@ import { LessonNav } from "@/components/course-learn/lesson-nav";
 import { getSessionUser } from "@/lib/auth";
 import {
   flattenSubLessons,
+  getSubLessonLearningContent,
   MOCK_ASSIGNMENT,
   mockProgressPercent,
   resolveActiveSubLesson,
@@ -78,6 +79,11 @@ export default async function CourseLearnPage({ params, searchParams }) {
     );
   }
 
+  const subLessonContent = await getSubLessonLearningContent(catalog, {
+    courseId: course.id,
+    subLessonId: active.id,
+  });
+
   return (
     <main className="flex flex-1 flex-col bg-white">
       <div className="flex flex-1 flex-col lg:flex-row">
@@ -92,9 +98,10 @@ export default async function CourseLearnPage({ params, searchParams }) {
         />
 
         <LessonContent
-          title={active.title}
+          title={subLessonContent?.title ?? active.title}
+          description={subLessonContent?.description}
           coverUrl={course.coverUrl}
-          videoUrl={null}
+          videoUrl={subLessonContent?.videoUrl ?? null}
           assignment={MOCK_ASSIGNMENT}
         />
       </div>
