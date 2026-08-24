@@ -1,4 +1,4 @@
-const MINIMUM_CUSTOMER_PAYMENT = 100;
+export const MINIMUM_CUSTOMER_PAYMENT = 100;
 
 /**
  * Returns the minimum order amount required for a fixed discount so the
