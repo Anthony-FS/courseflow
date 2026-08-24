@@ -1,3 +1,4 @@
+import { normalizeCourseCode } from "@/lib/course-validation";
 import { createClient } from "@/lib/supabase/client";
 
 const FALLBACK_COVER = "/courses/service-design.svg";
@@ -6,7 +7,7 @@ const TRAILER_BUCKET = "course-trailers";
 const ATTACHMENT_BUCKET = "course-attachments";
 
 const COURSE_DETAIL_COLUMNS =
-  "id, title, summary, description, price, cover_image_url, cover_file_url, video_trailer_url";
+  "id, title, course_code, summary, description, price, cover_image_url, cover_file_url, video_trailer_url";
 const COURSE_DETAIL_WITH_LESSONS = `${COURSE_DETAIL_COLUMNS}, lessons ( id, title, sort_order, sub_lessons ( id, title, sort_order ) )`;
 
 function toPublicStorageUrl(objectPath, supabaseUrl) {
@@ -98,6 +99,42 @@ async function resolveAttachmentHref(supabase, fileUrl) {
   );
 }
 
+function attachmentObjectPath(fileUrl) {
+  const value = String(fileUrl ?? "").trim();
+  if (!value || /^https?:\/\//i.test(value) || value.startsWith("/")) {
+    return null;
+  }
+
+  return value.startsWith(`${ATTACHMENT_BUCKET}/`)
+    ? value.slice(ATTACHMENT_BUCKET.length + 1)
+    : value;
+}
+
+async function getAttachmentFileSize(supabase, fileUrl) {
+  const objectPath = attachmentObjectPath(fileUrl);
+  if (!objectPath || typeof supabase?.storage?.from !== "function") {
+    return null;
+  }
+
+  const slash = objectPath.lastIndexOf("/");
+  const folder = slash === -1 ? "" : objectPath.slice(0, slash);
+  const fileName = slash === -1 ? objectPath : objectPath.slice(slash + 1);
+
+  try {
+    const { data } = await supabase.storage.from(ATTACHMENT_BUCKET).list(folder, {
+      search: fileName,
+      limit: 20,
+    });
+    const match = Array.isArray(data)
+      ? data.find((item) => item.name === fileName)
+      : null;
+    const size = match?.metadata?.size ?? match?.size;
+    return Number.isFinite(Number(size)) ? Number(size) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCourseAttachment(supabase, courseId) {
   if (!courseId) {
     return null;
@@ -128,6 +165,7 @@ export async function getCourseAttachment(supabase, courseId) {
     name: row.name ?? "Attachment",
     fileUrl: await resolveAttachmentHref(supabase, row.file_url),
     fileType: row.file_type ?? "",
+    fileSize: await getAttachmentFileSize(supabase, row.file_url),
   };
 }
 
@@ -180,6 +218,7 @@ export function mapCourseDetail(row) {
   return {
     id: row.id,
     title: row.title ?? "",
+    courseCode: row.course_code ?? "",
     summary: row.summary ?? "",
     description: row.description ?? "",
     price: row.price ?? 0,
@@ -203,21 +242,40 @@ async function fetchLessonsForCourse(supabase, courseId) {
   return data ?? [];
 }
 
+function isCourseCodeMatch(row, normalized) {
+  return normalizeCourseCode(row?.course_code) === normalized;
+}
+
+async function fetchCourseRowByCode(supabase, select, normalized) {
+  const { data, error } = await supabase
+    .from("courses")
+    .select(select)
+    .ilike("course_code", normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data || !isCourseCodeMatch(data, normalized)) {
+    return null;
+  }
+
+  return data;
+}
+
 export async function getCourseByCode(supabase, code, catalogSupabase) {
-  const courseCode = String(code ?? "").trim();
-  if (!courseCode) {
+  const normalized = normalizeCourseCode(code);
+  if (!normalized) {
     return null;
   }
 
   const catalog = catalogSupabase ?? supabase;
 
-  const { data, error } = await supabase
-    .from("courses")
-    .select(COURSE_DETAIL_WITH_LESSONS)
-    .eq("id", courseCode)
-    .maybeSingle();
+  const data = await fetchCourseRowByCode(
+    supabase,
+    COURSE_DETAIL_WITH_LESSONS,
+    normalized,
+  );
 
-  if (!error && data) {
+  if (data) {
     const nestedLessons = Array.isArray(data.lessons) ? data.lessons : [];
     if (nestedLessons.length > 0) {
       return mapCourseDetail(data);
@@ -227,13 +285,13 @@ export async function getCourseByCode(supabase, code, catalogSupabase) {
     return mapCourseDetail({ ...data, lessons });
   }
 
-  const { data: course, error: courseError } = await supabase
-    .from("courses")
-    .select(COURSE_DETAIL_COLUMNS)
-    .eq("id", courseCode)
-    .maybeSingle();
+  const course = await fetchCourseRowByCode(
+    supabase,
+    COURSE_DETAIL_COLUMNS,
+    normalized,
+  );
 
-  if (courseError || !course) {
+  if (!course) {
     return null;
   }
 

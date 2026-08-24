@@ -22,7 +22,7 @@ export default async function CourseLearnPage({ params }) {
 
   const isSubscribed = await isCourseEnrolled(catalog, user.id, course.id);
   if (!isSubscribed) {
-    redirect(`/courses/${encodeURIComponent(code)}`);
+    redirect(`/courses/${encodeURIComponent(course.courseCode)}`);
   }
 
   return (
@@ -34,7 +34,7 @@ export default async function CourseLearnPage({ params }) {
         Start learning from this course. Lessons will open here.
       </p>
       <Link
-        href={`/courses/${encodeURIComponent(code)}`}
+        href={`/courses/${encodeURIComponent(course.courseCode)}`}
         className="mt-8 inline-flex text-body2 font-medium text-blue-500 hover:text-blue-400"
       >
         Back to course
