@@ -756,9 +756,16 @@
   left: 5.5%;
   width: 30px;
   height: 27px;
-  border: 3px solid var(--orange-100);
+  background: var(--orange-100);
   clip-path: polygon(50% 100%, 0 0, 100% 0);
-  transform: rotate(180deg);
+}
+
+.instructor-decoration::after {
+  position: absolute;
+  inset: 3px;
+  background: var(--white);
+  content: "";
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
 }
 
 @media (max-width: 680px) {

@@ -22,12 +22,12 @@ const socialLinks = [
 export default function Footer() {
   return (
     <footer className="bg-blue-700 text-white">
-      <div className="mx-auto flex min-h-60 w-[calc(100%-3rem)] max-w-280 items-center justify-between gap-10 max-[760px]:flex-col max-[760px]:justify-center max-[760px]:py-10">
+      <div className="mx-auto flex min-h-60 w-[calc(100%-3rem)] max-w-280 items-center justify-between gap-10 max-[760px]:flex-col max-[760px]:items-start max-[760px]:justify-start max-[760px]:gap-5 max-[760px]:px-0 max-[760px]:pt-10 max-[760px]:pb-7">
         <Link href="/" aria-label="CourseFlow home">
           <Image src="/courseflow-logo.svg" alt="CourseFlow" width={140} height={16} />
         </Link>
 
-        <nav className="flex items-center gap-22 text-body2 text-gray-300 max-[760px]:gap-8" aria-label="Footer navigation">
+        <nav className="flex items-center gap-22 text-body2 text-gray-300 my-5 max-[760px]:grid max-[760px]:gap-3" aria-label="Footer navigation">
           {/*Add navigation links here*/}
           <Link className="transition-colors hover:text-white" href="/">All Courses</Link>
           <Link className="transition-colors hover:text-white" href="/">Bundle Package</Link>
