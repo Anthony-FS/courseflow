@@ -27,7 +27,7 @@ export async function GET(_request, { params }) {
   if (error) return error;
   const { data, error: queryError } = await supabase
     .from("promo_codes")
-    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, promo_code_courses(course_id, courses(course_code))")
+    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, updated_at, promo_code_courses(course_id, courses(course_code))")
     .eq("id", (await params).id)
     .single();
   if (queryError) return jsonError(queryError.message, 404);
@@ -52,6 +52,7 @@ export async function PATCH(request, { params }) {
       discount_value: normalized.discountValue,
       min_purchase_amount: normalized.minPurchaseAmount,
       course_id: null,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", promoId)
     .select("id")
