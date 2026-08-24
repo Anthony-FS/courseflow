@@ -32,7 +32,7 @@ function getInitials(name) {
     .toUpperCase();
 }
 
-export function UserMenu({ displayName, email, avatarUrl }) {
+export function UserMenu({ displayName, email, avatarUrl, compact = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -84,7 +84,7 @@ export function UserMenu({ displayName, email, avatarUrl }) {
         aria-haspopup="menu"
         aria-label={`Open account menu for ${displayName}`}
         onClick={() => setIsOpen((open) => !open)}
-        className="flex items-center gap-3 text-gray-700"
+        className={compact ? "grid size-10 place-items-center rounded-full text-gray-700" : "flex items-center gap-3 text-gray-700"}
       >
         {avatarUrl ? (
           <Image
@@ -100,11 +100,13 @@ export function UserMenu({ displayName, email, avatarUrl }) {
             {getInitials(displayName)}
           </span>
         )}
-        <span className="max-w-36 truncate text-body2">{displayName}</span>
-        <ChevronDown
-          aria-hidden="true"
-          className={`size-4 text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
-        />
+        {!compact ? <span className="max-w-36 truncate text-body2">{displayName}</span> : null}
+        {!compact ? (
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          />
+        ) : null}
       </button>
 
       {isOpen ? (

@@ -45,14 +45,14 @@ export default function Feature() {
         </div>
 
         <div className="mt-29.5 grid grid-cols-2 items-center gap-29.5 max-[900px]:gap-8 max-[680px]:mt-12 max-[680px]:flex max-[680px]:flex-col">
-          <div className="max-[680px]:order-1">
+          <div className="w-full max-[680px]:order-2">
             <h2 className="max-w-140 text-headline2 font-medium leading-tight tracking-[-0.02em] text-black max-[900px]:text-headline3">Interactions between the tutor and the learners</h2>
             <div className="mt-10 grid gap-6">
               <FeatureItem icon={Users} title="Purely Collaborative" />
               <FeatureItem icon={Heart} title="Supports All Students" />
             </div>
           </div>
-          <div className="max-[680px]:order-2"><FeatureImage image="feature2.jpg" alt="Collaborative learning" /></div>
+          <div className="w-full max-[680px]:order-1"><FeatureImage image="feature2.jpg" alt="Collaborative learning" /></div>
         </div>
       </div>
 

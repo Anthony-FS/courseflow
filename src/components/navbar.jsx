@@ -3,6 +3,7 @@ import Image from "next/image";
 
 import { getSessionUser } from "@/lib/auth";
 import { UserMenu } from "@/components/user-menu";
+import MobileNavMenu from "@/components/mobile-nav-menu";
 
 export default async function Navbar() {
   const { user, profile } = await getSessionUser();
@@ -26,7 +27,7 @@ export default async function Navbar() {
           />
         </Link>
         <nav
-          className="flex items-center gap-16 max-[760px]:gap-4"
+          className="flex items-center gap-16 max-[760px]:hidden"
           aria-label="Main navigation"
         >
           <Link
@@ -58,6 +59,21 @@ export default async function Navbar() {
             </div>
           )}
         </nav>
+        <div className="hidden items-center gap-4 max-[760px]:flex">
+          <Link className="font-medium text-body2 text-blue-700" href="/courses">
+            Our Courses
+          </Link>
+          {user ? (
+            <UserMenu
+              compact
+              displayName={displayName}
+              email={user.email}
+              avatarUrl={profile?.avatar_url || user.user_metadata?.avatar_url}
+            />
+          ) : (
+            <MobileNavMenu />
+          )}
+        </div>
       </div>
     </header>
   );

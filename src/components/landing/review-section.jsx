@@ -26,7 +26,7 @@ function ReviewCard({ review, onPauseChange }) {
         <h3 className="text-[24px] font-medium leading-tight text-blue-500">{review.name}</h3>
         <p className="mt-5.5 max-w-117.5 text-[16px] leading-normal max-[680px]:mt-4">{review.text}</p>
       </div>
-      <Quote className="absolute -left-40 -top-0.5 h-11 w-11 text-blue-300 stroke-[1.4]" aria-hidden="true" />
+      <Quote className="absolute -left-40 -top-0.5 h-11 w-11 scale-x-[-1] scale-y-[-1] text-blue-300 stroke-[1.4]" aria-hidden="true" />
       <Quote className="absolute bottom-5 right-6 h-11 w-11 text-blue-300 stroke-[1.4]" aria-hidden="true" />
     </article>
   );
