@@ -101,4 +101,21 @@ describe("register field validation", () => {
       "Please enter a valid date of birth",
     );
   });
+
+  // อายุต้องอย่างน้อย 18 ปี — freeze วันที่เพื่อไม่ให้เทสพังตามเวลาจริง
+  it("rejects a date of birth under 18 years old", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-17T12:00:00.000Z"));
+
+    expect(validateAll({ ...valid, dob: "2008-08-18" }).dob).toBe(
+      "You must be at least 18 years old",
+    );
+  });
+
+  it("accepts a date of birth on the 18th birthday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-17T12:00:00.000Z"));
+
+    expect(validateAll({ ...valid, dob: "2008-08-17" }).dob).toBe("");
+  });
 });
