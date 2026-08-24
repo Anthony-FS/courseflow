@@ -48,6 +48,7 @@ erDiagram
     string avatar_url
     string role
     boolean is_active
+    timestamptz updated_at
   }
 
   courses {

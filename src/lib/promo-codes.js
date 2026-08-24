@@ -4,7 +4,7 @@ export async function getPromoCodes() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, promo_code_courses(course_id, courses(course_code))")
+    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, updated_at, promo_code_courses(course_id, courses(course_code))")
     .order("code");
 
   if (error) {

@@ -2,24 +2,10 @@ import { SquarePen, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { formatCourseDate } from "@/lib/format";
 
 function formatAmount(value) {
   return new Intl.NumberFormat("en-US").format(Number(value ?? 0));
-}
-
-function formatCreatedDate(promo) {
-  if (!promo.starts_at) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(promo.starts_at));
 }
 
 export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
@@ -35,13 +21,14 @@ export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
             <th scope="col" className="px-4 py-3 font-medium">Discount type</th>
             <th scope="col" className="px-4 py-3 font-medium">Courses included</th>
             <th scope="col" className="px-4 py-3 font-medium">Created date</th>
+            <th scope="col" className="px-4 py-3 font-medium">Updated date</th>
             <th scope="col" className="px-4 py-3 font-medium">Action</th>
           </tr>
         </thead>
         <tbody className="text-body2 text-gray-900">
           {promoCodes.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-6 py-10 text-center text-gray-600">{emptyMessage}</td>
+              <td colSpan={7} className="px-6 py-10 text-center text-gray-600">{emptyMessage}</td>
             </tr>
           ) : (
             promoCodes.map((promo) => (
@@ -54,7 +41,8 @@ export function PromoCodeTable({ promoCodes, isLoading = false, onDelete }) {
                 <td className="max-w-[240px] truncate px-4 py-4" title={promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}>
                   {promo.appliesToAllCourses ? "All" : promo.courseCodes?.join(", ") || "All"}
                 </td>
-                <td className="whitespace-nowrap px-4 py-4">{formatCreatedDate(promo)}</td>
+                <td className="whitespace-nowrap px-4 py-4">{formatCourseDate(promo.starts_at)}</td>
+                <td className="whitespace-nowrap px-4 py-4">{formatCourseDate(promo.updated_at ?? promo.starts_at)}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3 text-blue-300">
                     <Button type="button" variant="ghost" size="icon-sm" className="cursor-pointer" aria-label={`Delete ${promo.code}`} onClick={() => onDelete?.(promo)}>
