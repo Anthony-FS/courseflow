@@ -205,10 +205,11 @@ describe("getCourseByCode", () => {
     expect(await getCourseByCode({}, "   ")).toBeNull();
   });
 
-  it("loads a course by id and maps the detail", async () => {
+  it("loads a course by course_code and maps the detail", async () => {
     const row = {
       id: "abc",
       title: "UX Research Basics",
+      course_code: "SD101",
       summary: "",
       description: "",
       price: 10,
@@ -221,9 +222,17 @@ describe("getCourseByCode", () => {
         return {
           select() {
             return {
+              ilike() {
+                return {
+                  limit() {
+                    return {
+                      maybeSingle: async () => ({ data: row, error: null }),
+                    };
+                  },
+                };
+              },
               eq() {
                 return {
-                  maybeSingle: async () => ({ data: row, error: null }),
                   order: async () => ({ data: [], error: null }),
                 };
               },
@@ -233,8 +242,9 @@ describe("getCourseByCode", () => {
       },
     };
 
-    await expect(getCourseByCode(supabase, "abc")).resolves.toMatchObject({
+    await expect(getCourseByCode(supabase, "sd101")).resolves.toMatchObject({
       id: "abc",
+      courseCode: "SD101",
       title: "UX Research Basics",
       price: 10,
       lessons: [],
@@ -245,6 +255,7 @@ describe("getCourseByCode", () => {
     const courseRow = {
       id: "abc",
       title: "UX Research Basics",
+      course_code: "SD101",
       summary: "",
       description: "",
       price: 10,
@@ -260,9 +271,13 @@ describe("getCourseByCode", () => {
         return {
           select() {
             return {
-              eq() {
+              ilike() {
                 return {
-                  maybeSingle: async () => ({ data: courseRow, error: null }),
+                  limit() {
+                    return {
+                      maybeSingle: async () => ({ data: courseRow, error: null }),
+                    };
+                  },
                 };
               },
             };
@@ -287,9 +302,10 @@ describe("getCourseByCode", () => {
     };
 
     await expect(
-      getCourseByCode(sessionSupabase, "abc", catalogSupabase),
+      getCourseByCode(sessionSupabase, "SD101", catalogSupabase),
     ).resolves.toMatchObject({
       id: "abc",
+      courseCode: "SD101",
       lessons: [{ id: "l1", title: "Introduction", subLessons: [] }],
     });
   });

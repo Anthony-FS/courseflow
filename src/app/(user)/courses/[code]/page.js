@@ -75,7 +75,7 @@ export default async function CourseDetailPage({ params }) {
         />
 
         <CoursePurchaseSidebar
-          courseCode={code}
+          courseCode={course.courseCode}
           courseId={course.id}
           initiallySaved={inWishlist}
           isSubscribed={isSubscribed}
@@ -111,7 +111,7 @@ export default async function CourseDetailPage({ params }) {
       </div>
       </main>
       <CoursePurchaseMobileBar
-        courseCode={code}
+        courseCode={course.courseCode}
         courseId={course.id}
         initiallySaved={inWishlist}
         isSubscribed={isSubscribed}
