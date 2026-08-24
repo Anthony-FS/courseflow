@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   flattenSubLessons,
+  getSubLessonLearningContent,
   learnSubLessonHref,
   mockProgressPercent,
+  pickVideoMaterial,
   resolveActiveSubLesson,
   withMockLessonStatuses,
 } from "@/lib/course-learn";
@@ -63,5 +65,94 @@ describe("course-learn helpers", () => {
     expect(learnSubLessonHref("svc-101", "abc/def")).toBe(
       "/courses/svc-101/learn?subLessonId=abc%2Fdef",
     );
+  });
+
+  it("picks video material by file type", () => {
+    const picked = pickVideoMaterial([
+      {
+        name: "notes.pdf",
+        file_url: "course-attachments/a/notes.pdf",
+        file_type: "application/pdf",
+      },
+      {
+        name: "Industry Overview Video",
+        file_url: "course-trailers/admin/lesson.mp4",
+        file_type: "video/mp4",
+      },
+    ]);
+
+    expect(picked?.file_url).toBe("course-trailers/admin/lesson.mp4");
+  });
+
+  it("loads sub-lesson content with resolved video url", async () => {
+    const supabaseUrl = "https://example.supabase.co";
+    const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl;
+
+    const supabase = {
+      from(table) {
+        const filters = [];
+        const chain = {
+          select() {
+            return chain;
+          },
+          eq(column, value) {
+            filters.push({ column, value });
+            return chain;
+          },
+          maybeSingle: async () => {
+            if (table === "sub_lessons") {
+              return {
+                data: {
+                  id: "sub-1",
+                  title: "Industry Overview",
+                  description: "Welcome to mobile and game development!",
+                },
+                error: null,
+              };
+            }
+            return { data: null, error: null };
+          },
+          then(onFulfilled, onRejected) {
+            if (table === "materials") {
+              return Promise.resolve({
+                data: [
+                  {
+                    name: "Industry Overview Video",
+                    file_url: "course-trailers/admin/lesson.mp4",
+                    file_type: "video/mp4",
+                  },
+                ],
+                error: null,
+              }).then(onFulfilled, onRejected);
+            }
+            return Promise.resolve({ data: [], error: null }).then(
+              onFulfilled,
+              onRejected,
+            );
+          },
+        };
+        return chain;
+      },
+    };
+
+    const result = await getSubLessonLearningContent(supabase, {
+      courseId: "course-1",
+      subLessonId: "sub-1",
+    });
+
+    if (previousUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    }
+
+    expect(result).toEqual({
+      title: "Industry Overview",
+      description: "Welcome to mobile and game development!",
+      videoUrl:
+        "https://example.supabase.co/storage/v1/object/public/course-trailers/admin/lesson.mp4",
+      videoName: "Industry Overview Video",
+    });
   });
 });

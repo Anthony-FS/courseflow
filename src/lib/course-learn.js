@@ -1,3 +1,5 @@
+import { resolveTrailerUrl } from "@/lib/courses";
+
 /** Flatten lessons → ordered sub-lessons for prev/next navigation. */
 export function flattenSubLessons(lessons) {
   return (lessons ?? []).flatMap((lesson) =>
@@ -81,3 +83,62 @@ export const MOCK_ASSIGNMENT = {
   status: "pending",
   deadlineLabel: "Assign within 2 days",
 };
+
+function isVideoMaterial(row) {
+  const type = String(row?.file_type ?? "").toLowerCase();
+  return type.startsWith("video/") || type === "video";
+}
+
+export function pickVideoMaterial(materials) {
+  const rows = Array.isArray(materials) ? materials : [];
+  return (
+    rows.find((row) => isVideoMaterial(row) && row.file_url) ??
+    rows.find((row) => row.file_url) ??
+    null
+  );
+}
+
+/**
+ * Load learner-facing sub-lesson content (title, description, video).
+ * Uses service/catalog client after enrollment is verified on the page.
+ */
+export async function getSubLessonLearningContent(
+  supabase,
+  { courseId, subLessonId },
+) {
+  const id = String(subLessonId ?? "").trim();
+  const course = String(courseId ?? "").trim();
+  if (!supabase || !id || !course) {
+    return null;
+  }
+
+  const [{ data: subLesson, error: subError }, { data: materials, error: materialsError }] =
+    await Promise.all([
+      supabase
+        .from("sub_lessons")
+        .select("id, title, description")
+        .eq("id", id)
+        .eq("course_id", course)
+        .maybeSingle(),
+      supabase
+        .from("materials")
+        .select("name, file_url, file_type")
+        .eq("sub_lesson_id", id)
+        .eq("course_id", course),
+    ]);
+
+  if (subError || materialsError || !subLesson) {
+    return null;
+  }
+
+  const videoMaterial = pickVideoMaterial(materials);
+
+  return {
+    title: subLesson.title ?? "",
+    description: subLesson.description ?? "",
+    videoUrl: videoMaterial?.file_url
+      ? resolveTrailerUrl(videoMaterial.file_url)
+      : null,
+    videoName: videoMaterial?.name ?? "",
+  };
+}
