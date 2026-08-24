@@ -86,27 +86,36 @@ export default async function CourseLearnPage({ params, searchParams }) {
 
   return (
     <main className="flex flex-1 flex-col bg-white">
-      <div className="flex flex-1 flex-col lg:flex-row">
-        <CourseCurriculumSidebar
-          key={active.lessonId}
-          courseCode={courseCode}
-          courseTitle={course.title}
-          courseSummary={course.summary || course.description}
-          progressPercent={progressPercent}
-          lessons={lessonsWithStatus}
-          activeSubLessonId={active.id}
-        />
+      <div className="mx-auto flex w-[calc(100%-3rem)] max-w-280 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <CourseCurriculumSidebar
+            key={active.lessonId}
+            courseCode={courseCode}
+            courseTitle={course.title}
+            courseSummary={course.summary || course.description}
+            progressPercent={progressPercent}
+            lessons={lessonsWithStatus}
+            activeSubLessonId={active.id}
+          />
 
-        <LessonContent
-          title={subLessonContent?.title ?? active.title}
-          description={subLessonContent?.description}
-          coverUrl={course.coverUrl}
-          videoUrl={subLessonContent?.videoUrl ?? null}
-          assignment={MOCK_ASSIGNMENT}
-        />
+          <LessonContent
+            title={subLessonContent?.title ?? active.title}
+            description={subLessonContent?.description}
+            coverUrl={course.coverUrl}
+            videoUrl={subLessonContent?.videoUrl ?? null}
+            assignment={MOCK_ASSIGNMENT}
+          />
+        </div>
       </div>
 
-      <LessonNav courseCode={courseCode} previous={prev} next={next} />
+      <div className="mx-auto w-[calc(100%-3rem)]">
+        <LessonNav
+          courseCode={courseCode}
+          previous={prev}
+          next={next}
+          className="px-0"
+        />
+      </div>
     </main>
   );
 }

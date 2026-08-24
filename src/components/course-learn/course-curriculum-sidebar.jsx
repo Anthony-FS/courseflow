@@ -35,7 +35,7 @@ function CourseCurriculumSidebar({
   const [openId, setOpenId] = useState(activeLessonId);
 
   return (
-    <aside className="flex h-full flex-col border-r border-gray-300 bg-white px-6 py-8 lg:max-w-[22.5rem] lg:px-8">
+    <aside className="flex h-full w-full flex-col border-r border-gray-300 bg-white px-6 py-8 lg:w-[22.5rem] lg:shrink-0 lg:px-8">
       <p className="text-body3 font-medium text-orange-500">Course</p>
       <h2 className="mt-2 text-headline3 font-medium tracking-[-0.02em] text-black">
         {courseTitle}

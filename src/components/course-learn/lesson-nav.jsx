@@ -9,7 +9,7 @@ function LessonNav({ courseCode, previous, next, className }) {
     <nav
       aria-label="Lesson navigation"
       className={cn(
-        "flex w-full items-center justify-between gap-4 border-t border-gray-300 bg-white px-6 py-5 sm:px-8 lg:px-10",
+        "flex w-full items-center justify-between gap-4 border-t border-gray-300 bg-white px-6 py-5 lg:px-8",
         className,
       )}
     >
