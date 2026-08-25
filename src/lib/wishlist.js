@@ -19,6 +19,54 @@ export async function isCourseWishlisted(supabase, userId, courseId) {
   return Boolean(data?.id);
 }
 
+let clientWishlistCache = null;
+
+export function initWishlistCache(initialIds = []) {
+  if (typeof window === "undefined") return;
+  if (!clientWishlistCache) {
+    clientWishlistCache = new Set(initialIds);
+  } else {
+    for (const id of initialIds) {
+      clientWishlistCache.add(id);
+    }
+  }
+}
+
+export function getActiveWishlistSet(initialIds = []) {
+  if (typeof window === "undefined") {
+    return new Set(initialIds);
+  }
+  if (!clientWishlistCache) {
+    clientWishlistCache = new Set(initialIds);
+  }
+  return new Set(clientWishlistCache);
+}
+
+export function updateWishlistCache(action, courseId) {
+  if (typeof window === "undefined") return;
+  if (!clientWishlistCache) {
+    clientWishlistCache = new Set();
+  }
+  if (action === "add" && courseId) {
+    clientWishlistCache.add(courseId);
+  } else if (action === "remove" && courseId) {
+    clientWishlistCache.delete(courseId);
+  }
+}
+
+export function setWishlistCacheIds(ids = []) {
+  if (typeof window === "undefined") return;
+  clientWishlistCache = new Set(ids);
+}
+
+export function dispatchWishlistChange(detail) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("courseflow:wishlist-change", { detail }),
+    );
+  }
+}
+
 export async function addCourseToWishlist(courseId) {
   const response = await fetch("/api/wishlist", {
     method: "POST",
@@ -36,6 +84,9 @@ export async function addCourseToWishlist(courseId) {
   if (!response.ok) {
     throw new Error(data?.error || "Failed to add this course to your wishlist.");
   }
+
+  updateWishlistCache("add", courseId);
+  dispatchWishlistChange({ action: "add", courseId });
 
   return data;
 }
@@ -55,6 +106,9 @@ export async function removeCourseFromWishlist(courseId) {
   if (!response.ok) {
     throw new Error(data?.error || "Failed to remove this course from your wishlist.");
   }
+
+  updateWishlistCache("remove", courseId);
+  dispatchWishlistChange({ action: "remove", courseId });
 
   return data;
 }

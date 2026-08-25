@@ -48,6 +48,27 @@ export async function POST(request) {
 
   const resolvedCourseId = course.id;
 
+  const { data: enrollment, error: enrollmentError } = await supabase
+    .from("enrollments")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("course_id", resolvedCourseId)
+    .maybeSingle();
+
+  if (enrollmentError) {
+    return jsonError(
+      enrollmentError.message || "Failed to check enrollment",
+      500,
+    );
+  }
+
+  if (enrollment?.id) {
+    return jsonError(
+      "You already own this course and cannot add it to your wishlist",
+      400,
+    );
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from("wishlists")
     .select("id")

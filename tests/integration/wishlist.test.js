@@ -124,6 +124,28 @@ describe("POST /api/wishlist", () => {
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/course id is required/i);
   });
+
+  it("returns 400 when user is already enrolled in the course", async () => {
+    const supabase = createMockSupabase({
+      courseId: COURSE_ID,
+      courseSelect: { id: COURSE_ID },
+      enrollmentsSelect: [
+        { id: "enrollment-1", user_id: USER.id, course_id: COURSE_ID },
+      ],
+    });
+    requireUser.mockResolvedValue({
+      supabase,
+      user: USER,
+      profile: { id: USER.id },
+      error: null,
+    });
+
+    const response = await postWishlist({ courseId: COURSE_ID });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/already own this course/i);
+  });
 });
 
 describe("DELETE /api/wishlist", () => {

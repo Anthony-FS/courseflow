@@ -16,9 +16,15 @@ import {
   getCourseByCode,
   getOtherInterestingCourses,
 } from "@/lib/courses";
-import { isCourseEnrolled } from "@/lib/enrollments";
+import {
+  getUserEnrolledCourseIds,
+  isCourseEnrolled,
+} from "@/lib/enrollments";
 import { createServiceClient } from "@/lib/supabase/server";
-import { isCourseWishlisted } from "@/lib/wishlist";
+import {
+  getUserWishlistCourseIds,
+  isCourseWishlisted,
+} from "@/lib/wishlist";
 
 function catalogClient(sessionSupabase) {
   return createServiceClient() ?? sessionSupabase;
@@ -54,11 +60,20 @@ export default async function CourseDetailPage({ params }) {
   }
 
   const catalog = catalogClient(supabase);
-  const [inWishlist, isSubscribed, attachment, otherCourses] = await Promise.all([
+  const [
+    inWishlist,
+    isSubscribed,
+    attachment,
+    otherCourses,
+    enrolledCourseIds,
+    wishlistCourseIds,
+  ] = await Promise.all([
     isCourseWishlisted(supabase, user.id, course.id),
     isCourseEnrolled(catalog, user.id, course.id),
     getCourseAttachment(catalog, course.id),
     getOtherInterestingCourses(catalog, course.id, 3),
+    getUserEnrolledCourseIds(catalog, user.id),
+    getUserWishlistCourseIds(supabase, user.id),
   ]);
 
   return (
@@ -124,7 +139,11 @@ export default async function CourseDetailPage({ params }) {
         summary={course.summary}
         title={course.title}
       />
-      <OtherInterestingCourses courses={otherCourses} />
+      <OtherInterestingCourses
+        courses={otherCourses}
+        enrolledCourseIds={enrolledCourseIds}
+        wishlistCourseIds={wishlistCourseIds}
+      />
     </>
   );
 }

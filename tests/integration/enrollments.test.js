@@ -210,3 +210,42 @@ describe("POST /api/enrollments", () => {
     expect(body.error).toMatch(/course id is required/i);
   });
 });
+
+describe("getUserEnrolledCourseIds and isCourseEnrolled", () => {
+  it("returns enrolled course IDs for the user", async () => {
+    const { getUserEnrolledCourseIds, isCourseEnrolled } = await import(
+      "@/lib/enrollments"
+    );
+
+    const supabase = createMockSupabase({
+      enrollmentsSelect: [
+        { id: "e-1", user_id: USER.id, course_id: "course-1" },
+        { id: "e-2", user_id: USER.id, course_id: "course-2" },
+      ],
+    });
+
+    const enrolledIds = await getUserEnrolledCourseIds(supabase, USER.id);
+    expect(enrolledIds).toEqual(["course-1", "course-2"]);
+
+    expect(await isCourseEnrolled(supabase, USER.id, "course-1")).toBe(true);
+    expect(await isCourseEnrolled(supabase, USER.id, "course-999")).toBe(false);
+  });
+
+  it("handles missing parameters safely", async () => {
+    const { getUserEnrolledCourseIds, isCourseEnrolled } = await import(
+      "@/lib/enrollments"
+    );
+
+    expect(await getUserEnrolledCourseIds(null, USER.id)).toEqual([]);
+    expect(await getUserEnrolledCourseIds(createMockSupabase(), null)).toEqual(
+      [],
+    );
+    expect(await isCourseEnrolled(null, USER.id, COURSE_ID)).toBe(false);
+    expect(await isCourseEnrolled(createMockSupabase(), null, COURSE_ID)).toBe(
+      false,
+    );
+    expect(await isCourseEnrolled(createMockSupabase(), USER.id, null)).toBe(
+      false,
+    );
+  });
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,10 @@ function WishlistButton({ courseId, initiallySaved = false, className }) {
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  useEffect(() => {
+    setSaved(initiallySaved);
+  }, [initiallySaved]);
+
   async function handleClick() {
     if (isPending) {
       return;
@@ -27,10 +31,12 @@ function WishlistButton({ courseId, initiallySaved = false, className }) {
       if (saved) {
         await removeCourseFromWishlist(courseId);
         setSaved(false);
+        router.refresh();
         toast.success("Removed course from your wishlist");
       } else {
         await addCourseToWishlist(courseId);
         setSaved(true);
+        router.refresh();
         toast.success("Added course to your wishlist", {
           action: {
             label: "View Wishlist",
