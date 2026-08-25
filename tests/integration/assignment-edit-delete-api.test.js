@@ -101,6 +101,59 @@ describe("Admin Assignment Edit/Delete API", () => {
         submissionType: "file",
         allowedFileTypes: ["pdf", "doc"],
         maxFileSizeMb: 10,
+        answerText: "",
+        choiceA: "",
+        choiceB: "",
+        choiceC: "",
+        choiceD: "",
+        correctChoice: "",
+      });
+    });
+
+    it("returns 4-choice answer fields for the edit form", async () => {
+      const supabase = createMockSupabase({
+        assignmentsSelect: [
+          {
+            id: "assignment-1",
+            course_id: "course-1",
+            sub_lesson_id: "sub-1",
+            title: "Pick the keyword",
+            description: "",
+            submission_type: "choice",
+            allowed_file_types: null,
+            max_file_size_mb: null,
+            answer_text: null,
+            choice_a: "var",
+            choice_b: "let",
+            choice_c: "const",
+            choice_d: "function",
+            correct_choice: "C",
+            subLesson: {
+              lesson_id: "lesson-1",
+            },
+          },
+        ],
+      });
+
+      mockAdmin(supabase);
+
+      const response = await getAssignment(
+        new Request(
+          "http://localhost/api/admin/assignments/assignment-1",
+        ),
+        assignmentParams(),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.assignment).toMatchObject({
+        submissionType: "choice",
+        answerText: "",
+        choiceA: "var",
+        choiceB: "let",
+        choiceC: "const",
+        choiceD: "function",
+        correctChoice: "C",
       });
     });
 
@@ -140,6 +193,7 @@ describe("Admin Assignment Edit/Delete API", () => {
           submissionType: "text",
           allowedFileTypes: ["pdf"],
           maxFileSizeMb: 20,
+          answerText: "Updated answer",
         }),
         assignmentParams(),
       );
@@ -160,10 +214,52 @@ describe("Admin Assignment Edit/Delete API", () => {
         submission_type: "text",
         allowed_file_types: null,
         max_file_size_mb: null,
+        answer_text: "Updated answer",
+        choice_a: null,
+        choice_b: null,
+        choice_c: null,
+        choice_d: null,
+        correct_choice: null,
       });
       expect(updates[0].filters).toContainEqual({
         column: "id",
         value: "assignment-1",
+      });
+    });
+
+    it("updates an assignment to 4-choice and stores options", async () => {
+      const supabase = createMockSupabase();
+      mockAdmin(supabase);
+
+      const response = await updateAssignment(
+        patchRequest({
+          courseId: "course-1",
+          lessonId: "lesson-1",
+          subLessonId: "sub-1",
+          title: "Pick the keyword",
+          description: "",
+          submissionType: "choice",
+          choiceA: "var",
+          choiceB: "let",
+          choiceC: "const",
+          choiceD: "function",
+          correctChoice: "B",
+        }),
+        assignmentParams(),
+      );
+
+      expect(response.status).toBe(200);
+      const updates = updatesFor(supabase, "assignments");
+      expect(updates[0].payload).toMatchObject({
+        submission_type: "choice",
+        answer_text: null,
+        choice_a: "var",
+        choice_b: "let",
+        choice_c: "const",
+        choice_d: "function",
+        correct_choice: "B",
+        allowed_file_types: null,
+        max_file_size_mb: null,
       });
     });
 
