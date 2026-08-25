@@ -768,6 +768,47 @@
   clip-path: polygon(50% 100%, 0 0, 100% 0);
 }
 
+.catalog-hero-decoration {
+  position: absolute;
+  pointer-events: none;
+}
+.catalog-hero-decoration--circle {
+  top: 18px;
+  left: 18%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--blue-200);
+}
+.catalog-hero-decoration--plus {
+  top: 8px;
+  right: 22%;
+  color: var(--green);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1;
+}
+.catalog-hero-decoration--triangle {
+  top: 52px;
+  right: 28%;
+  width: 18px;
+  height: 16px;
+  background: var(--orange-100);
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+@media (max-width: 760px) {
+  .catalog-hero-decoration--circle {
+    left: 12%;
+  }
+  .catalog-hero-decoration--plus {
+    right: 10%;
+  }
+  .catalog-hero-decoration--triangle {
+    right: 16%;
+  }
+}
+
 @media (max-width: 680px) {
   .feature-decoration--plus {
     right: 8%;
