@@ -172,24 +172,21 @@ function CourseCurriculumSidebar({
         <p className="text-body3 font-medium text-black">
           {progressPercent}% Complete
         </p>
-        <svg
-          className="mt-2 h-2.5 w-full"
-          viewBox="0 0 100 10"
-          preserveAspectRatio="none"
+        <div
+          className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-300"
           role="progressbar"
           aria-valuenow={progressPercent}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Course progress"
         >
-          <rect width="100" height="10" rx="5" className="fill-gray-300" />
-          <rect
-            width={Math.min(100, Math.max(0, progressPercent))}
-            height="10"
-            rx="5"
-            className="fill-blue-500"
+          <div
+            className="h-full rounded-full bg-blue-500 transition-[width] duration-500 ease-out"
+            style={{
+              width: `${Math.min(100, Math.max(0, progressPercent))}%`,
+            }}
           />
-        </svg>
+        </div>
       </div>
 
       <nav className="mt-8" aria-label="Course curriculum">
