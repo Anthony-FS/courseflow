@@ -589,33 +589,6 @@ export function searchCourses(courses, query) {
   });
 }
 
-export async function getOtherInterestingCourses(
-  supabase,
-  currentCourseId,
-  limit = 3,
-) {
-  try {
-    let request = supabase
-      .from("courses")
-      .select(CATALOG_COLUMNS);
-
-    if (currentCourseId) {
-      request = request.neq("id", currentCourseId);
-    }
-
-    const { data, error } = await request
-      .order("created_at", { ascending: false });
-
-    if (error || !data) {
-      return [];
-    }
-
-    return data.slice(0, limit).map(mapCatalogCourse);
-  } catch {
-    return [];
-  }
-}
-
 export async function deleteCourse(id) {
   const response = await fetch(`/api/admin/courses/${id}`, {
     method: "DELETE",

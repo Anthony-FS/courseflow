@@ -347,7 +347,10 @@ describe("getOtherInterestingCourses", () => {
       courseSelect: mockCourses,
     });
 
-    const results = await getOtherInterestingCourses(supabase, "course-1", 3);
+    const results = await getOtherInterestingCourses(supabase, {
+      excludeCourseId: "course-1",
+      limit: 3,
+    });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       id: "course-2",
