@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 export function AdminShell({ children }) {
   const pathname = usePathname();
@@ -17,6 +18,7 @@ export function AdminShell({ children }) {
       <div className="flex min-h-full min-w-0 flex-1 flex-col bg-gray-100">
         {children}
       </div>
+      <Toaster />
     </div>
   );
 }
