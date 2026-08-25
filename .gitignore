@@ -25,6 +25,9 @@
 *.pem
 .cursor
 
+# local agent specs/plans — not for GitHub
+/docs/superpowers/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

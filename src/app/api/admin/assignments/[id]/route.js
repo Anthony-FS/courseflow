@@ -1,7 +1,11 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import {
+  SUBMISSION_TYPES,
+  assignmentAnswerColumns,
+  mapAssignmentAnswerFields,
+} from "@/lib/assignment-validation";
 
-const SUBMISSION_TYPES = ["text", "file", "url"];
 const FILE_TYPES = ["pdf", "doc", "image"];
 const MAX_FILE_SIZES = [5, 10, 20, 50];
 
@@ -38,6 +42,12 @@ export async function GET(_request, { params }) {
       submission_type,
       allowed_file_types,
       max_file_size_mb,
+      answer_text,
+      choice_a,
+      choice_b,
+      choice_c,
+      choice_d,
+      correct_choice,
       subLesson:sub_lessons (
         lesson_id
       )
@@ -64,6 +74,7 @@ export async function GET(_request, { params }) {
       submissionType: data.submission_type ?? "text",
       allowedFileTypes: data.allowed_file_types ?? [],
       maxFileSizeMb: data.max_file_size_mb ?? 20,
+      ...mapAssignmentAnswerFields(data),
     },
   });
 }
@@ -133,6 +144,13 @@ export async function PATCH(request, { params }) {
     storedMaxSize = maxFileSizeMb;
   }
 
+  const { columns: answerColumns, error: answerError } =
+    assignmentAnswerColumns(submissionType, body);
+
+  if (answerError) {
+    return jsonError(answerError, 400);
+  }
+
   const { data, error: updateError } = await supabase
     .from("assignments")
     .update({
@@ -143,6 +161,7 @@ export async function PATCH(request, { params }) {
       submission_type: submissionType,
       allowed_file_types: storedFileTypes,
       max_file_size_mb: storedMaxSize,
+      ...answerColumns,
     })
     .eq("id", id)
     .select("id")

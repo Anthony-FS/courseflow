@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createMockSupabase, insertsFor } from "../helpers/mock-supabase.js";
+import { EMPTY_FIELD_MESSAGE } from "@/lib/course-validation";
 
 vi.mock("@/lib/auth", () => ({
   requireAdmin: vi.fn(),
@@ -45,6 +46,7 @@ describe("POST /api/admin/assignments", () => {
       title: "Week 1 homework",
       description: "Write a summary",
       submissionType: "text",
+      answerText: "A one-paragraph summary",
       allowedFileTypes: ["pdf"],
       maxFileSizeMb: 20,
     });
@@ -63,6 +65,12 @@ describe("POST /api/admin/assignments", () => {
       submission_type: "text",
       allowed_file_types: null,
       max_file_size_mb: null,
+      answer_text: "A one-paragraph summary",
+      choice_a: null,
+      choice_b: null,
+      choice_c: null,
+      choice_d: null,
+      correct_choice: null,
     });
   });
 
@@ -126,6 +134,82 @@ describe("POST /api/admin/assignments", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error.toLowerCase()).toContain("allowed");
+    expect(insertsFor(supabase, "assignments")).toHaveLength(0);
+  });
+
+  it("rejects a text assignment without an answer", async () => {
+    const supabase = createMockSupabase();
+    mockAdmin(supabase);
+
+    const response = await postAssignment({
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      subLessonId: "sub-1",
+      title: "Week 1 homework",
+      submissionType: "text",
+      answerText: "  ",
+    });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe(EMPTY_FIELD_MESSAGE);
+    expect(insertsFor(supabase, "assignments")).toHaveLength(0);
+  });
+
+  it("creates a 4-choice assignment with options and a correct letter", async () => {
+    const supabase = createMockSupabase();
+    mockAdmin(supabase);
+
+    const response = await postAssignment({
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      subLessonId: "sub-1",
+      title: "Pick the keyword",
+      description: "",
+      submissionType: "choice",
+      choiceA: "var",
+      choiceB: "let",
+      choiceC: "const",
+      choiceD: "function",
+      correctChoice: "C",
+    });
+
+    expect(response.status).toBe(201);
+
+    const assignmentInserts = insertsFor(supabase, "assignments");
+    expect(assignmentInserts[0].rows[0]).toMatchObject({
+      submission_type: "choice",
+      answer_text: null,
+      choice_a: "var",
+      choice_b: "let",
+      choice_c: "const",
+      choice_d: "function",
+      correct_choice: "C",
+      allowed_file_types: null,
+      max_file_size_mb: null,
+    });
+  });
+
+  it("rejects a 4-choice assignment missing a correct letter", async () => {
+    const supabase = createMockSupabase();
+    mockAdmin(supabase);
+
+    const response = await postAssignment({
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      subLessonId: "sub-1",
+      title: "Pick the keyword",
+      submissionType: "choice",
+      choiceA: "var",
+      choiceB: "let",
+      choiceC: "const",
+      choiceD: "function",
+      correctChoice: "",
+    });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe(EMPTY_FIELD_MESSAGE);
     expect(insertsFor(supabase, "assignments")).toHaveLength(0);
   });
 });

@@ -116,6 +116,12 @@ erDiagram
     string submission_type
     string[] allowed_file_types
     int max_file_size_mb
+    text answer_text
+    text choice_a
+    text choice_b
+    text choice_c
+    text choice_d
+    string correct_choice
     timestamptz start_at
     timestamptz end_at
   }
@@ -191,7 +197,10 @@ Sub-lesson **count** in the UI is derived from child `sub_lessons` rows (not sto
 | Sub-lesson | `assignments.sub_lesson_id` |
 | Assignment | `assignments.title` |
 | Description (optional) | `assignments.description` |
-| Submission | `assignments.submission_type` (`text` \| `file` \| `url`) |
+| Submission | `assignments.submission_type` (`text` \| `file` \| `url` \| `choice`) |
+| Answer (text) | `assignments.answer_text` (required in the form; null allowed on old rows) |
+| Choices A–D | `assignments.choice_a`–`choice_d` (null unless `choice`) |
+| Correct choice | `assignments.correct_choice` (`A` \| `B` \| `C` \| `D`; null unless `choice`) |
 | Allowed files | `assignments.allowed_file_types` (`pdf`, `doc`, `image`; null unless `file`) |
 | Max file size | `assignments.max_file_size_mb` (5 / 10 / 20 / 50; null unless `file`) |
 
@@ -210,7 +219,7 @@ A sub-lesson may have many assignments. `start_at` and `end_at` stay unused by t
 - A course has many **lessons**; each lesson has many **sub_lessons**. `sub_lessons.course_id` is kept for convenient course-scoped queries.
 - Sub-lesson samples: `sub_lessons.is_preview`. Full sub-lesson content is gated by enrollment in app logic.
 - `materials.content` holds text (or HTML) when the item is not a file. `file_url` / `file_type` stay for PDF, video, and images; unused columns stay null.
-- Assignment `submission_type` is `text` | `file` | `url`. `allowed_file_types` (`pdf`, `doc`, `image`) and `max_file_size_mb` (5 / 10 / 20 / 50) are set only for `file`; otherwise both stay null. A sub-lesson may have many assignments.
+- Assignment `submission_type` is `text` | `file` | `url` | `choice`. `allowed_file_types` (`pdf`, `doc`, `image`) and `max_file_size_mb` (5 / 10 / 20 / 50) are set only for `file`; otherwise both stay null. `answer_text` is used only for `text`. `choice_a`–`choice_d` and `correct_choice` (`A`/`B`/`C`/`D`) are used only for `choice`. A sub-lesson may have many assignments.
 - Overdue assignment status is computed from `assignments.end_at`, not stored. The Add Assignment form does not set `start_at` or `end_at`.
 - Analytics are queries over enrollments / progress / submissions — no extra fact table.
 
