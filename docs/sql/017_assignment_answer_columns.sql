@@ -41,6 +41,7 @@ alter table public.assignments
       and choice_b is not null and btrim(choice_b) <> ''
       and choice_c is not null and btrim(choice_c) <> ''
       and choice_d is not null and btrim(choice_d) <> ''
+      and correct_choice is not null
       and correct_choice in ('A', 'B', 'C', 'D')
     )
     or (
