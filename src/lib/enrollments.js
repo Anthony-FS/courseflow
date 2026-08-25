@@ -44,7 +44,7 @@ export async function enrollUserInCourse(supabase, userId, courseId) {
 }
 
 export async function isCourseEnrolled(supabase, userId, courseId) {
-  if (!userId || !courseId) {
+  if (!supabase || !userId || !courseId) {
     return false;
   }
 
@@ -60,6 +60,24 @@ export async function isCourseEnrolled(supabase, userId, courseId) {
   }
 
   return Boolean(data?.id);
+}
+
+export async function getUserEnrolledCourseIds(supabase, userId) {
+  if (!supabase || !userId) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("enrollments")
+      .select("course_id")
+      .eq("user_id", userId);
+
+    if (error || !data) return [];
+    return data.map((row) => row.course_id).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 export async function enrollInCourse(courseId) {

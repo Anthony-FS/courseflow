@@ -13,6 +13,12 @@ import {
   catalogRequestUrl,
 } from "@/lib/courses";
 import { getTotalPages } from "@/lib/pagination";
+import {
+  getActiveWishlistSet,
+  initWishlistCache,
+  setWishlistCacheIds,
+} from "@/lib/wishlist";
+import { createClient } from "@/lib/supabase/client";
 
 async function loadCatalog({ query, page, pageSize, signal }) {
   const response = await fetch(catalogRequestUrl({ query, page, pageSize }), {
@@ -27,8 +33,15 @@ async function loadCatalog({ query, page, pageSize, signal }) {
   return body;
 }
 
-export function OurCoursesCatalog({ initialWishlistIds = [] }) {
-  const [wishlistSet] = useState(() => new Set(initialWishlistIds));
+export function OurCoursesCatalog({
+  initialWishlistIds = [],
+  enrolledCourseIds = [],
+}) {
+  initWishlistCache(initialWishlistIds);
+  const [wishlistSet, setWishlistSet] = useState(() =>
+    getActiveWishlistSet(initialWishlistIds),
+  );
+  const [enrolledSet] = useState(() => new Set(enrolledCourseIds));
   const [input, setInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -39,6 +52,54 @@ export function OurCoursesCatalog({ initialWishlistIds = [] }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const pageSizeRef = useRef(null);
+
+  useEffect(() => {
+    async function syncWishlist() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from("wishlists")
+            .select("course_id")
+            .eq("user_id", user.id);
+          if (data) {
+            const ids = data.map((r) => r.course_id).filter(Boolean);
+            setWishlistCacheIds(ids);
+            setWishlistSet(new Set(ids));
+          }
+        }
+      } catch {
+        // Ignore background sync errors
+      }
+    }
+
+    syncWishlist();
+  }, []);
+
+  useEffect(() => {
+    function handleWishlistChange(event) {
+      const detail = event?.detail;
+      if (!detail?.courseId) return;
+
+      setWishlistSet((prev) => {
+        const next = new Set(prev);
+        if (detail.action === "add") {
+          next.add(detail.courseId);
+        } else if (detail.action === "remove") {
+          next.delete(detail.courseId);
+        }
+        return next;
+      });
+    }
+
+    window.addEventListener("courseflow:wishlist-change", handleWishlistChange);
+    return () => {
+      window.removeEventListener("courseflow:wishlist-change", handleWishlistChange);
+    };
+  }, []);
 
   useEffect(() => {
     function updatePageSize() {
@@ -155,6 +216,7 @@ export function OurCoursesCatalog({ initialWishlistIds = [] }) {
               <WishlistCard
                 course={course}
                 initiallySaved={wishlistSet.has(course.id)}
+                isEnrolled={enrolledSet.has(course.id)}
               />
             </li>
           ))}

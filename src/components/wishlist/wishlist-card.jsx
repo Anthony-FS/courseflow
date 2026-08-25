@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ export function WishlistCard({
   onRemove,
   isRemoving = false,
   initiallySaved = false,
+  isEnrolled = false,
   showSubscribeButton = false,
 }) {
   const router = useRouter();
@@ -38,6 +39,28 @@ export function WishlistCard({
   const [saved, setSaved] = useState(initiallySaved);
   const [isPending, setIsPending] = useState(false);
 
+  useEffect(() => {
+    setSaved(initiallySaved);
+  }, [initiallySaved]);
+
+  useEffect(() => {
+    function handleWishlistChange(event) {
+      const detail = event?.detail;
+      if (detail?.courseId === id) {
+        if (detail.action === "add") {
+          setSaved(true);
+        } else if (detail.action === "remove") {
+          setSaved(false);
+        }
+      }
+    }
+
+    window.addEventListener("courseflow:wishlist-change", handleWishlistChange);
+    return () => {
+      window.removeEventListener("courseflow:wishlist-change", handleWishlistChange);
+    };
+  }, [id]);
+
   const displayDescription = summary || description || "";
   const displayTime = formatLearningTime(totalLearningTime);
 
@@ -53,18 +76,20 @@ export function WishlistCard({
     event.preventDefault();
     event.stopPropagation();
 
-    if (isPending) return;
+    if (isPending || isEnrolled) return;
     setIsPending(true);
 
     try {
       if (saved) {
         await removeCourseFromWishlist(id);
         setSaved(false);
-        toast.success(`Removed "${title}" from your wishlist`);
+        router.refresh();
+        toast.success(`Removed "${title || "Course"}" from your wishlist`);
       } else {
         await addCourseToWishlist(id);
         setSaved(true);
-        toast.success(`Added "${title}" to your wishlist`, {
+        router.refresh();
+        toast.success(`Added "${title || "Course"}" to your wishlist`, {
           action: {
             label: "View Wishlist",
             onClick: () => router.push("/wishlist"),
@@ -72,23 +97,26 @@ export function WishlistCard({
         });
       }
     } catch (error) {
-      toast.error(
+      const msg =
         error.message ||
-          (saved
-            ? "Failed to remove course from wishlist"
-            : "Please log in to save courses to your wishlist"),
-        {
-          action: !saved
-            ? {
-                label: "Log in",
-                onClick: () =>
-                  router.push(
-                    `/login?next=/courses/${encodeURIComponent(code || id)}`,
-                  ),
-              }
-            : undefined,
-        },
-      );
+        (saved
+          ? `Failed to remove ${title || "course"} from your wishlist.`
+          : `Failed to add ${title || "course"} to your wishlist.`);
+
+      if (
+        msg.toLowerCase().includes("unauthenticated") ||
+        msg.toLowerCase().includes("log in") ||
+        msg.toLowerCase().includes("session")
+      ) {
+        toast.error("Please log in to save courses to your wishlist", {
+          action: {
+            label: "Log in",
+            onClick: () => router.push("/login"),
+          },
+        });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsPending(false);
     }
@@ -117,7 +145,7 @@ export function WishlistCard({
         />
 
         {/* Quick Remove Action Button on Wishlist Page */}
-        {onRemove ? (
+        {!isEnrolled && onRemove ? (
           <button
             type="button"
             onClick={handleRemoveClick}
@@ -132,7 +160,7 @@ export function WishlistCard({
               <BookmarkCheck className="size-5 fill-orange-500/20" aria-hidden />
             )}
           </button>
-        ) : (
+        ) : !isEnrolled ? (
           /* Interactive Quick Bookmark Button on Catalog / Other Courses */
           <button
             type="button"
@@ -151,7 +179,7 @@ export function WishlistCard({
               <Bookmark className="size-5" aria-hidden />
             )}
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Card Content */}

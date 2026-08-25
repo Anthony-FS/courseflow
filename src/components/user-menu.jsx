@@ -36,14 +36,38 @@ export function UserMenu({
   displayName,
   email,
   avatarUrl,
-  wishlistCount = 0,
+  wishlistCount: initialWishlistCount = 0,
   compact = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [wishlistCount, setWishlistCount] = useState(initialWishlistCount);
   const menuRef = useRef(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setWishlistCount(initialWishlistCount);
+  }, [initialWishlistCount]);
+
+  useEffect(() => {
+    function handleWishlistChange(event) {
+      const detail = event?.detail;
+      if (!detail) return;
+      if (typeof detail.count === "number") {
+        setWishlistCount(detail.count);
+      } else if (detail.action === "add") {
+        setWishlistCount((prev) => prev + 1);
+      } else if (detail.action === "remove") {
+        setWishlistCount((prev) => Math.max(0, prev - 1));
+      }
+    }
+
+    window.addEventListener("courseflow:wishlist-change", handleWishlistChange);
+    return () => {
+      window.removeEventListener("courseflow:wishlist-change", handleWishlistChange);
+    };
+  }, []);
 
   useEffect(() => {
     function handlePointerDown(event) {

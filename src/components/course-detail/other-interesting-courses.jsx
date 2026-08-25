@@ -21,10 +21,17 @@ function CourseCardPlaceholder() {
   );
 }
 
-function OtherInterestingCourses({ courses = [] }) {
+function OtherInterestingCourses({
+  courses = [],
+  enrolledCourseIds = [],
+  wishlistCourseIds = [],
+}) {
   if (Array.isArray(courses) && courses.length === 0) {
     return null;
   }
+
+  const enrolledSet = new Set(enrolledCourseIds);
+  const wishlistSet = new Set(wishlistCourseIds);
 
   return (
     <section
@@ -42,7 +49,11 @@ function OtherInterestingCourses({ courses = [] }) {
           {Array.isArray(courses) && courses.length > 0
             ? courses.map((course) => (
                 <li key={course.id} className="flex">
-                  <WishlistCard course={course} />
+                  <WishlistCard
+                    course={course}
+                    initiallySaved={wishlistSet.has(course.id)}
+                    isEnrolled={enrolledSet.has(course.id)}
+                  />
                 </li>
               ))
             : Array.from({ length: 3 }, (_, index) => (
