@@ -190,13 +190,52 @@ export function PaymentForm({ course }) {
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [qrImage, setQrImage] = useState("");
   const [pendingChargeId, setPendingChargeId] = useState("");
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
 
   const discountAmount = appliedPromo?.discountAmount ?? 0;
   const total = appliedPromo?.total ?? checkout.subtotal;
+  const isWaitingForQrPayment = Boolean(pendingChargeId);
 
   useEffect(() => {
     loadOmise().catch(() => {});
   }, []);
+
+  async function checkChargeStatus(chargeId) {
+    const response = await fetch(`/api/payments/charges/${chargeId}`);
+    const data = await readJson(response);
+
+    if (!response.ok) {
+      const message =
+        data?.error ||
+        "Could not confirm payment status. Try Refresh status.";
+      if (response.status === 409 && data?.paid) {
+        setCheckoutError("");
+        setCheckoutMessage(
+          "Payment received. Finishing enrollment… you can tap Refresh status.",
+        );
+      } else {
+        setCheckoutError(message);
+      }
+      return { ok: false, data };
+    }
+
+    if (data?.paid && data?.enrolled) {
+      setCheckoutError("");
+      setCheckoutMessage("Payment confirmed. Opening your course…");
+      router.push(checkout.coursePath);
+      router.refresh();
+      return { ok: true, data };
+    }
+
+    if (data?.paid && !data?.enrolled) {
+      setCheckoutMessage(
+        "Payment received. Finishing enrollment… you can tap Refresh status.",
+      );
+      return { ok: false, data };
+    }
+
+    return { ok: false, data };
+  }
 
   useEffect(() => {
     if (!pendingChargeId) return undefined;
@@ -204,13 +243,10 @@ export function PaymentForm({ course }) {
     let cancelled = false;
 
     async function pollCharge() {
-      const response = await fetch(`/api/payments/charges/${pendingChargeId}`);
-      const data = await readJson(response);
-      if (cancelled || !response.ok) return;
-
-      if (data?.paid) {
-        router.push(checkout.coursePath);
-        router.refresh();
+      const result = await checkChargeStatus(pendingChargeId);
+      if (cancelled) return;
+      if (result.ok) {
+        setPendingChargeId("");
       }
     }
 
@@ -221,7 +257,28 @@ export function PaymentForm({ course }) {
       cancelled = true;
       clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- poll only while charge id is set
   }, [pendingChargeId, checkout.coursePath, router]);
+
+  async function handleRefreshStatus() {
+    if (!pendingChargeId || isRefreshingStatus) return;
+    setIsRefreshingStatus(true);
+    setCheckoutError("");
+    try {
+      const result = await checkChargeStatus(pendingChargeId);
+      if (result.ok) {
+        setPendingChargeId("");
+      } else if (!result.data?.paid) {
+        setCheckoutMessage(
+          "Still waiting for payment. After paying in your bank app (or marking successful in Omise Dashboard), tap Refresh status.",
+        );
+      }
+    } catch {
+      setCheckoutError("Could not refresh payment status.");
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  }
 
   async function handleApplyPromo(event) {
     event.preventDefault();
@@ -356,13 +413,23 @@ export function PaymentForm({ course }) {
       if (method === "qr") {
         setQrImage(data.qrImage || "");
         setPendingChargeId(data.chargeId || "");
-        setCheckoutMessage("Scan the QR code with your banking app to pay.");
+        setCheckoutMessage(
+          "Scan the QR code with your banking app. This page checks payment status automatically. In Omise test mode, open the charge in the Dashboard → Actions → Mark as Successful.",
+        );
         return;
       }
 
-      if (data.paid) {
+      if (data.paid && data.enrolled !== false) {
         router.push(checkout.coursePath);
         router.refresh();
+        return;
+      }
+
+      if (data.paid && data.enrolled === false) {
+        setPendingChargeId(data.chargeId || "");
+        setCheckoutMessage(
+          "Payment received. Finishing enrollment… you can tap Refresh status.",
+        );
         return;
       }
 
@@ -487,6 +554,22 @@ export function PaymentForm({ course }) {
                   ? "Scan this QR code with your banking app to pay."
                   : "Place order to generate a PromptPay QR code."}
               </p>
+              {isWaitingForQrPayment ? (
+                <div className="flex w-full flex-col items-center gap-2">
+                  <p className="text-center text-body4 text-gray-600" aria-live="polite">
+                    Waiting for payment confirmation…
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full max-w-xs"
+                    disabled={isRefreshingStatus}
+                    onClick={handleRefreshStatus}
+                  >
+                    {isRefreshingStatus ? "Checking…" : "Refresh status"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </MethodOption>
         </div>
@@ -583,10 +666,14 @@ export function PaymentForm({ course }) {
         <Button
           type="button"
           className="mt-8 w-full"
-          disabled={isPlacingOrder}
+          disabled={isPlacingOrder || isWaitingForQrPayment}
           onClick={handlePlaceOrder}
         >
-          {isPlacingOrder ? "Processing..." : "Place order"}
+          {isPlacingOrder
+            ? "Processing..."
+            : isWaitingForQrPayment
+              ? "Waiting for payment…"
+              : "Place order"}
         </Button>
       </aside>
     </div>

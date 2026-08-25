@@ -1,6 +1,6 @@
 import { enrollUserInCourse } from "@/lib/enrollments";
 import { isOmiseChargePaid } from "@/lib/omise-server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function loadPayableCourse(supabase, courseId) {
   const { data: course, error } = await supabase
@@ -33,7 +33,7 @@ export async function enrollPaidUser(userId, courseId, supabase) {
   const client = supabase || createServiceClient();
   if (!client) {
     throw new Error(
-      "Enrollment is unavailable. Set SUPABASE_SERVICE_ROLE_KEY for webhooks.",
+      "Enrollment is unavailable. Set SUPABASE_SERVICE_ROLE_KEY in .env.local.",
     );
   }
 
@@ -100,7 +100,31 @@ export async function upsertPaymentRecord(supabase, {
   return { skipped: false, status };
 }
 
-export async function fulfillPaidCharge(charge, fallbackMethod = "qr") {
+/**
+ * Prefer service role (webhook). Fall back to the signed-in user's client when
+ * the payer matches charge metadata (local poll without service role).
+ */
+async function resolveFulfillmentClient(chargeUserId, sessionUser) {
+  const service = createServiceClient();
+  if (service) {
+    return { client: service, via: "service" };
+  }
+
+  if (sessionUser?.id && sessionUser.id === chargeUserId) {
+    const sessionClient = await createClient();
+    return { client: sessionClient, via: "session" };
+  }
+
+  throw new Error(
+    "Enrollment is unavailable. Set SUPABASE_SERVICE_ROLE_KEY in .env.local (required for QR enrollment / webhooks).",
+  );
+}
+
+export async function fulfillPaidCharge(
+  charge,
+  fallbackMethod = "qr",
+  { sessionUser = null } = {},
+) {
   const userId = String(charge?.metadata?.userId ?? "").trim();
   const courseId = String(charge?.metadata?.courseId ?? "").trim();
   const promoCode = String(charge?.metadata?.promoCode ?? "").trim();
@@ -109,12 +133,7 @@ export async function fulfillPaidCharge(charge, fallbackMethod = "qr") {
     return { ignored: true };
   }
 
-  const client = createServiceClient();
-  if (!client) {
-    throw new Error(
-      "Enrollment is unavailable. Set SUPABASE_SERVICE_ROLE_KEY for webhooks.",
-    );
-  }
+  const { client } = await resolveFulfillmentClient(userId, sessionUser);
 
   const amount = Number(charge.amount) / 100;
   await upsertPaymentRecord(client, {
@@ -127,13 +146,14 @@ export async function fulfillPaidCharge(charge, fallbackMethod = "qr") {
   });
 
   if (!isOmiseChargePaid(charge)) {
-    return { pending: true, enrolled: false };
+    return { pending: true, enrolled: false, paid: false };
   }
 
   const enrollment = await enrollPaidUser(userId, courseId, client);
   return {
     ignored: false,
     pending: false,
+    paid: true,
     enrolled: true,
     already: enrollment.already,
   };
