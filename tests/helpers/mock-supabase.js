@@ -5,7 +5,6 @@ export function createMockSupabase({
   courseId = "course-test-id",
   lessonsSelect = null,
   assignmentsSelect = null,
-  enrollmentsSelect = null,
   submissionsSelect = null,
   courseSelect = null,
   promoSelect = null,

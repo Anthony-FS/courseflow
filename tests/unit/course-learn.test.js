@@ -72,6 +72,13 @@ describe("course-learn helpers", () => {
     expect(firstOnly[0].subLessons[1].status).toBe("in-progress");
     expect(mockProgressPercent(firstOnly)).toBe(0);
 
+    const visitWithoutNext = withMockLessonStatuses(lessons, "s2", [], {
+      visitedIds: ["s1", "s2"],
+    });
+    expect(visitWithoutNext[0].subLessons[0].status).toBe("in-progress");
+    expect(visitWithoutNext[0].subLessons[1].status).toBe("in-progress");
+    expect(mockProgressPercent(visitWithoutNext)).toBe(0);
+
     const unvisitedWithAssignment = withMockLessonStatuses(lessons, "s1", [], {
       assignmentSubLessonIds: ["s2"],
     });
