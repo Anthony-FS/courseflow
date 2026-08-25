@@ -52,12 +52,13 @@ function UploadBox({ id, label, accept, file, existingName, onChange, error }) {
           type="file"
           accept={accept}
           className="sr-only"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
           onChange={(event) => onChange(event.target.files?.[0] ?? null)}
         />
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          aria-invalid={error || undefined}
           aria-describedby={error ? `${id}-error` : undefined}
           className={cn(
             "flex size-44 flex-col items-center justify-center gap-2 rounded-lg border bg-gray-100 text-body3 text-blue-500 transition-colors",
@@ -134,6 +135,7 @@ export function AssignmentSubmissionCard({
   const hasSubmitted = Boolean(saved.submittedAt || saved.status === "submitted");
   const showInput = !hasSubmitted || isEditing;
   const type = assignment.submissionType;
+  const fieldErrorId = `assignment-${type}-${assignment.id}-error`;
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -182,6 +184,7 @@ export function AssignmentSubmissionCard({
       setIsEditing(false);
       onSubmitted?.(result);
     } catch (saveError) {
+      // A file uploaded before this failed save may remain in Storage.
       setError(saveError.message || "Failed to save submission.");
     } finally {
       setIsSubmitting(false);
@@ -211,6 +214,7 @@ export function AssignmentSubmissionCard({
               placeholder="Answer..."
               rows={5}
               aria-invalid={error ? true : undefined}
+              aria-describedby={error ? fieldErrorId : undefined}
               className="w-full rounded-lg border border-transparent bg-white px-4 py-3 text-body2 text-black outline-none placeholder:text-gray-500 focus:border-orange-100"
             />
           ) : null}
@@ -222,6 +226,7 @@ export function AssignmentSubmissionCard({
               onChange={(event) => setDraft(event.target.value)}
               placeholder="https://"
               aria-invalid={error ? true : undefined}
+              aria-describedby={error ? fieldErrorId : undefined}
               className="h-12 w-full rounded-lg border border-transparent bg-white px-4 text-body2 text-black outline-none placeholder:text-gray-500 focus:border-orange-100"
             />
           ) : null}
@@ -272,7 +277,7 @@ export function AssignmentSubmissionCard({
             </fieldset>
           ) : null}
 
-          {type !== "file" ? <FieldError message={error} /> : null}
+          {type !== "file" ? <FieldError id={fieldErrorId} message={error} /> : null}
 
           <div className="mt-6">
             <Button type="submit" disabled={isSubmitting}>

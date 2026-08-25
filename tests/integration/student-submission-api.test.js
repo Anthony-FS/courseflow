@@ -97,6 +97,18 @@ describe("PUT /api/assignments/[id]/submission", () => {
     expect(insertsFor(supabase, "submissions")).toHaveLength(0);
   });
 
+  it("returns 400 for a null JSON body", async () => {
+    const supabase = enrolledMock();
+    mockUser(supabase);
+
+    const response = await putBody(null);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe(EMPTY_FIELD_MESSAGE);
+    expect(insertsFor(supabase, "submissions")).toHaveLength(0);
+  });
+
   it("updates an existing row on the second submit", async () => {
     const supabase = enrolledMock({
       submissionsSelect: {
@@ -114,10 +126,33 @@ describe("PUT /api/assignments/[id]/submission", () => {
 
     expect(response.status).toBe(200);
     expect(body.content).toBe("new answer");
+    expect(body.submittedAt).toEqual(expect.any(String));
     expect(insertsFor(supabase, "submissions")).toHaveLength(0);
     expect(updatesFor(supabase, "submissions")[0].payload).toMatchObject({
       content: "new answer",
       status: "submitted",
+      submitted_at: body.submittedAt,
+    });
+  });
+
+  it("recovers from a unique violation by updating the concurrent row", async () => {
+    const supabase = enrolledMock({
+      submissionsSelect: [],
+      insertErrors: { submissions: { code: "23505" } },
+    });
+    mockUser(supabase);
+
+    const response = await putBody({ content: "raced answer" });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.content).toBe("raced answer");
+    expect(body.submittedAt).toEqual(expect.any(String));
+    expect(insertsFor(supabase, "submissions")).toHaveLength(1);
+    expect(updatesFor(supabase, "submissions")[0].payload).toMatchObject({
+      content: "raced answer",
+      status: "submitted",
+      submitted_at: body.submittedAt,
     });
   });
 

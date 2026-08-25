@@ -56,7 +56,9 @@ export function sanitizeSubmissionFileName(name) {
 
 export function isOwnedSubmissionPath(path, userId, assignmentId) {
   const value = String(path ?? "");
-  if (value.includes("..")) return false;
+  if (value.split("/").some((segment) => segment === "." || segment === "..")) {
+    return false;
+  }
   const prefix = `${userId}/${assignmentId}/`;
   if (!value.startsWith(prefix)) return false;
   const fileName = value.slice(prefix.length);

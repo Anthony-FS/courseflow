@@ -30,7 +30,7 @@ export async function PUT(request, { params }) {
 
   const validated = validateStudentSubmissionContent(
     assignment.submission_type,
-    body.content,
+    body?.content,
     { userId: user.id, assignmentId: assignment.id },
   );
   if (!validated.ok) {

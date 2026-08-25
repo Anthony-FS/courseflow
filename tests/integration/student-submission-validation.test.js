@@ -159,6 +159,18 @@ describe("path helpers", () => {
       ),
     ).toBe(false);
   });
+
+  it("accepts a sanitized file name containing consecutive dots", () => {
+    const fileName = sanitizeSubmissionFileName("draft..pdf");
+
+    expect(
+      isOwnedSubmissionPath(
+        `${USER_ID}/${ASSIGNMENT_ID}/${fileName}`,
+        USER_ID,
+        ASSIGNMENT_ID,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("answerKeyFields", () => {
