@@ -37,10 +37,12 @@ export function resolveActiveSubLesson(flatSubLessons, subLessonId) {
 }
 
 /**
- * Status from Next Lesson completions and assignment visits:
- * completed stays completed when revisited (unless an assignment is still open);
- * yellow pending-assignment only after the student has visited the lesson;
- * unvisited lessons stay not-started (empty green), even if they have an assignment.
+ * Badge status:
+ * - completed (full green): only after Next Lesson (`completedIds`)
+ * - pending-assignment (yellow half): visited lesson with unfinished assignment
+ * - in-progress (green half): visited or currently active, but not completed
+ * - not-started (empty green): never visited
+ * Visiting alone must never produce a full green badge.
  */
 export function withMockLessonStatuses(
   lessons,
@@ -63,13 +65,14 @@ export function withMockLessonStatuses(
       const id = subLesson.id;
       const assignmentOpen =
         hasAssignment.has(id) && !assignmentSubmitted.has(id);
+      const wasVisited = visited.has(id) || id === activeSubLessonId;
       let status = "not-started";
 
-      if (visited.has(id) && assignmentOpen) {
-        status = "pending-assignment";
-      } else if (completed.has(id)) {
+      if (completed.has(id) && !assignmentOpen) {
         status = "completed";
-      } else if (id === activeSubLessonId && !assignmentOpen) {
+      } else if (wasVisited && assignmentOpen) {
+        status = "pending-assignment";
+      } else if (wasVisited) {
         status = "in-progress";
       }
 

@@ -90,6 +90,7 @@ async function upsertSubLessonProgress(
     updated_at: now,
   };
 
+  // Only Next Lesson (complete) may set completed_at. Visits must never do so.
   if (action === "complete") {
     patch.completed_at = existing?.completed_at || now;
   }
@@ -118,6 +119,9 @@ async function upsertSubLessonProgress(
       user_id: userId,
       course_id: courseId,
       sub_lesson_id: subLessonId,
+      completed_at: action === "complete" ? now : null,
+      assignment_submitted_at:
+        action === "submit_assignment" ? now : null,
       ...patch,
     })
     .select("id")
