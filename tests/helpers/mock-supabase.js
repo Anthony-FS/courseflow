@@ -11,6 +11,8 @@ export function createMockSupabase({
   promoSelect = null,
   materialsSelect = null,
   wishlistsSelect = null,
+  progressSelect = null,
+  subLessonsSelect = null,
   insertErrors = {},
   updateErrors = {},
 } = {}) {
@@ -46,10 +48,13 @@ export function createMockSupabase({
         ? enrollmentsSelect
         : [enrollmentsSelect];
     }
-    if (table === "submissions" && submissionsSelect !== null) {
-      return Array.isArray(submissionsSelect)
-        ? submissionsSelect
-        : [submissionsSelect];
+    if (table === "sub_lesson_progress" && progressSelect !== null) {
+      return Array.isArray(progressSelect) ? progressSelect : [progressSelect];
+    }
+    if (table === "sub_lessons" && subLessonsSelect !== null) {
+      return Array.isArray(subLessonsSelect)
+        ? subLessonsSelect
+        : [subLessonsSelect];
     }
     return [];
   }

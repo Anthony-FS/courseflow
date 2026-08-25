@@ -39,9 +39,9 @@ function LessonNav({
           <Button asChild size="sm" className="min-h-12 px-6">
             <Link
               href={learnSubLessonHref(courseCode, next.id)}
-              onClick={() =>
-                markSubLessonCompleted(courseId, currentSubLessonId)
-              }
+              onClick={() => {
+                void markSubLessonCompleted(courseId, currentSubLessonId);
+              }}
             >
               Next Lesson
             </Link>
