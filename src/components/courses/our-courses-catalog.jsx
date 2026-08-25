@@ -4,10 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { AdminPagination } from "@/components/admin/pagination";
-import {
-  CourseCard,
-  CourseCardSkeleton,
-} from "@/components/courses/course-card";
+import { CourseCardSkeleton } from "@/components/courses/course-card";
+import { WishlistCard } from "@/components/wishlist/wishlist-card";
 import {
   CATALOG_DEBOUNCE_MS,
   CATALOG_MOBILE_MAX_PX,
@@ -152,8 +150,8 @@ export function OurCoursesCatalog() {
       {status !== "error" && courses.length > 0 ? (
         <ul className="mt-16 grid grid-cols-1 gap-6 min-[761px]:grid-cols-3">
           {courses.map((course) => (
-            <li key={course.id}>
-              <CourseCard course={course} />
+            <li key={course.id} className="flex">
+              <WishlistCard course={course} />
             </li>
           ))}
         </ul>

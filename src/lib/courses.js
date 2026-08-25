@@ -188,7 +188,7 @@ export function embeddedCount(value) {
 export const CATALOG_DEBOUNCE_MS = 300;
 export const CATALOG_MOBILE_MAX_PX = 760;
 export const CATALOG_COLUMNS =
-  "id, course_code, title, summary, cover_image_url, total_learning_time, created_at, lessons(count)";
+  "id, course_code, title, summary, cover_image_url, total_learning_time, price, created_at, lessons(count)";
 
 export function catalogPageSizeFromWidth(width) {
   return Number(width) <= CATALOG_MOBILE_MAX_PX ? 6 : 12;
@@ -220,15 +220,19 @@ export function catalogSearchFilter(query) {
 
 export function mapCatalogCourse(row) {
   const hours = Number(row?.total_learning_time);
+  const code = row?.course_code ?? "";
 
   return {
     id: row?.id,
-    courseCode: row?.course_code ?? "",
+    code,
+    courseCode: code,
     title: row?.title ?? "",
     summary: row?.summary ?? "",
     coverUrl: resolveCoverUrl(row?.cover_image_url),
     lessonCount: embeddedCount(row?.lessons),
     hours: Number.isFinite(hours) && hours > 0 ? hours : 0,
+    totalLearningTime: row?.total_learning_time ?? "",
+    price: row?.price ?? 0,
   };
 }
 

@@ -17,9 +17,9 @@ describe("catalog constants", () => {
   it("debounces for 300ms and selects only card columns", () => {
     expect(CATALOG_DEBOUNCE_MS).toBe(300);
     expect(CATALOG_COLUMNS).toBe(
-      "id, course_code, title, summary, cover_image_url, total_learning_time, created_at, lessons(count)",
+      "id, course_code, title, summary, cover_image_url, total_learning_time, price, created_at, lessons(count)",
     );
-    expect(CATALOG_COLUMNS).not.toMatch(/description|price|video_trailer/);
+    expect(CATALOG_COLUMNS).not.toMatch(/description|video_trailer/);
   });
 });
 
@@ -90,12 +90,15 @@ describe("mapCatalogCourse", () => {
 
     expect(course).toEqual({
       id: "c1",
+      code: "SD101",
       courseCode: "SD101",
       title: "Service Design Essentials",
       summary: "Learn service design",
       coverUrl: FALLBACK_COVER,
       lessonCount: 6,
       hours: 0,
+      totalLearningTime: "",
+      price: 0,
     });
   });
 
