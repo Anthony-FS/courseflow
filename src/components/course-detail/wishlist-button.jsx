@@ -1,31 +1,42 @@
 "use client";
 
 import { useState } from "react";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { addCourseToWishlist } from "@/lib/wishlist";
+import { addCourseToWishlist, removeCourseFromWishlist } from "@/lib/wishlist";
 import { cn } from "@/lib/utils";
 
 function WishlistButton({ courseId, initiallySaved = false, className }) {
   const [saved, setSaved] = useState(initiallySaved);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function handleClick() {
-    if (saved || isSaving) {
+    if (isPending) {
       return;
     }
 
-    setIsSaving(true);
+    setIsPending(true);
     setErrorMessage("");
 
     try {
-      await addCourseToWishlist(courseId);
-      setSaved(true);
+      if (saved) {
+        await removeCourseFromWishlist(courseId);
+        setSaved(false);
+      } else {
+        await addCourseToWishlist(courseId);
+        setSaved(true);
+      }
     } catch (error) {
-      setErrorMessage(error.message || "Failed to add this course to your wishlist.");
+      setErrorMessage(
+        error.message ||
+          (saved
+            ? "Failed to remove this course from your wishlist."
+            : "Failed to add this course to your wishlist."),
+      );
     } finally {
-      setIsSaving(false);
+      setIsPending(false);
     }
   }
 
@@ -34,11 +45,25 @@ function WishlistButton({ courseId, initiallySaved = false, className }) {
       <Button
         variant="secondary"
         type="button"
-        className={cn("w-full", className)}
+        className={cn("w-full gap-2 transition-all duration-200", className)}
         onClick={handleClick}
-        disabled={saved || isSaving}
+        disabled={isPending}
+        aria-pressed={saved}
       >
-        {saved ? "Added to Wishlist" : isSaving ? "Adding..." : "Add to Wishlist"}
+        {saved ? (
+          <BookmarkCheck className="size-5 text-orange-500 fill-orange-500/20" aria-hidden />
+        ) : (
+          <Bookmark className="size-5 text-orange-500" aria-hidden />
+        )}
+        <span>
+          {isPending
+            ? saved
+              ? "Removing..."
+              : "Adding..."
+            : saved
+              ? "Remove from Wishlist"
+              : "Add to Wishlist"}
+        </span>
       </Button>
       {errorMessage ? (
         <p className="text-body3 text-orange-500" role="alert">
@@ -50,3 +75,5 @@ function WishlistButton({ courseId, initiallySaved = false, className }) {
 }
 
 export { WishlistButton };
+
+
