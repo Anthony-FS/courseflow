@@ -6,14 +6,51 @@ import { Plus, Search } from "lucide-react";
 
 import { PromoCodeTable } from "@/components/admin/promo-code-table";
 import { AdminPagination } from "@/components/admin/pagination";
+import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getPromoCodes, searchPromoCodes } from "@/lib/promo-codes";
 import { getTotalPages, paginateItems } from "@/lib/pagination";
+import { sortItems } from "@/lib/sorting";
+
+const PROMO_SORT_OPTIONS = [
+  {
+    value: "code",
+    label: "Promo code",
+    ascendingLabel: "A-Z",
+    descendingLabel: "Z-A",
+  },
+  {
+    value: "minPurchase",
+    label: "Minimum purchase",
+    ascendingLabel: "Low to high",
+    descendingLabel: "High to low",
+  },
+  {
+    value: "discountValue",
+    label: "Discount value",
+    ascendingLabel: "Low to high",
+    descendingLabel: "High to low",
+  },
+  {
+    value: "createdAt",
+    label: "Created date",
+    ascendingLabel: "Oldest first",
+    descendingLabel: "Newest first",
+  },
+  {
+    value: "updatedAt",
+    label: "Updated date",
+    ascendingLabel: "Oldest first",
+    descendingLabel: "Newest first",
+  },
+];
 
 export default function AdminPromoCodesPage() {
   const [promoCodes, setPromoCodes] = useState([]);
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("code");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -42,20 +79,41 @@ export default function AdminPromoCodesPage() {
     };
   }, []);
 
-  const visiblePromoCodes = useMemo(
+  const filteredPromoCodes = useMemo(
     () => searchPromoCodes(promoCodes, query),
     [promoCodes, query],
   );
 
-  const totalPages = getTotalPages(visiblePromoCodes.length);
+  const sortedPromoCodes = useMemo(() => {
+    const sortConfig = {
+      code: { type: "text", getValue: (promo) => promo.code },
+      minPurchase: { type: "number", getValue: (promo) => promo.min_purchase_amount },
+      discountValue: { type: "number", getValue: (promo) => promo.discount_value },
+      createdAt: { type: "date", getValue: (promo) => promo.starts_at },
+      updatedAt: { type: "date", getValue: (promo) => promo.updated_at },
+    }[sortBy] ?? { type: "text", getValue: (promo) => promo.code };
+
+    return sortItems(filteredPromoCodes, {
+      ...sortConfig,
+      direction: sortDirection,
+    });
+  }, [filteredPromoCodes, sortBy, sortDirection]);
+
+  const totalPages = getTotalPages(sortedPromoCodes.length);
 
   const paginatedPromoCodes = useMemo(
-    () => paginateItems(visiblePromoCodes, currentPage),
-    [visiblePromoCodes, currentPage],
+    () => paginateItems(sortedPromoCodes, currentPage),
+    [sortedPromoCodes, currentPage],
   );
 
   function handleSearchChange(event) {
     setQuery(event.target.value);
+    setCurrentPage(1);
+  }
+
+  function handleSortChange({ sortBy: nextSortBy, sortDirection: nextDirection }) {
+    setSortBy(nextSortBy);
+    setSortDirection(nextDirection);
     setCurrentPage(1);
   }
 
@@ -97,6 +155,12 @@ export default function AdminPromoCodesPage() {
             />
             <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-gray-600" />
           </label>
+          <SortFilterBar
+            options={PROMO_SORT_OPTIONS}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            onSortChange={handleSortChange}
+          />
           <Button asChild className="min-h-12 gap-2 px-6 py-3">
             <Link href="/admin/promo-codes/add-code">
             <Plus aria-hidden="true" className="size-5" />
@@ -112,7 +176,7 @@ export default function AdminPromoCodesPage() {
           <PromoCodeTable promoCodes={paginatedPromoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
         </div>
 
-        {status === "ready" && visiblePromoCodes.length > 0 ? (
+        {status === "ready" && sortedPromoCodes.length > 0 ? (
           <AdminPagination
             currentPage={currentPage}
             totalPages={totalPages}

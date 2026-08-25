@@ -6,6 +6,7 @@ import { Plus, Search } from "lucide-react";
 
 import { CourseTable } from "@/components/admin/course-table";
 import { AdminPagination } from "@/components/admin/pagination";
+import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { deleteCourse, getCourses, searchCourses } from "@/lib/courses";
@@ -14,10 +15,46 @@ import {
   getTotalPages,
   paginateItems,
 } from "@/lib/pagination";
+import { sortItems } from "@/lib/sorting";
+
+const COURSE_SORT_OPTIONS = [
+  {
+    value: "courseCode",
+    label: "Course code",
+    ascendingLabel: "A-Z",
+    descendingLabel: "Z-A",
+  },
+  {
+    value: "title",
+    label: "Course name",
+    ascendingLabel: "A-Z",
+    descendingLabel: "Z-A",
+  },
+  {
+    value: "price",
+    label: "Price",
+    ascendingLabel: "Low to high",
+    descendingLabel: "High to low",
+  },
+  {
+    value: "createdAt",
+    label: "Created date",
+    ascendingLabel: "Oldest first",
+    descendingLabel: "Newest first",
+  },
+  {
+    value: "updatedAt",
+    label: "Updated date",
+    ascendingLabel: "Oldest first",
+    descendingLabel: "Newest first",
+  },
+];
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState([]);
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("courseCode");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [status, setStatus] = useState("loading");
@@ -51,20 +88,59 @@ export default function AdminCoursesPage() {
     };
   }, []);
 
-  const visibleCourses = useMemo(
+  const filteredCourses = useMemo(
     () => searchCourses(courses, query),
     [courses, query],
   );
 
-  const totalPages = getTotalPages(visibleCourses.length);
+  const sortedCourses = useMemo(() => {
+    const sortConfig = {
+      courseCode: {
+        type: "text",
+        getValue: (course) => course.course_code,
+      },
+      title: {
+        type: "text",
+        getValue: (course) => course.title,
+      },
+      price: {
+        type: "number",
+        getValue: (course) => course.price,
+      },
+      createdAt: {
+        type: "date",
+        getValue: (course) => course.created_at,
+      },
+      updatedAt: {
+        type: "date",
+        getValue: (course) => course.updated_at,
+      },
+    }[sortBy] ?? {
+      type: "text",
+      getValue: (course) => course.course_code,
+    };
+
+    return sortItems(filteredCourses, {
+      ...sortConfig,
+      direction: sortDirection,
+    });
+  }, [filteredCourses, sortBy, sortDirection]);
+
+  const totalPages = getTotalPages(sortedCourses.length);
 
   const paginatedCourses = useMemo(
-    () => paginateItems(visibleCourses, currentPage),
-    [visibleCourses, currentPage],
+    () => paginateItems(sortedCourses, currentPage),
+    [sortedCourses, currentPage],
   );
 
   function handleSearchChange(event) {
     setQuery(event.target.value);
+    setCurrentPage(1);
+  }
+
+  function handleSortChange({ sortBy: nextSortBy, sortDirection: nextDirection }) {
+    setSortBy(nextSortBy);
+    setSortDirection(nextDirection);
     setCurrentPage(1);
   }
 
@@ -114,6 +190,12 @@ export default function AdminCoursesPage() {
               className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-gray-600"
             />
           </label>
+          <SortFilterBar
+            options={COURSE_SORT_OPTIONS}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            onSortChange={handleSortChange}
+          />
           <Button asChild className="min-h-12 gap-2 px-6 py-3">
             <Link href="/admin/courses/new">
               <Plus aria-hidden="true" className="size-5" />
@@ -138,7 +220,7 @@ export default function AdminCoursesPage() {
           />
         </div>
 
-        {status === "ready" && visibleCourses.length > 0 ? (
+        {status === "ready" && sortedCourses.length > 0 ? (
           <AdminPagination
             currentPage={currentPage}
             totalPages={totalPages}
