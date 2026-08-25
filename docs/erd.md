@@ -230,6 +230,7 @@ A sub-lesson may have many assignments. `start_at` and `end_at` stay unused by t
 - Wishlist is unique `(user_id, course_id)`.
 - Enrollment is unique `(user_id, course_id)`. `completed_at` is set when all sub-lessons are done — that unlocks reviews.
 - Submission is unique `(assignment_id, user_id)`. `status` is `in_progress` | `submitted`.
+- Students save via PUT `/api/assignments/[id]/submission`. File answers go to the private Storage bucket `assignment-submissions` (path `{user_id}/{assignment_id}/{fileName}`); `submissions.content` stores that path. This feature always writes `status` = `submitted`.
 - Progress is unique `(user_id, sub_lesson_id)`. Course % = completed sub-lessons / total sub-lessons.
 - Review is unique `(user_id, course_id)`.
 - Promo `course_id` null = applies to any course. One redemption row per use, tied to the enrollment it discounted.

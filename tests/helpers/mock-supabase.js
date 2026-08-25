@@ -5,6 +5,8 @@ export function createMockSupabase({
   courseId = "course-test-id",
   lessonsSelect = null,
   assignmentsSelect = null,
+  enrollmentsSelect = null,
+  submissionsSelect = null,
   courseSelect = null,
   promoSelect = null,
   materialsSelect = null,
@@ -34,6 +36,16 @@ export function createMockSupabase({
       return Array.isArray(assignmentsSelect)
         ? assignmentsSelect
         : [assignmentsSelect];
+    }
+    if (table === "enrollments" && enrollmentsSelect !== null) {
+      return Array.isArray(enrollmentsSelect)
+        ? enrollmentsSelect
+        : [enrollmentsSelect];
+    }
+    if (table === "submissions" && submissionsSelect !== null) {
+      return Array.isArray(submissionsSelect)
+        ? submissionsSelect
+        : [submissionsSelect];
     }
     return [];
   }
