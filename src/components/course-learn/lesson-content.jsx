@@ -1,5 +1,6 @@
 import { LessonAssignment } from "@/components/course-learn/lesson-assignment";
 import { LessonVideo } from "@/components/course-learn/lesson-video";
+import { SubLessonRenderer } from "@/components/course-learn/sub-lesson-renderer";
 
 function LessonContent({
   title,
@@ -18,13 +19,17 @@ function LessonContent({
           {title}
         </h1>
 
-        {description ? (
-          <p className="mt-3 text-body2 text-gray-700">{description}</p>
+        {videoUrl ? (
+          <div className="mt-6">
+            <LessonVideo title={title} coverUrl={coverUrl} videoUrl={videoUrl} />
+          </div>
         ) : null}
 
-        <div className="mt-6">
-          <LessonVideo title={title} coverUrl={coverUrl} videoUrl={videoUrl} />
-        </div>
+        {description ? (
+          <div className="mt-6 rounded-2xl bg-[#0D1117] p-6 sm:p-8 text-white shadow-card">
+            <SubLessonRenderer description={description} />
+          </div>
+        ) : null}
 
         {assignment ? (
           <LessonAssignment

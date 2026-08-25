@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { SubLessonBlockBuilder } from "@/components/admin/sub-lesson-block-builder";
 import {
   uploadAdminFile,
   createAdminLesson,
@@ -21,6 +22,11 @@ import {
   deleteAdminLesson,
   getAdminLessonDetail,
 } from "@/lib/admin-courses";
+import {
+  BLOCK_TYPES,
+  parseSubLessonContent,
+  serializeSubLessonContent,
+} from "@/lib/sub-lesson-blocks";
 import { cn } from "@/lib/utils";
 
 function remapSubLessonTitleErrors(errors, fromIndex, toIndex) {
@@ -241,6 +247,14 @@ export default function LessonForm({
   const handleSubLessonDescriptionChange = (index, value) => {
     const updated = [...subLessons];
     updated[index].description = value;
+    updated[index].blocks = parseSubLessonContent(value);
+    setSubLessons(updated);
+  };
+
+  const handleSubLessonBlocksChange = (index, newBlocks) => {
+    const updated = [...subLessons];
+    updated[index].blocks = newBlocks;
+    updated[index].description = serializeSubLessonContent(newBlocks);
     setSubLessons(updated);
   };
 
@@ -382,9 +396,30 @@ export default function LessonForm({
             finalAttachmentName = uploadRes.name || sub.attachmentName;
           }
 
+          // Process and upload any image/video files inside content blocks
+          let processedBlocks = sub.blocks || parseSubLessonContent(sub.description);
+          if (Array.isArray(processedBlocks) && processedBlocks.length > 0) {
+            processedBlocks = await Promise.all(
+              processedBlocks.map(async (block) => {
+                if (block.type === BLOCK_TYPES.IMAGE && block.file) {
+                  const res = await uploadAdminFile("cover", block.file);
+                  return { ...block, url: res.fileUrl, file: null };
+                }
+                if (block.type === BLOCK_TYPES.VIDEO && block.file) {
+                  const res = await uploadAdminFile("trailer", block.file);
+                  return { ...block, url: res.fileUrl, file: null };
+                }
+                const { file, ...rest } = block;
+                return rest;
+              }),
+            );
+          }
+
+          const finalDescription = serializeSubLessonContent(processedBlocks);
+
           return {
             title: sub.title.trim(),
-            description: sub.description ? sub.description.trim() : "",
+            description: finalDescription ? finalDescription.trim() : "",
             videoUrl: finalVideoUrl,
             videoName: finalVideoName,
             attachmentUrl: finalAttachmentUrl,
@@ -528,7 +563,7 @@ export default function LessonForm({
           {/* Lesson Name Field */}
           <div>
             <label className="block text-sm font-medium text-[#2A2E3F] mb-2">
-              Lesson name *
+              Lesson name
             </label>
             <input
               type="text"
@@ -621,7 +656,7 @@ export default function LessonForm({
                               {index + 1}
                             </span>
                             <label className="block text-sm font-semibold text-[#2A2E3F]">
-                              Sub-lesson name *
+                              Sub-lesson name
                             </label>
                           </div>
 
@@ -687,20 +722,16 @@ export default function LessonForm({
                           )}
                         </div>
 
-                        {/* Text Content / Description Area */}
+                        {/* Sub-Lesson Content Blocks Builder */}
                         <div>
-                          <label className="block text-sm font-medium text-[#2A2E3F] mb-2 flex items-center gap-1.5">
-                            <FileText className="w-4 h-4 text-[#646D89]" />
-                            <span>Lesson Content / Description (Optional)</span>
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={sub.description || ""}
-                            placeholder="Write lesson notes, key takeaways, summary, or reading materials..."
-                            onChange={(e) =>
-                              handleSubLessonDescriptionChange(index, e.target.value)
+                          <SubLessonBlockBuilder
+                            blocks={
+                              sub.blocks || parseSubLessonContent(sub.description)
                             }
-                            className="w-full p-3.5 bg-white rounded-lg border border-[#D6D9E4] focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F] resize-y"
+                            onChange={(newBlocks) =>
+                              handleSubLessonBlocksChange(index, newBlocks)
+                            }
+                            subLessonIndex={index}
                           />
                         </div>
 
@@ -709,7 +740,7 @@ export default function LessonForm({
                           {/* Video Upload Section */}
                           <div>
                             <label className="block text-sm font-medium text-[#2A2E3F] mb-3">
-                              Video *
+                              Video
                             </label>
 
                             {sub.videoUrl ? (
