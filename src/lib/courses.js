@@ -378,6 +378,57 @@ export async function getCatalogCourses(
   };
 }
 
+export async function getOtherInterestingCourses(
+  supabase,
+  { excludeCourseId, userId, limit = 3 } = {},
+) {
+  if (!supabase) {
+    return [];
+  }
+
+  const excludeIds = new Set();
+  const currentId = String(excludeCourseId ?? "").trim();
+  if (currentId) {
+    excludeIds.add(currentId);
+  }
+
+  const enrolledUserId = String(userId ?? "").trim();
+  if (enrolledUserId) {
+    const { data: enrollments } = await supabase
+      .from("enrollments")
+      .select("course_id")
+      .eq("user_id", enrolledUserId);
+
+    for (const row of enrollments ?? []) {
+      const courseId = String(row?.course_id ?? "").trim();
+      if (courseId) {
+        excludeIds.add(courseId);
+      }
+    }
+  }
+
+  let request = supabase
+    .from("courses")
+    .select(CATALOG_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const ids = [...excludeIds];
+  if (ids.length === 1) {
+    request = request.neq("id", ids[0]);
+  } else if (ids.length > 1) {
+    request = request.not("id", "in", `(${ids.join(",")})`);
+  }
+
+  const { data, error } = await request;
+
+  if (error) {
+    return [];
+  }
+
+  return (data ?? []).map(mapCatalogCourse);
+}
+
 function mapCourse(row) {
   return {
     id: row.id,

@@ -71,7 +71,11 @@ export default async function CourseDetailPage({ params }) {
     isCourseWishlisted(supabase, user.id, course.id),
     isCourseEnrolled(catalog, user.id, course.id),
     getCourseAttachment(catalog, course.id),
-    getOtherInterestingCourses(catalog, course.id, 3),
+    getOtherInterestingCourses(catalog, {
+      excludeCourseId: course.id,
+      userId: user.id,
+      limit: 3,
+    }),
     getUserEnrolledCourseIds(catalog, user.id),
     getUserWishlistCourseIds(supabase, user.id),
   ]);
