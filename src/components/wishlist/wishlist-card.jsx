@@ -16,6 +16,7 @@ import {
 
 export function WishlistCard({
   course,
+  href,
   onRemove,
   isRemoving = false,
   initiallySaved = false,
@@ -101,7 +102,7 @@ export function WishlistCard({
 
   return (
     <Link
-      href={`/courses/${encodeURIComponent(code || id)}`}
+      href={href || `/courses/${encodeURIComponent(code || id)}`}
       className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       {/* Course Cover Image */}
@@ -201,4 +202,3 @@ export function WishlistCard({
     </Link>
   );
 }
-

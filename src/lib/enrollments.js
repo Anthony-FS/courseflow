@@ -1,3 +1,5 @@
+import { resolveCoverUrl } from "@/lib/courses";
+
 function isUniqueViolation(error) {
   return error?.code === "23505";
 }
@@ -79,4 +81,90 @@ export async function enrollInCourse(courseId) {
   }
 
   return data;
+}
+
+function lessonCount(lessons) {
+  if (Array.isArray(lessons)) return lessons.length;
+  if (lessons && typeof lessons === "object" && "count" in lessons) {
+    return lessons.count;
+  }
+  return 0;
+}
+
+function mapEnrolledCourse(enrollment) {
+  const course = Array.isArray(enrollment.courses)
+    ? enrollment.courses[0]
+    : enrollment.courses;
+
+  if (!course) return null;
+
+  return {
+    enrollmentId: enrollment.id,
+    enrolledAt: enrollment.subscribed_at,
+    id: course.id,
+    code: course.course_code || course.id,
+    title: course.title || "",
+    summary: course.summary || "",
+    description: course.description || "",
+    totalLearningTime: course.total_learning_time || "",
+    coverUrl: resolveCoverUrl(
+      course.cover_image_url || course.cover_file_url,
+    ),
+    price: course.price ?? 0,
+    lessonCount: lessonCount(course.lessons),
+  };
+}
+
+export async function getUserEnrolledCourses(supabase, userId) {
+  if (!supabase || !userId) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("enrollments")
+    .select(`
+      id,
+      subscribed_at,
+      course_id,
+      courses (
+        id,
+        title,
+        course_code,
+        summary,
+        description,
+        total_learning_time,
+        cover_image_url,
+        cover_file_url,
+        price,
+        lessons ( id )
+      )
+    `)
+    .eq("user_id", userId)
+    .order("subscribed_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || "Failed to load enrolled courses.");
+  }
+
+  return (data ?? []).map(mapEnrolledCourse).filter(Boolean);
+}
+
+export async function loadMyCourses() {
+  const response = await fetch("/api/enrollments", {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to load your courses.");
+  }
+
+  return Array.isArray(data?.courses) ? data.courses : [];
 }
