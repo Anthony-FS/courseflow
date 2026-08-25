@@ -1,3 +1,9 @@
+import {
+  getAssignmentsForCourse,
+  mockProgressPercent,
+  withMockLessonStatuses,
+} from "@/lib/course-learn";
+import { getCourseProgress } from "@/lib/course-learn-progress";
 import { resolveCoverUrl } from "@/lib/courses";
 
 function isUniqueViolation(error) {
@@ -133,6 +139,36 @@ function mapEnrolledCourse(enrollment) {
   };
 }
 
+function courseLessonsForProgress(course) {
+  return (course.lessons ?? []).map((lesson) => ({
+    id: lesson.id,
+    subLessons: (lesson.sub_lessons ?? []).map((subLesson) => ({
+      id: subLesson.id,
+    })),
+  }));
+}
+
+async function getEnrollmentProgress(supabase, userId, course) {
+  const [progress, assignments] = await Promise.all([
+    getCourseProgress(supabase, userId, course.id),
+    getAssignmentsForCourse(supabase, course.id),
+  ]);
+  const lessonsWithStatus = withMockLessonStatuses(
+    courseLessonsForProgress(course),
+    null,
+    progress.completedIds,
+    {
+      visitedIds: progress.visitedIds,
+      assignmentSubLessonIds: assignments.map(
+        (assignment) => assignment.subLessonId,
+      ),
+      submittedAssignmentSubLessonIds: progress.submittedAssignmentIds,
+    },
+  );
+
+  return Math.min(100, Math.max(0, mockProgressPercent(lessonsWithStatus)));
+}
+
 export async function getUserEnrolledCourses(supabase, userId) {
   if (!supabase || !userId) {
     return [];
@@ -154,7 +190,10 @@ export async function getUserEnrolledCourses(supabase, userId) {
         cover_image_url,
         cover_file_url,
         price,
-        lessons ( id )
+        lessons (
+          id,
+          sub_lessons ( id )
+        )
       )
     `)
     .eq("user_id", userId)
@@ -164,7 +203,22 @@ export async function getUserEnrolledCourses(supabase, userId) {
     throw new Error(error.message || "Failed to load enrolled courses.");
   }
 
-  return (data ?? []).map(mapEnrolledCourse).filter(Boolean);
+  const courses = await Promise.all(
+    (data ?? []).map(async (enrollment) => {
+      const mapped = mapEnrolledCourse(enrollment);
+      const course = Array.isArray(enrollment.courses)
+        ? enrollment.courses[0]
+        : enrollment.courses;
+      if (!mapped || !course) return null;
+
+      return {
+        ...mapped,
+        progress: await getEnrollmentProgress(supabase, userId, course),
+      };
+    }),
+  );
+
+  return courses.filter(Boolean);
 }
 
 export async function loadMyCourses() {

@@ -109,6 +109,7 @@ export function MyCoursesList() {
           <WishlistCard
             course={course}
             href={`/courses/${encodeURIComponent(course.code)}/learn`}
+            progress={course.progress}
           />
         </li>
       ))}
