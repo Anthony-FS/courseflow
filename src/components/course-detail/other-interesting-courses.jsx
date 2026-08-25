@@ -1,3 +1,5 @@
+import { WishlistCard } from "@/components/wishlist/wishlist-card";
+
 function CourseCardPlaceholder() {
   return (
     <article className="overflow-hidden rounded-lg bg-white shadow-card">
@@ -19,7 +21,11 @@ function CourseCardPlaceholder() {
   );
 }
 
-function OtherInterestingCourses() {
+function OtherInterestingCourses({ courses = [] }) {
+  if (Array.isArray(courses) && courses.length === 0) {
+    return null;
+  }
+
   return (
     <section
       className="bg-gray-100 py-16"
@@ -33,11 +39,17 @@ function OtherInterestingCourses() {
           Other Interesting Courses
         </h2>
         <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }, (_, index) => (
-            <li key={index}>
-              <CourseCardPlaceholder />
-            </li>
-          ))}
+          {Array.isArray(courses) && courses.length > 0
+            ? courses.map((course) => (
+                <li key={course.id} className="flex">
+                  <WishlistCard course={course} />
+                </li>
+              ))
+            : Array.from({ length: 3 }, (_, index) => (
+                <li key={index}>
+                  <CourseCardPlaceholder />
+                </li>
+              ))}
         </ul>
       </div>
     </section>

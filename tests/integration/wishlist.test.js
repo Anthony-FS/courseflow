@@ -74,6 +74,28 @@ describe("POST /api/wishlist", () => {
     });
   });
 
+  it("resolves course_code to course id when adding to wishlist", async () => {
+    const supabase = createMockSupabase({
+      courseSelect: { id: "resolved-uuid", course_code: "SD-101" },
+    });
+    requireUser.mockResolvedValue({
+      supabase,
+      user: USER,
+      profile: { id: USER.id },
+      error: null,
+    });
+
+    const response = await postWishlist({ courseId: "SD-101" });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.ok).toBe(true);
+    expect(insertsFor(supabase, "wishlists")[0].rows[0]).toEqual({
+      user_id: USER.id,
+      course_id: "resolved-uuid",
+    });
+  });
+
   it("returns 401 when the user is not signed in", async () => {
     requireUser.mockResolvedValue({
       supabase: createMockSupabase(),
@@ -280,5 +302,72 @@ describe("isCourseWishlisted", () => {
     const supabase = createMockSupabase();
     expect(await isCourseWishlisted(supabase, null, COURSE_ID)).toBe(false);
     expect(await isCourseWishlisted(supabase, USER.id, null)).toBe(false);
+  });
+});
+
+describe("getOtherInterestingCourses", () => {
+  it("returns other interesting courses excluding current course", async () => {
+    const { getOtherInterestingCourses } = await import("@/lib/courses");
+    const mockCourses = [
+      {
+        id: "course-2",
+        course_code: "UX-201",
+        title: "UX Design Mastery",
+        summary: "Master UX design fundamentals.",
+        cover_image_url: "/courses/service-design.svg",
+        total_learning_time: "8",
+        price: 4500,
+        lessons: [{ count: 5 }],
+      },
+    ];
+
+    const supabase = createMockSupabase({
+      courseSelect: mockCourses,
+    });
+
+    const results = await getOtherInterestingCourses(supabase, "course-1", 3);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      id: "course-2",
+      courseCode: "UX-201",
+      title: "UX Design Mastery",
+      price: 4500,
+    });
+  });
+});
+
+describe("getUserWishlistCount and getUserWishlistCourseIds", () => {
+  it("returns the exact count of wishlisted items", async () => {
+    const { getUserWishlistCount, getUserWishlistCourseIds } = await import(
+      "@/lib/wishlist"
+    );
+
+    const mockWishlists = [
+      { id: "w-1", user_id: USER.id, course_id: "course-1" },
+      { id: "w-2", user_id: USER.id, course_id: "course-2" },
+    ];
+
+    const supabase = createMockSupabase({
+      wishlistsSelect: mockWishlists,
+    });
+
+    const count = await getUserWishlistCount(supabase, USER.id);
+    expect(count).toBe(2);
+
+    const ids = await getUserWishlistCourseIds(supabase, USER.id);
+    expect(ids).toEqual(["course-1", "course-2"]);
+  });
+
+  it("returns 0 and empty array when supabase or userId is missing", async () => {
+    const { getUserWishlistCount, getUserWishlistCourseIds } = await import(
+      "@/lib/wishlist"
+    );
+
+    expect(await getUserWishlistCount(null, USER.id)).toBe(0);
+    expect(await getUserWishlistCount(createMockSupabase(), null)).toBe(0);
+    expect(await getUserWishlistCourseIds(null, USER.id)).toEqual([]);
+    expect(await getUserWishlistCourseIds(createMockSupabase(), null)).toEqual(
+      [],
+    );
   });
 });

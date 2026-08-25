@@ -17,7 +17,7 @@ describe("catalog constants", () => {
   it("debounces for 300ms and selects only card columns", () => {
     expect(CATALOG_DEBOUNCE_MS).toBe(300);
     expect(CATALOG_COLUMNS).toBe(
-      "id, course_code, title, summary, cover_image_url, total_learning_time, price, created_at, lessons(count)",
+      "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, lessons(count)",
     );
     expect(CATALOG_COLUMNS).not.toMatch(/description|video_trailer/);
   });

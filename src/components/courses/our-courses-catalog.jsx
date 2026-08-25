@@ -27,7 +27,8 @@ async function loadCatalog({ query, page, pageSize, signal }) {
   return body;
 }
 
-export function OurCoursesCatalog() {
+export function OurCoursesCatalog({ initialWishlistIds = [] }) {
+  const [wishlistSet] = useState(() => new Set(initialWishlistIds));
   const [input, setInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -151,7 +152,10 @@ export function OurCoursesCatalog() {
         <ul className="mt-16 grid grid-cols-1 gap-6 min-[761px]:grid-cols-3">
           {courses.map((course) => (
             <li key={course.id} className="flex">
-              <WishlistCard course={course} />
+              <WishlistCard
+                course={course}
+                initiallySaved={wishlistSet.has(course.id)}
+              />
             </li>
           ))}
         </ul>

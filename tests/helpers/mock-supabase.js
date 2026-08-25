@@ -10,6 +10,7 @@ export function createMockSupabase({
   promoSelect = null,
   materialsSelect = null,
   wishlistsSelect = null,
+  enrollmentsSelect = null,
   progressSelect = null,
   subLessonsSelect = null,
   insertErrors = {},
@@ -94,7 +95,7 @@ export function createMockSupabase({
   }
 
   function from(table) {
-    function selectChain() {
+    function selectChain(options = {}) {
       const filters = [];
       const chain = {
         eq(column, value) {
@@ -121,9 +122,11 @@ export function createMockSupabase({
           return chain;
         },
         order() {
+          const filtered = applyFilters(selectRows(table), filters);
           return Promise.resolve({
-            data: applyFilters(selectRows(table), filters),
+            data: filtered,
             error: null,
+            count: filtered.length,
           });
         },
         maybeSingle: async () => ({
@@ -143,9 +146,11 @@ export function createMockSupabase({
           };
         },
         then(onFulfilled, onRejected) {
+          const filtered = applyFilters(selectRows(table), filters);
           return Promise.resolve({
-            data: applyFilters(selectRows(table), filters),
+            data: options?.head ? null : filtered,
             error: null,
+            count: filtered.length,
           }).then(onFulfilled, onRejected);
         },
       };
@@ -167,8 +172,7 @@ export function createMockSupabase({
           };
         },
         then(onFulfilled, onRejected) {
-          const error = updateErrors[table] ?? null;
-          return Promise.resolve({ data: null, error }).then(
+          return Promise.resolve({ data: null, error: null }).then(
             onFulfilled,
             onRejected,
           );
@@ -233,7 +237,7 @@ export function createMockSupabase({
         return chain;
       },
       select(_columns, options = {}) {
-        const chain = selectChain();
+        const chain = selectChain(options);
         if (options?.head && options?.count === "exact") {
           const withCount = {
             ...chain,
@@ -248,7 +252,6 @@ export function createMockSupabase({
               }).then(onFulfilled, onRejected);
             },
           };
-          // Preserve filter chaining for count queries.
           withCount.eq = (column, value) => {
             chain.eq(column, value);
             return withCount;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Bookmark } from "lucide-react";
+import { toast } from "sonner";
 
 import { WishlistCard } from "@/components/wishlist/wishlist-card";
 import { removeCourseFromWishlist } from "@/lib/wishlist";
@@ -25,13 +26,17 @@ export function WishlistCourseList({ initialCourses = [] }) {
 
     try {
       await removeCourseFromWishlist(courseId);
+      toast.success(
+        `Removed "${courseToRemove?.title || "Course"}" from your wishlist`,
+      );
     } catch (error) {
       // Rollback on error
       setCourses(previousCourses);
-      setErrorMessage(
+      const msg =
         error.message ||
-          `Failed to remove ${courseToRemove?.title || "course"} from your wishlist.`,
-      );
+        `Failed to remove ${courseToRemove?.title || "course"} from your wishlist.`;
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setRemovingId(null);
     }
@@ -59,6 +64,7 @@ export function WishlistCourseList({ initialCourses = [] }) {
                 course={course}
                 onRemove={handleRemove}
                 isRemoving={removingId === course.id}
+                showSubscribeButton
               />
             </li>
           ))}

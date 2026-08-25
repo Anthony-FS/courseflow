@@ -21,15 +21,6 @@ function PurchaseActions({
     ? "min-h-12 rounded-full px-3 py-3 text-body3 whitespace-normal"
     : undefined;
 
-  if (isSubscribed) {
-    return (
-      <StartLearningButton
-        courseCode={courseCode}
-        className={buttonClassName}
-      />
-    );
-  }
-
   return (
     <div className={cn("grid gap-4", compact && "grid-cols-2 gap-3")}>
       <WishlistButton
@@ -37,12 +28,19 @@ function PurchaseActions({
         initiallySaved={initiallySaved}
         className={buttonClassName}
       />
-      <SubscribeButton
-        courseId={courseId}
-        courseTitle={courseTitle}
-        className={buttonClassName}
-        label={compact ? "Subscribe" : undefined}
-      />
+      {isSubscribed ? (
+        <StartLearningButton
+          courseCode={courseCode}
+          className={buttonClassName}
+        />
+      ) : (
+        <SubscribeButton
+          courseId={courseId}
+          courseTitle={courseTitle}
+          className={buttonClassName}
+          label={compact ? "Subscribe" : undefined}
+        />
+      )}
     </div>
   );
 }

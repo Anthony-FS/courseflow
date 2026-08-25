@@ -129,3 +129,41 @@ export async function getUserWishlist(supabase, userId) {
     .filter(Boolean);
 }
 
+export async function getUserWishlistCount(supabase, userId) {
+  if (!supabase || !userId) {
+    return 0;
+  }
+
+  try {
+    const { count, data, error } = await supabase
+      .from("wishlists")
+      .select("id", { count: "exact" })
+      .eq("user_id", userId);
+
+    if (error) return 0;
+    if (typeof count === "number" && count > 0) return count;
+    if (Array.isArray(data)) return data.length;
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getUserWishlistCourseIds(supabase, userId) {
+  if (!supabase || !userId) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("wishlists")
+      .select("course_id")
+      .eq("user_id", userId);
+
+    if (error || !data) return [];
+    return data.map((row) => row.course_id).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
