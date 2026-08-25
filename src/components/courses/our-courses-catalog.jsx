@@ -136,7 +136,7 @@ export function OurCoursesCatalog() {
       ) : null}
 
       {status === "loading" && courses.length === 0 ? (
-        <ul className="mt-16 grid grid-cols-3 gap-6 max-[760px]:grid-cols-1">
+        <ul className="mt-16 grid grid-cols-1 gap-6 min-[761px]:grid-cols-3">
           {Array.from({ length: skeletonCount }, (_, index) => (
             <li key={index}>
               <CourseCardSkeleton />
@@ -146,7 +146,7 @@ export function OurCoursesCatalog() {
       ) : null}
 
       {status !== "error" && courses.length > 0 ? (
-        <ul className="mt-16 grid grid-cols-3 gap-6 max-[760px]:grid-cols-1">
+        <ul className="mt-16 grid grid-cols-1 gap-6 min-[761px]:grid-cols-3">
           {courses.map((course) => (
             <li key={course.id}>
               <CourseCard course={course} />
