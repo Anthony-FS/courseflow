@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { AdminPagination } from "@/components/admin/pagination";
@@ -39,16 +39,19 @@ export function OurCoursesCatalog() {
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const pageSizeRef = useRef(null);
 
   useEffect(() => {
     function updatePageSize() {
-      setPageSize((current) => {
-        const next = catalogPageSizeFromWidth(window.innerWidth);
-        if (current !== null && current !== next) {
-          setPage(1);
-        }
-        return next;
-      });
+      const next = catalogPageSizeFromWidth(window.innerWidth);
+      const current = pageSizeRef.current;
+
+      if (current !== null && current !== next) {
+        setPage(1);
+      }
+
+      pageSizeRef.current = next;
+      setPageSize(next);
     }
 
     updatePageSize();
@@ -126,6 +129,7 @@ export function OurCoursesCatalog() {
             type="button"
             className="mt-4 text-body2 font-medium text-blue-500"
             onClick={() => {
+              setErrorMessage("");
               setStatus("loading");
               setReloadKey((key) => key + 1);
             }}

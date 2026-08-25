@@ -60,6 +60,23 @@ describe("GET /api/courses", () => {
     );
   });
 
+  it("returns 500 without querying when the service client is unavailable in production", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    createServiceClient.mockReturnValue(null);
+
+    try {
+      const response = await getCourses();
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body.error).toMatch(/catalog is unavailable/i);
+      expect(getCatalogCourses).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
   it("returns 500 when the catalog query fails", async () => {
     getCatalogCourses.mockRejectedValue(new Error("db down"));
 

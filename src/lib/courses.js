@@ -211,7 +211,7 @@ export function catalogSearchFilter(query) {
   }
 
   const escaped = trimmed
-    .replaceAll(",", " ")
+    .replace(/[(),"]/g, " ")
     .replaceAll("%", "\\%")
     .replaceAll("_", "\\_");
 

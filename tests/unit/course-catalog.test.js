@@ -68,6 +68,12 @@ describe("catalogSearchFilter", () => {
       "title.ilike.%a b%,summary.ilike.%a b%",
     );
   });
+
+  it("strips PostgREST grouping characters from search queries", () => {
+    const filter = catalogSearchFilter('Design (UX) "Basics"');
+
+    expect(filter).not.toMatch(/[()"]/);
+  });
 });
 
 describe("mapCatalogCourse", () => {

@@ -12,7 +12,13 @@ export async function GET(request) {
     return jsonError("Invalid page or page size", 400);
   }
 
-  const supabase = createServiceClient() ?? (await createClient());
+  let supabase = createServiceClient();
+  if (!supabase) {
+    if (process.env.NODE_ENV !== "development") {
+      return jsonError("Course catalog is unavailable", 500);
+    }
+    supabase = await createClient();
+  }
 
   try {
     const result = await getCatalogCourses(supabase, {
