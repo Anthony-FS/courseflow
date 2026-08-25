@@ -75,6 +75,38 @@ describe("getCourseProgress", () => {
       submittedAssignmentIds: [],
     });
   });
+
+  it("merges submitted assignment ids from submissions table", async () => {
+    const supabase = createMockSupabase({
+      progressSelect: [
+        {
+          sub_lesson_id: "s1",
+          visited_at: "2026-01-01T00:00:00.000Z",
+          completed_at: null,
+          assignment_submitted_at: null,
+        },
+      ],
+      assignmentsSelect: [
+        { id: "a1", sub_lesson_id: "s1" },
+        { id: "a2", sub_lesson_id: "s3" },
+      ],
+      submissionsSelect: [
+        {
+          assignment_id: "a1",
+          status: "submitted",
+          submitted_at: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+    });
+
+    await expect(
+      getCourseProgress(supabase, USER.id, COURSE_ID),
+    ).resolves.toEqual({
+      visitedIds: ["s1"],
+      completedIds: [],
+      submittedAssignmentIds: ["s1"],
+    });
+  });
 });
 
 describe("recordSubLessonProgress", () => {

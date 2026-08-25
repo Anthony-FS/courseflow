@@ -46,6 +46,62 @@ function notifyProgress(courseId, { action, subLessonId } = {}) {
   );
 }
 
+/** Optimistic sidebar update before /api/progress finishes. */
+export function notifyAssignmentSubmitted(courseId, subLessonId) {
+  notifyProgress(courseId, {
+    action: "submit_assignment",
+    subLessonId,
+  });
+}
+
+/**
+ * Sub-lesson IDs that already have a real submission row.
+ * Sidebar uses this so Submitted assignments don't stay yellow when
+ * `sub_lesson_progress.assignment_submitted_at` was never synced.
+ */
+async function getSubmittedAssignmentSubLessonIds(supabase, userId, courseId) {
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("assignments")
+    .select("id, sub_lesson_id")
+    .eq("course_id", courseId);
+
+  if (assignmentsError || !Array.isArray(assignments) || assignments.length === 0) {
+    return [];
+  }
+
+  const byAssignmentId = new Map(
+    assignments
+      .filter((row) => row?.id && row?.sub_lesson_id)
+      .map((row) => [row.id, row.sub_lesson_id]),
+  );
+  if (byAssignmentId.size === 0) {
+    return [];
+  }
+
+  const { data: submissions, error: submissionsError } = await supabase
+    .from("submissions")
+    .select("assignment_id, status, submitted_at")
+    .eq("user_id", userId)
+    .in("assignment_id", [...byAssignmentId.keys()]);
+
+  if (submissionsError || !Array.isArray(submissions)) {
+    return [];
+  }
+
+  const submitted = [];
+  for (const row of submissions) {
+    const isSubmitted =
+      row?.submitted_at || row?.status === "submitted";
+    if (!isSubmitted) continue;
+    const subLessonId = byAssignmentId.get(row.assignment_id);
+    if (subLessonId) {
+      submitted.push(subLessonId);
+    }
+  }
+
+  return [...new Set(submitted)];
+}
+
 export async function getCourseProgress(supabase, userId, courseId) {
   const user = String(userId ?? "").trim();
   const course = String(courseId ?? "").trim();
@@ -53,19 +109,41 @@ export async function getCourseProgress(supabase, userId, courseId) {
     return emptyProgress();
   }
 
-  const { data, error } = await supabase
-    .from("sub_lesson_progress")
-    .select(
-      "sub_lesson_id, visited_at, completed_at, assignment_submitted_at",
-    )
-    .eq("user_id", user)
-    .eq("course_id", course);
+  const [{ data, error }, submittedFromSubmissions] = await Promise.all([
+    supabase
+      .from("sub_lesson_progress")
+      .select(
+        "sub_lesson_id, visited_at, completed_at, assignment_submitted_at",
+      )
+      .eq("user_id", user)
+      .eq("course_id", course),
+    getSubmittedAssignmentSubLessonIds(supabase, user, course),
+  ]);
 
   if (error || !Array.isArray(data)) {
-    return emptyProgress();
+    return {
+      ...emptyProgress(),
+      visitedIds: submittedFromSubmissions,
+      submittedAssignmentIds: submittedFromSubmissions,
+    };
   }
 
-  return mapProgressRows(data);
+  const progress = mapProgressRows(data);
+  const submittedAssignmentIds = [
+    ...new Set([
+      ...progress.submittedAssignmentIds,
+      ...submittedFromSubmissions,
+    ]),
+  ];
+  const visitedIds = [
+    ...new Set([...progress.visitedIds, ...submittedAssignmentIds]),
+  ];
+
+  return {
+    ...progress,
+    visitedIds,
+    submittedAssignmentIds,
+  };
 }
 
 async function upsertSubLessonProgress(

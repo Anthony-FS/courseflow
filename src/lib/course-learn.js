@@ -98,13 +98,6 @@ export function learnSubLessonHref(courseCode, subLessonId) {
   return `/courses/${code}/learn?subLessonId=${id}`;
 }
 
-/** Placeholder until learner assignment API exists. */
-export const MOCK_ASSIGNMENT = {
-  question: "What are the 4 elements of service design?",
-  status: "pending",
-  deadlineLabel: "Assign within 2 days",
-};
-
 function isVideoMaterial(row) {
   const type = String(row?.file_type ?? "").toLowerCase();
   return type.startsWith("video/") || type === "video";
@@ -164,6 +157,25 @@ export async function getSubLessonLearningContent(
   };
 }
 
+/** Learner-safe assignment fields (no answer keys). */
+export function mapLearnerAssignment(row) {
+  return {
+    id: row.id,
+    subLessonId: row.sub_lesson_id,
+    title: row.title ?? "",
+    description: row.description ?? "",
+    submissionType: row.submission_type ?? "text",
+    choiceA: row.choice_a ?? "",
+    choiceB: row.choice_b ?? "",
+    choiceC: row.choice_c ?? "",
+    choiceD: row.choice_d ?? "",
+    allowedFileTypes: row.allowed_file_types ?? [],
+    maxFileSizeMb: row.max_file_size_mb ?? 5,
+    answerText: "",
+    correctChoice: "",
+  };
+}
+
 export async function getAssignmentsForCourse(supabase, courseId) {
   const course = String(courseId ?? "").trim();
   if (!supabase || !course) {
@@ -172,19 +184,69 @@ export async function getAssignmentsForCourse(supabase, courseId) {
 
   const { data, error } = await supabase
     .from("assignments")
-    .select("id, sub_lesson_id, title, description")
+    .select(
+      "id, sub_lesson_id, title, description, submission_type, choice_a, choice_b, choice_c, choice_d, allowed_file_types, max_file_size_mb",
+    )
     .eq("course_id", course);
 
   if (error || !Array.isArray(data)) {
     return [];
   }
 
-  return data
-    .filter((row) => row.sub_lesson_id)
-    .map((row) => ({
-      id: row.id,
-      subLessonId: row.sub_lesson_id,
-      question: row.title || row.description || "Assignment",
-      status: "pending",
-    }));
+  return data.filter((row) => row.sub_lesson_id).map(mapLearnerAssignment);
+}
+
+export async function getUserAssignmentSubmission(
+  supabase,
+  userId,
+  assignmentId,
+) {
+  const user = String(userId ?? "").trim();
+  const id = String(assignmentId ?? "").trim();
+  if (!supabase || !user || !id) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("content, status, submitted_at")
+    .eq("assignment_id", id)
+    .eq("user_id", user)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    content: data.content ?? "",
+    status: data.status ?? null,
+    submittedAt: data.submitted_at ?? null,
+  };
+}
+
+/** Attach answer keys only after the learner has submitted. */
+export async function withAssignmentAnswerKeys(supabase, assignment) {
+  if (!supabase || !assignment?.id) {
+    return assignment;
+  }
+
+  const { data, error } = await supabase
+    .from("assignments")
+    .select("answer_text, correct_choice, submission_type")
+    .eq("id", assignment.id)
+    .maybeSingle();
+
+  if (error || !data) {
+    return assignment;
+  }
+
+  const type = data.submission_type ?? assignment.submissionType;
+  return {
+    ...assignment,
+    answerText:
+      type === "text" ? String(data.answer_text ?? "").trim() : "",
+    correctChoice:
+      type === "choice" ? String(data.correct_choice ?? "").trim() : "",
+  };
 }

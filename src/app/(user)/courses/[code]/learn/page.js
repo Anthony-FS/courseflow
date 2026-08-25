@@ -8,7 +8,9 @@ import {
   flattenSubLessons,
   getAssignmentsForCourse,
   getSubLessonLearningContent,
+  getUserAssignmentSubmission,
   resolveActiveSubLesson,
+  withAssignmentAnswerKeys,
 } from "@/lib/course-learn";
 import { getCourseProgress } from "@/lib/course-learn-progress";
 import { getCourseByCode } from "@/lib/courses";
@@ -83,9 +85,24 @@ export default async function CourseLearnPage({ params, searchParams }) {
   const assignmentSubLessonIds = courseAssignments.map(
     (assignment) => assignment.subLessonId,
   );
-  const activeAssignment =
+  let activeAssignment =
     courseAssignments.find((assignment) => assignment.subLessonId === active.id) ??
     null;
+  let activeSubmission = null;
+
+  if (activeAssignment) {
+    activeSubmission = await getUserAssignmentSubmission(
+      supabase,
+      user.id,
+      activeAssignment.id,
+    );
+    if (activeSubmission) {
+      activeAssignment = await withAssignmentAnswerKeys(
+        catalog,
+        activeAssignment,
+      );
+    }
+  }
 
   return (
     <main className="flex flex-1 flex-col bg-white">
@@ -111,6 +128,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
             coverUrl={course.coverUrl}
             videoUrl={subLessonContent?.videoUrl ?? null}
             assignment={activeAssignment}
+            submission={activeSubmission}
             courseId={course.id}
             subLessonId={active.id}
           />

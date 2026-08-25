@@ -7,6 +7,7 @@ function LessonContent({
   coverUrl,
   videoUrl = null,
   assignment = null,
+  submission = null,
   courseId,
   subLessonId,
 }) {
@@ -27,10 +28,10 @@ function LessonContent({
 
         {assignment ? (
           <LessonAssignment
+            key={assignment.id}
             className="mt-8"
-            question={assignment.question}
-            status={assignment.status}
-            deadlineLabel={assignment.deadlineLabel}
+            assignment={assignment}
+            submission={submission}
             courseId={courseId}
             subLessonId={subLessonId}
           />
