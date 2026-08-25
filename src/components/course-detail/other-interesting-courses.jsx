@@ -1,25 +1,8 @@
-function CourseCardPlaceholder() {
-  return (
-    <article className="overflow-hidden rounded-lg bg-white shadow-card">
-      <div className="aspect-16/10 bg-gray-200" aria-hidden />
-      <div className="p-6">
-        <p className="text-body3 font-medium text-orange-500">Course</p>
-        <div className="mt-2 h-7 w-3/4 rounded bg-gray-200" />
-        <div className="mt-3 space-y-2">
-          <div className="h-4 w-full rounded bg-gray-200" />
-          <div className="h-4 w-5/6 rounded bg-gray-200" />
-        </div>
-      </div>
-      <div className="mx-6 h-px bg-gray-300" />
-      <div className="flex items-center gap-6 px-6 py-4">
-        <div className="h-4 w-20 rounded bg-gray-200" />
-        <div className="h-4 w-20 rounded bg-gray-200" />
-      </div>
-    </article>
-  );
-}
+import { WishlistCard } from "@/components/wishlist/wishlist-card";
 
-function OtherInterestingCourses() {
+function OtherInterestingCourses({ courses = [] }) {
+  const list = Array.isArray(courses) ? courses.slice(0, 3) : [];
+
   return (
     <section
       className="bg-gray-100 py-16"
@@ -32,13 +15,23 @@ function OtherInterestingCourses() {
         >
           Other Interesting Courses
         </h2>
-        <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }, (_, index) => (
-            <li key={index}>
-              <CourseCardPlaceholder />
-            </li>
-          ))}
-        </ul>
+
+        {list.length === 0 ? (
+          <p className="mt-10 text-center text-body2 text-gray-700">
+            No other courses available yet.
+          </p>
+        ) : (
+          <ul className="mt-10 flex flex-wrap justify-center gap-6">
+            {list.map((course) => (
+              <li
+                key={course.id}
+                className="flex w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
+              >
+                <WishlistCard course={course} />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

@@ -11,7 +11,11 @@ import { ModuleSamples } from "@/components/course-detail/module-samples";
 import { OtherInterestingCourses } from "@/components/course-detail/other-interesting-courses";
 import { CourseAttachmentSection } from "@/components/course-detail/subscribed-actions";
 import { getSessionUser } from "@/lib/auth";
-import { getCourseAttachment, getCourseByCode } from "@/lib/courses";
+import {
+  getCourseAttachment,
+  getCourseByCode,
+  getOtherInterestingCourses,
+} from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isCourseWishlisted } from "@/lib/wishlist";
@@ -50,11 +54,17 @@ export default async function CourseDetailPage({ params }) {
   }
 
   const catalog = catalogClient(supabase);
-  const [inWishlist, isSubscribed, attachment] = await Promise.all([
-    isCourseWishlisted(supabase, user.id, course.id),
-    isCourseEnrolled(catalog, user.id, course.id),
-    getCourseAttachment(catalog, course.id),
-  ]);
+  const [inWishlist, isSubscribed, attachment, otherCourses] =
+    await Promise.all([
+      isCourseWishlisted(supabase, user.id, course.id),
+      isCourseEnrolled(catalog, user.id, course.id),
+      getCourseAttachment(catalog, course.id),
+      getOtherInterestingCourses(catalog, {
+        excludeCourseId: course.id,
+        userId: user.id,
+        limit: 3,
+      }),
+    ]);
 
   return (
     <>
@@ -119,7 +129,7 @@ export default async function CourseDetailPage({ params }) {
         summary={course.summary}
         title={course.title}
       />
-      <OtherInterestingCourses />
+      <OtherInterestingCourses courses={otherCourses} />
     </>
   );
 }
