@@ -5,12 +5,13 @@ export function createMockSupabase({
   courseId = "course-test-id",
   lessonsSelect = null,
   assignmentsSelect = null,
-  enrollmentsSelect = null,
   submissionsSelect = null,
   courseSelect = null,
   promoSelect = null,
   materialsSelect = null,
   wishlistsSelect = null,
+  progressSelect = null,
+  subLessonsSelect = null,
   insertErrors = {},
   updateErrors = {},
 } = {}) {
@@ -41,15 +42,23 @@ export function createMockSupabase({
         ? assignmentsSelect
         : [assignmentsSelect];
     }
+    if (table === "submissions" && submissionsSelect !== null) {
+      return Array.isArray(submissionsSelect)
+        ? submissionsSelect
+        : [submissionsSelect];
+    }
     if (table === "enrollments" && enrollmentsSelect !== null) {
       return Array.isArray(enrollmentsSelect)
         ? enrollmentsSelect
         : [enrollmentsSelect];
     }
-    if (table === "submissions" && submissionsSelect !== null) {
-      return Array.isArray(submissionsSelect)
-        ? submissionsSelect
-        : [submissionsSelect];
+    if (table === "sub_lesson_progress" && progressSelect !== null) {
+      return Array.isArray(progressSelect) ? progressSelect : [progressSelect];
+    }
+    if (table === "sub_lessons" && subLessonsSelect !== null) {
+      return Array.isArray(subLessonsSelect)
+        ? subLessonsSelect
+        : [subLessonsSelect];
     }
     return [];
   }
@@ -71,6 +80,9 @@ export function createMockSupabase({
     }
     if (filter.op === "is") {
       return filter.value === null ? value == null : value === filter.value;
+    }
+    if (filter.op === "in") {
+      return Array.isArray(filter.value) && filter.value.includes(value);
     }
     return true;
   }
@@ -99,6 +111,10 @@ export function createMockSupabase({
         },
         is(column, value) {
           filters.push({ op: "is", column, value });
+          return chain;
+        },
+        in(column, value) {
+          filters.push({ op: "in", column, value });
           return chain;
         },
         limit() {
