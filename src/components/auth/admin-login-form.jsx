@@ -1,11 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+
+function resolveAdminNextPath(nextParam) {
+  if (
+    typeof nextParam === "string" &&
+    nextParam.startsWith("/admin") &&
+    nextParam !== "/admin/login" &&
+    !nextParam.startsWith("//")
+  ) {
+    return nextParam;
+  }
+  return "/admin/courses";
+}
 
 function validateEmail(email) {
   const value = email.trim();
@@ -52,6 +64,7 @@ function FieldError({ id, message }) {
 
 export function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -111,7 +124,7 @@ export function AdminLoginForm() {
         .maybeSingle();
 
       const isAdmin =
-        profile?.role === "admin" && profile?.is_active !== false;
+        profile?.role === "admin" && profile?.is_active === true;
 
       if (!isAdmin) {
         await supabase.auth.signOut();
@@ -121,7 +134,7 @@ export function AdminLoginForm() {
         return;
       }
 
-      router.push("/admin/courses");
+      router.push(resolveAdminNextPath(searchParams.get("next")));
       router.refresh();
     } catch {
       const message = "Login failed. Please try again.";

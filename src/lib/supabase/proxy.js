@@ -1,8 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
-/** Temporary: allow /admin pages without login until admin auth UI exists. */
-const TEMP_DISABLE_ADMIN_PAGE_PROTECTION = true;
+function isSafeAdminNextPath(pathname) {
+  return (
+    typeof pathname === "string" &&
+    pathname.startsWith("/admin") &&
+    pathname !== "/admin/login" &&
+    !pathname.startsWith("//")
+  );
+}
 
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({
@@ -43,10 +49,6 @@ export async function updateSession(request) {
   // and getClaims() or users may be randomly logged out.
   await supabase.auth.getClaims();
 
-  if (TEMP_DISABLE_ADMIN_PAGE_PROTECTION) {
-    return supabaseResponse;
-  }
-
   const pathname = request.nextUrl.pathname;
   const isAdminPage =
     pathname === "/admin" || pathname.startsWith("/admin/");
@@ -59,6 +61,30 @@ export async function updateSession(request) {
     } = await supabase.auth.getUser();
 
     if (pathname === "/admin/login") {
+      if (!user) {
+        return supabaseResponse;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, is_active")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const isAdmin =
+        profile?.role === "admin" && profile?.is_active === true;
+
+      if (isAdmin) {
+        const nextPath = request.nextUrl.searchParams.get("next");
+        const destination = isSafeAdminNextPath(nextPath)
+          ? nextPath
+          : "/admin/courses";
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = destination;
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
+      }
+
       return supabaseResponse;
     }
 
