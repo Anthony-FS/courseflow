@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Plus, X } from "lucide-react";
+import { CircleAlert, Play, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CourseLessonsSection } from "@/components/course-lessons-section";
 import {
   createAdminCourse,
@@ -14,6 +21,7 @@ import {
   updateAdminCourse,
   uploadAdminFile,
 } from "@/lib/admin-courses";
+import { validateUpload } from "@/lib/admin-uploads";
 import {
   COURSE_LIMITS,
   EMPTY_FIELD_MESSAGE,
@@ -22,6 +30,7 @@ import {
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
+import { resolveCoverUrl, resolveTrailerUrl } from "@/lib/courses";
 import {
   clampPercentDiscount,
   digitsOnly,
@@ -168,13 +177,53 @@ function UploadBox({
   accept,
   file,
   existingName,
+  existingUrl,
   onChange,
   error,
   size = "default",
+  preview = "file",
 }) {
   const inputRef = useRef(null);
+  const [objectUrl, setObjectUrl] = useState(null);
   const displayName = file?.name || existingName;
-  const hasMedia = Boolean(displayName);
+  const hasMedia = Boolean(displayName || objectUrl || existingUrl);
+
+  useEffect(() => {
+    if (!(file instanceof Blob)) {
+      setObjectUrl(null);
+      return undefined;
+    }
+
+    const nextUrl = URL.createObjectURL(file);
+    setObjectUrl(nextUrl);
+    return () => {
+      URL.revokeObjectURL(nextUrl);
+    };
+  }, [file]);
+
+  const resolvedExistingUrl = existingUrl
+    ? preview === "image"
+      ? resolveCoverUrl(existingUrl)
+      : preview === "video"
+        ? resolveTrailerUrl(existingUrl)
+        : existingUrl
+    : null;
+
+  const previewSrc = objectUrl || resolvedExistingUrl || null;
+  const showImagePreview = preview === "image" && Boolean(previewSrc);
+  const showVideoPreview = preview === "video" && Boolean(previewSrc);
+  const hasPreviewMedia = showImagePreview || showVideoPreview;
+
+  const tooltipLabel =
+    preview === "image"
+      ? hasMedia
+        ? "Change cover"
+        : "Add"
+      : preview === "video"
+        ? hasMedia
+          ? "Change trailer"
+          : "Add"
+        : null;
 
   function handleClear(event) {
     event.preventDefault();
@@ -185,6 +234,64 @@ function UploadBox({
     onChange(null);
   }
 
+  function handleFileChange(event) {
+    const nextFile = event.target.files?.[0] ?? null;
+    const accepted = onChange(nextFile);
+    if (accepted === false && inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
+  const uploadButton = (
+    <button
+      type="button"
+      onClick={() => inputRef.current?.click()}
+      aria-invalid={error || undefined}
+      aria-describedby={error ? `${id}-error` : undefined}
+      className={cn(
+        "relative flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border bg-gray-100 text-body3 text-blue-500 transition-colors",
+        "hover:border-blue-300 hover:bg-blue-100",
+        "focus-visible:outline-none focus-visible:shadow-focus",
+        size === "sm" ? "size-36" : "size-44",
+        !error && "border-gray-300",
+        hasPreviewMedia && "p-0 hover:bg-gray-100",
+      )}
+      style={error ? { borderColor: ERROR_COLOR } : undefined}
+    >
+      {showImagePreview ? (
+        <img
+          src={previewSrc}
+          alt={displayName || "Cover preview"}
+          className="absolute inset-0 size-full object-cover"
+        />
+      ) : null}
+
+      {showVideoPreview ? (
+        <>
+          <video
+            src={previewSrc}
+            className="absolute inset-0 size-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+          />
+          <span className="relative z-10 grid size-10 place-items-center rounded-full bg-white/95 text-blue-500 shadow-card">
+            <Play className="size-5 fill-blue-500" aria-hidden />
+          </span>
+        </>
+      ) : null}
+
+      {!showImagePreview && !showVideoPreview ? (
+        <>
+          <Plus className="size-6 stroke-[1.75]" aria-hidden />
+          <span className="max-w-32 truncate px-2">
+            {displayName || label}
+          </span>
+        </>
+      ) : null}
+    </button>
+  );
+
   return (
     <div>
       <div className="relative inline-block">
@@ -194,33 +301,24 @@ function UploadBox({
           type="file"
           accept={accept}
           className="sr-only"
-          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+          onChange={handleFileChange}
         />
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          aria-invalid={error || undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className={cn(
-            "flex flex-col items-center justify-center gap-2 rounded-lg border bg-gray-100 text-body3 text-blue-500 transition-colors",
-            "hover:border-blue-300 hover:bg-blue-100",
-            "focus-visible:outline-none focus-visible:shadow-focus",
-            size === "sm" ? "size-36" : "size-44",
-            !error && "border-gray-300"
-          )}
-          style={error ? { borderColor: ERROR_COLOR } : undefined}
-        >
-          <Plus className="size-6 stroke-[1.75]" aria-hidden />
-          <span className="max-w-32 truncate px-2">
-            {displayName || label}
-          </span>
-        </button>
+        {tooltipLabel ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>{uploadButton}</TooltipTrigger>
+              <TooltipContent side="right">{tooltipLabel}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          uploadButton
+        )}
         {hasMedia ? (
           <button
             type="button"
             onClick={handleClear}
-            aria-label={`Remove ${displayName}`}
-            className="absolute -top-1.5 -right-1.5 z-10 flex size-6 items-center justify-center rounded-full border border-gray-400 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus-visible:outline-none focus-visible:shadow-focus"
+            aria-label={`Remove ${displayName || "file"}`}
+            className="absolute -top-1.5 -right-1.5 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full border border-gray-400 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus-visible:outline-none focus-visible:shadow-focus"
           >
             <X className="size-3.5" aria-hidden />
           </button>
@@ -390,6 +488,20 @@ function AddCourseForm({
     });
   }
 
+  function acceptSelectedUpload(kind, file) {
+    if (!file) {
+      return true;
+    }
+
+    const result = validateUpload(kind, file);
+    if (!result.ok) {
+      toast.error(result.message);
+      return false;
+    }
+
+    return true;
+  }
+
   function updateField(field, value) {
     if (useDraft) {
       draftContent.setDraft((current) => ({
@@ -545,9 +657,11 @@ function AddCourseForm({
       if (err?.fields && typeof err.fields === "object") {
         setErrors((current) => ({ ...current, ...err.fields }));
       }
-      setSubmitError(
-        err.message || (isEdit ? "Failed to update course" : "Failed to create course"),
-      );
+      const message =
+        err.message ||
+        (isEdit ? "Failed to update course" : "Failed to create course");
+      toast.error(message);
+      setSubmitError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -858,11 +972,22 @@ function AddCourseForm({
                 accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 file={coverImage}
                 existingName={existingCover?.name}
+                existingUrl={existingCover?.url}
+                preview="image"
                 error={errors.coverImage}
                 onChange={(file) => {
+                  if (!file) {
+                    patchDraft({ coverImage: null });
+                    setExistingCover(null);
+                    clearError("coverImage");
+                    return true;
+                  }
+                  if (!acceptSelectedUpload("cover", file)) {
+                    return false;
+                  }
                   patchDraft({ coverImage: file });
-                  if (!file) setExistingCover(null);
                   clearError("coverImage");
+                  return true;
                 }}
               />
             </div>
@@ -882,19 +1007,35 @@ function AddCourseForm({
                 accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
                 file={videoTrailer}
                 existingName={existingTrailer?.name}
+                existingUrl={existingTrailer?.url}
+                preview="video"
                 error={errors.videoTrailer}
                 onChange={(file) => {
+                  if (!file) {
+                    patchDraft({ videoTrailer: null });
+                    setExistingTrailer(null);
+                    clearError("videoTrailer");
+                    return true;
+                  }
+                  if (!acceptSelectedUpload("trailer", file)) {
+                    return false;
+                  }
                   patchDraft({ videoTrailer: file });
-                  if (!file) setExistingTrailer(null);
                   clearError("videoTrailer");
+                  return true;
                 }}
               />
             </div>
 
             <div className="space-y-3">
-              <p className="text-body3 font-medium text-gray-900">
-                Attach File (Optional)
-              </p>
+              <div>
+                <p className="text-body3 font-medium text-gray-900">
+                  Attach File (Optional)
+                </p>
+                <p className="mt-1 text-body4 text-gray-600">
+                  Supported file types: any. Max file size: 20 MB
+                </p>
+              </div>
               <UploadBox
                 id="attach-file"
                 label="Upload file"
@@ -902,8 +1043,16 @@ function AddCourseForm({
                 file={attachment}
                 existingName={existingAttachment?.name}
                 onChange={(file) => {
+                  if (!file) {
+                    patchDraft({ attachment: null });
+                    setExistingAttachment(null);
+                    return true;
+                  }
+                  if (!acceptSelectedUpload("attachment", file)) {
+                    return false;
+                  }
                   patchDraft({ attachment: file });
-                  if (!file) setExistingAttachment(null);
+                  return true;
                 }}
                 size="sm"
               />
