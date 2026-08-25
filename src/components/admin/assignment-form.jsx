@@ -27,6 +27,13 @@ const FILE_TYPE_OPTIONS = [
   { id: "image", label: "Image" },
 ];
 
+const SUBMISSION_TYPE_OPTIONS = [
+  { id: "text", label: "Text" },
+  { id: "file", label: "File upload" },
+  { id: "url", label: "URL" },
+  { id: "choice", label: "4 choice answer" },
+];
+
 const MAX_SIZE_OPTIONS = [5, 10, 20, 50];
 
 const INITIAL_FORM = {
@@ -48,9 +55,6 @@ const INITIAL_FORM = {
 
 const CHOICE_OPTIONS = ["A", "B", "C", "D"];
 
-const selectClassName =
-  "h-12 w-full rounded-lg border border-gray-400 bg-white px-3 text-body2 outline-none focus:border-orange-100 disabled:bg-gray-100 disabled:text-gray-500";
-
 function FieldError({ id, message }) {
   if (!message) return null;
 
@@ -63,40 +67,6 @@ function FieldError({ id, message }) {
     >
       {message}
     </p>
-  );
-}
-
-function NativeSelect({ id, value, error, className, children, ...props }) {
-  const hasError = Boolean(error);
-
-  return (
-    <div>
-      <div className="relative">
-        <select
-          id={id}
-          value={value}
-          aria-invalid={hasError || undefined}
-          aria-describedby={hasError ? `${id}-error` : undefined}
-          className={cn(selectClassName, hasError && "pr-10", className)}
-          {...props}
-          style={
-            hasError
-              ? { borderColor: ERROR_COLOR, boxShadow: "none" }
-              : undefined
-          }
-        >
-          {children}
-        </select>
-        {hasError ? (
-          <CircleAlert
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2"
-            style={{ color: ERROR_COLOR }}
-          />
-        ) : null}
-      </div>
-      <FieldError id={`${id}-error`} message={error} />
-    </div>
   );
 }
 
@@ -619,18 +589,15 @@ export default function AssignmentForm({ assignmentId = null }) {
             >
               Submission
             </label>
-            <NativeSelect
+            <MenuSelect
               id="assignment-submission"
               value={form.submissionType}
-              onChange={(event) =>
-                handleSubmissionTypeChange(event.target.value)
-              }
-            >
-              <option value="text">Text</option>
-              <option value="file">File upload</option>
-              <option value="url">URL</option>
-              <option value="choice">4 choice answer</option>
-            </NativeSelect>
+              placeholder="Select submission type"
+              open={openMenu === "submission"}
+              onOpenChange={(open) => setOpenMenu(open ? "submission" : null)}
+              onChange={handleSubmissionTypeChange}
+              options={SUBMISSION_TYPE_OPTIONS}
+            />
           </div>
 
           {form.submissionType === "text" ? (
@@ -771,19 +738,18 @@ export default function AssignmentForm({ assignmentId = null }) {
 
               <label className="block max-w-xs">
                 <span className="mb-1.5 block text-body2">Max file size</span>
-                <NativeSelect
+                <MenuSelect
                   id="assignment-max-size"
                   value={String(form.maxFileSizeMb)}
-                  onChange={(event) =>
-                    setField("maxFileSizeMb", Number(event.target.value))
-                  }
-                >
-                  {MAX_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size} MB
-                    </option>
-                  ))}
-                </NativeSelect>
+                  placeholder="Select max file size"
+                  open={openMenu === "max-size"}
+                  onOpenChange={(open) => setOpenMenu(open ? "max-size" : null)}
+                  onChange={(size) => setField("maxFileSizeMb", Number(size))}
+                  options={MAX_SIZE_OPTIONS.map((size) => ({
+                    id: String(size),
+                    label: `${size} MB`,
+                  }))}
+                />
               </label>
             </>
           ) : null}
