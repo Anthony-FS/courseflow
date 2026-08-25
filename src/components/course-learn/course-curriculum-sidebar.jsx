@@ -12,15 +12,16 @@ import {
 } from "@/lib/course-learn";
 import {
   markSubLessonVisited,
-  readCompletedSubLessonIds,
-  readSubmittedAssignmentSubLessonIds,
-  readVisitedSubLessonIds,
   SUB_LESSON_PROGRESS_EVENT,
 } from "@/lib/course-learn-progress";
 import { cn } from "@/lib/utils";
 
 function formatModuleNumber(index) {
   return String(index + 1).padStart(2, "0");
+}
+
+function uniqueIds(ids) {
+  return [...new Set((ids ?? []).filter(Boolean))];
 }
 
 /**
@@ -38,6 +39,9 @@ function CourseCurriculumSidebar({
   lessons = [],
   activeSubLessonId,
   assignmentSubLessonIds = [],
+  initialVisitedIds = [],
+  initialCompletedIds = [],
+  initialSubmittedAssignmentIds = [],
 }) {
   const activeLessonId =
     lessons.find((lesson) =>
@@ -45,27 +49,100 @@ function CourseCurriculumSidebar({
     )?.id ?? lessons[0]?.id ?? null;
 
   const [openId, setOpenId] = useState(activeLessonId);
-  const [completedIds, setCompletedIds] = useState([]);
-  const [visitedIds, setVisitedIds] = useState([]);
-  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState([]);
+  const [completedIds, setCompletedIds] = useState(() =>
+    uniqueIds(initialCompletedIds),
+  );
+  const [visitedIds, setVisitedIds] = useState(() =>
+    uniqueIds([
+      ...initialVisitedIds,
+      ...(activeSubLessonId ? [activeSubLessonId] : []),
+    ]),
+  );
+  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState(() =>
+    uniqueIds(initialSubmittedAssignmentIds),
+  );
 
   useEffect(() => {
-    function loadProgress(event) {
+    setCompletedIds(uniqueIds(initialCompletedIds));
+    setVisitedIds(
+      uniqueIds([
+        ...initialVisitedIds,
+        ...(activeSubLessonId ? [activeSubLessonId] : []),
+      ]),
+    );
+    setSubmittedAssignmentIds(uniqueIds(initialSubmittedAssignmentIds));
+  }, [
+    activeSubLessonId,
+    // Serialize so server-fetched arrays don't thrash on identity.
+    initialCompletedIds.join("|"),
+    initialSubmittedAssignmentIds.join("|"),
+    initialVisitedIds.join("|"),
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncVisit() {
+      if (!courseId || !activeSubLessonId) {
+        return;
+      }
+
+      setVisitedIds((current) =>
+        current.includes(activeSubLessonId)
+          ? current
+          : [...current, activeSubLessonId],
+      );
+
+      try {
+        await markSubLessonVisited(courseId, activeSubLessonId);
+      } catch {
+        if (!cancelled) {
+          // Keep optimistic visited state for the current session.
+        }
+      }
+    }
+
+    syncVisit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, activeSubLessonId]);
+
+  useEffect(() => {
+    function handleProgressEvent(event) {
       if (event?.detail?.courseId && event.detail.courseId !== courseId) {
         return;
       }
-      setCompletedIds(readCompletedSubLessonIds(courseId));
-      setVisitedIds(readVisitedSubLessonIds(courseId));
-      setSubmittedAssignmentIds(readSubmittedAssignmentSubLessonIds(courseId));
+
+      const subLessonId = event?.detail?.subLessonId;
+      const action = event?.detail?.action;
+      if (!subLessonId || !action) {
+        return;
+      }
+
+      if (action === "visit" || action === "complete" || action === "submit_assignment") {
+        setVisitedIds((current) =>
+          current.includes(subLessonId) ? current : [...current, subLessonId],
+        );
+      }
+      if (action === "complete") {
+        setCompletedIds((current) =>
+          current.includes(subLessonId) ? current : [...current, subLessonId],
+        );
+      }
+      if (action === "submit_assignment") {
+        setSubmittedAssignmentIds((current) =>
+          current.includes(subLessonId) ? current : [...current, subLessonId],
+        );
+      }
     }
 
-    markSubLessonVisited(courseId, activeSubLessonId);
-    loadProgress();
-    window.addEventListener(SUB_LESSON_PROGRESS_EVENT, loadProgress);
+    window.addEventListener(SUB_LESSON_PROGRESS_EVENT, handleProgressEvent);
     return () => {
-      window.removeEventListener(SUB_LESSON_PROGRESS_EVENT, loadProgress);
+      window.removeEventListener(SUB_LESSON_PROGRESS_EVENT, handleProgressEvent);
     };
-  }, [courseId, activeSubLessonId]);
+  }, [courseId]);
 
   const lessonsWithStatus = withMockLessonStatuses(
     lessons,

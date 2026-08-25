@@ -10,6 +10,7 @@ import {
   getSubLessonLearningContent,
   resolveActiveSubLesson,
 } from "@/lib/course-learn";
+import { getCourseProgress } from "@/lib/course-learn-progress";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -71,12 +72,13 @@ export default async function CourseLearnPage({ params, searchParams }) {
     );
   }
 
-  const [subLessonContent, courseAssignments] = await Promise.all([
+  const [subLessonContent, courseAssignments, progress] = await Promise.all([
     getSubLessonLearningContent(catalog, {
       courseId: course.id,
       subLessonId: active.id,
     }),
     getAssignmentsForCourse(catalog, course.id),
+    getCourseProgress(supabase, user.id, course.id),
   ]);
   const assignmentSubLessonIds = courseAssignments.map(
     (assignment) => assignment.subLessonId,
@@ -98,6 +100,9 @@ export default async function CourseLearnPage({ params, searchParams }) {
             lessons={course.lessons}
             activeSubLessonId={active.id}
             assignmentSubLessonIds={assignmentSubLessonIds}
+            initialVisitedIds={progress.visitedIds}
+            initialCompletedIds={progress.completedIds}
+            initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
           />
 
           <LessonContent

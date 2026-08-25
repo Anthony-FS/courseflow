@@ -22,10 +22,14 @@ function LessonAssignment({
   const [answer, setAnswer] = useState("");
   const [notice, setNotice] = useState("");
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    markAssignmentSubmitted(courseId, subLessonId);
-    setNotice("Assignment submit will be available soon.");
+    try {
+      await markAssignmentSubmitted(courseId, subLessonId);
+      setNotice("Assignment submitted.");
+    } catch (error) {
+      setNotice(error.message || "Failed to submit assignment.");
+    }
   }
 
   return (
