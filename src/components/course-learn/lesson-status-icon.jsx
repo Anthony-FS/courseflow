@@ -31,6 +31,20 @@ function LessonStatusIcon({ status = "not-started", className }) {
     );
   }
 
+  if (status === "pending-assignment") {
+    return (
+      <span
+        className={cn(
+          "relative size-5 shrink-0 overflow-hidden rounded-full border-2 border-orange-100",
+          className,
+        )}
+        aria-label="Assignment pending"
+      >
+        <span className="absolute inset-y-0 left-0 w-1/2 bg-orange-100" />
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn(

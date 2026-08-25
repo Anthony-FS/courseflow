@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { markAssignmentSubmitted } from "@/lib/course-learn-progress";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +15,8 @@ function LessonAssignment({
   question,
   status = "pending",
   deadlineLabel,
+  courseId,
+  subLessonId,
   className,
 }) {
   const [answer, setAnswer] = useState("");
@@ -21,6 +24,7 @@ function LessonAssignment({
 
   function handleSubmit(event) {
     event.preventDefault();
+    markAssignmentSubmitted(courseId, subLessonId);
     setNotice("Assignment submit will be available soon.");
   }
 

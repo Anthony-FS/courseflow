@@ -37,24 +37,42 @@ export function resolveActiveSubLesson(flatSubLessons, subLessonId) {
 }
 
 /**
- * Temporary status map until `sub_lesson_progress` is wired:
- * before active → completed, active → in-progress, after → not-started.
+ * Status from Next Lesson completions and assignment visits:
+ * completed stays completed when revisited (unless an assignment is still open);
+ * yellow pending-assignment only after the student has visited the lesson;
+ * unvisited lessons stay not-started (empty green), even if they have an assignment.
  */
-export function withMockLessonStatuses(lessons, activeSubLessonId) {
-  const flat = flattenSubLessons(lessons);
-  const activeIndex = flat.findIndex((item) => item.id === activeSubLessonId);
-  const pivot = activeIndex >= 0 ? activeIndex : 0;
+export function withMockLessonStatuses(
+  lessons,
+  activeSubLessonId,
+  completedIds = [],
+  {
+    visitedIds = [],
+    assignmentSubLessonIds = [],
+    submittedAssignmentSubLessonIds = [],
+  } = {},
+) {
+  const completed = new Set(completedIds);
+  const visited = new Set(visitedIds);
+  const hasAssignment = new Set(assignmentSubLessonIds);
+  const assignmentSubmitted = new Set(submittedAssignmentSubLessonIds);
 
   return (lessons ?? []).map((lesson) => ({
     ...lesson,
     subLessons: (lesson.subLessons ?? []).map((subLesson) => {
-      const index = flat.findIndex((item) => item.id === subLesson.id);
+      const id = subLesson.id;
+      const assignmentOpen =
+        hasAssignment.has(id) && !assignmentSubmitted.has(id);
       let status = "not-started";
-      if (index >= 0 && index < pivot) {
+
+      if (visited.has(id) && assignmentOpen) {
+        status = "pending-assignment";
+      } else if (completed.has(id)) {
         status = "completed";
-      } else if (index === pivot) {
+      } else if (id === activeSubLessonId && !assignmentOpen) {
         status = "in-progress";
       }
+
       return { ...subLesson, status };
     }),
   }));
@@ -141,4 +159,29 @@ export async function getSubLessonLearningContent(
       : null,
     videoName: videoMaterial?.name ?? "",
   };
+}
+
+export async function getAssignmentsForCourse(supabase, courseId) {
+  const course = String(courseId ?? "").trim();
+  if (!supabase || !course) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("assignments")
+    .select("id, sub_lesson_id, title, description")
+    .eq("course_id", course);
+
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .filter((row) => row.sub_lesson_id)
+    .map((row) => ({
+      id: row.id,
+      subLessonId: row.sub_lesson_id,
+      question: row.title || row.description || "Assignment",
+      status: "pending",
+    }));
 }

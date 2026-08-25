@@ -1,10 +1,20 @@
+"use client";
+
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { markSubLessonCompleted } from "@/lib/course-learn-progress";
 import { learnSubLessonHref } from "@/lib/course-learn";
 import { cn } from "@/lib/utils";
 
-function LessonNav({ courseCode, previous, next, className }) {
+function LessonNav({
+  courseId,
+  courseCode,
+  currentSubLessonId,
+  previous,
+  next,
+  className,
+}) {
   return (
     <nav
       aria-label="Lesson navigation"
@@ -27,7 +37,12 @@ function LessonNav({ courseCode, previous, next, className }) {
       <div className="flex shrink-0 justify-end">
         {next ? (
           <Button asChild size="sm" className="min-h-12 px-6">
-            <Link href={learnSubLessonHref(courseCode, next.id)}>
+            <Link
+              href={learnSubLessonHref(courseCode, next.id)}
+              onClick={() =>
+                markSubLessonCompleted(courseId, currentSubLessonId)
+              }
+            >
               Next Lesson
             </Link>
           </Button>
