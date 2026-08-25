@@ -1,7 +1,10 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import {
+  SUBMISSION_TYPES,
+  assignmentAnswerColumns,
+} from "@/lib/assignment-validation";
 
-const SUBMISSION_TYPES = ["text", "file", "url"];
 const FILE_TYPES = ["pdf", "doc", "image"];
 const MAX_FILE_SIZES = [5, 10, 20, 50];
 
@@ -66,6 +69,13 @@ export async function POST(request) {
     storedMaxSize = maxFileSizeMb;
   }
 
+  const { columns: answerColumns, error: answerError } =
+    assignmentAnswerColumns(submissionType, body);
+
+  if (answerError) {
+    return jsonError(answerError, 400);
+  }
+
   const { data, error: insertError } = await supabase
     .from("assignments")
     .insert({
@@ -76,6 +86,7 @@ export async function POST(request) {
       submission_type: submissionType,
       allowed_file_types: storedFileTypes,
       max_file_size_mb: storedMaxSize,
+      ...answerColumns,
     })
     .select("id")
     .single();
