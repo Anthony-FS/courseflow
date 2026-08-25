@@ -1,6 +1,21 @@
 import { requireUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
-import { enrollUserInCourse } from "@/lib/enrollments";
+import {
+  enrollUserInCourse,
+  getUserEnrolledCourses,
+} from "@/lib/enrollments";
+
+export async function GET() {
+  const { supabase, user, error } = await requireUser();
+  if (error) return error;
+
+  try {
+    const courses = await getUserEnrolledCourses(supabase, user.id);
+    return jsonOk({ courses });
+  } catch (loadError) {
+    return jsonError(loadError.message || "Failed to load enrolled courses", 500);
+  }
+}
 
 export async function POST(request) {
   const { supabase, user, error } = await requireUser();
