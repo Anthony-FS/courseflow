@@ -38,7 +38,15 @@ const INITIAL_FORM = {
   submissionType: "text",
   allowedFileTypes: [],
   maxFileSizeMb: 20,
+  answerText: "",
+  choiceA: "",
+  choiceB: "",
+  choiceC: "",
+  choiceD: "",
+  correctChoice: "",
 };
+
+const CHOICE_OPTIONS = ["A", "B", "C", "D"];
 
 const selectClassName =
   "h-12 w-full rounded-lg border border-gray-400 bg-white px-3 text-body2 outline-none focus:border-orange-100 disabled:bg-gray-100 disabled:text-gray-500";
@@ -244,6 +252,12 @@ export default function AssignmentForm({ assignmentId = null }) {
           submissionType: assignment.submissionType,
           allowedFileTypes: assignment.allowedFileTypes,
           maxFileSizeMb: assignment.maxFileSizeMb,
+          answerText: assignment.answerText ?? "",
+          choiceA: assignment.choiceA ?? "",
+          choiceB: assignment.choiceB ?? "",
+          choiceC: assignment.choiceC ?? "",
+          choiceD: assignment.choiceD ?? "",
+          correctChoice: assignment.correctChoice ?? "",
         });
       })
       .catch((error) => {
@@ -361,8 +375,22 @@ export default function AssignmentForm({ assignmentId = null }) {
       submissionType,
       allowedFileTypes: [],
       maxFileSizeMb: 20,
+      answerText: "",
+      choiceA: "",
+      choiceB: "",
+      choiceC: "",
+      choiceD: "",
+      correctChoice: "",
     }));
-    clearErrors("allowedFileTypes");
+    clearErrors(
+      "allowedFileTypes",
+      "answerText",
+      "choiceA",
+      "choiceB",
+      "choiceC",
+      "choiceD",
+      "correctChoice",
+    );
   }
 
   function toggleFileType(typeId) {
@@ -397,6 +425,12 @@ export default function AssignmentForm({ assignmentId = null }) {
         form.submissionType === "file" ? form.allowedFileTypes : [],
       maxFileSizeMb:
         form.submissionType === "file" ? Number(form.maxFileSizeMb) : null,
+      answerText: form.answerText,
+      choiceA: form.choiceA,
+      choiceB: form.choiceB,
+      choiceC: form.choiceC,
+      choiceD: form.choiceD,
+      correctChoice: form.correctChoice,
     };
 
     setIsSubmitting(true);
@@ -595,8 +629,103 @@ export default function AssignmentForm({ assignmentId = null }) {
               <option value="text">Text</option>
               <option value="file">File upload</option>
               <option value="url">URL</option>
+              <option value="choice">4 choice answer</option>
             </NativeSelect>
           </div>
+
+          {form.submissionType === "text" ? (
+            <label className="block">
+              <span className="mb-1.5 block text-body2">Answer</span>
+              <textarea
+                value={form.answerText}
+                onChange={(event) =>
+                  setField("answerText", event.target.value)
+                }
+                rows={4}
+                aria-invalid={Boolean(errors.answerText) || undefined}
+                aria-describedby={
+                  errors.answerText ? "assignment-answer-error" : undefined
+                }
+                className="w-full rounded-lg border border-gray-400 px-3 py-3 text-body2 outline-none focus:border-orange-100"
+                style={
+                  errors.answerText
+                    ? { borderColor: ERROR_COLOR, boxShadow: "none" }
+                    : undefined
+                }
+              />
+              <FieldError
+                id="assignment-answer-error"
+                message={errors.answerText}
+              />
+            </label>
+          ) : null}
+
+          {form.submissionType === "choice" ? (
+            <fieldset>
+              <legend className="mb-3 text-body2">Answers</legend>
+              <div className="space-y-4">
+                {CHOICE_OPTIONS.map((letter) => {
+                  const field = `choice${letter}`;
+                  const error = errors[field];
+                  return (
+                    <label key={letter} className="block">
+                      <span className="mb-1.5 block text-body2">
+                        {letter}
+                      </span>
+                      <input
+                        type="text"
+                        value={form[field]}
+                        onChange={(event) =>
+                          setField(field, event.target.value)
+                        }
+                        aria-invalid={Boolean(error) || undefined}
+                        aria-describedby={
+                          error
+                            ? `assignment-choice-${letter}-error`
+                            : undefined
+                        }
+                        className="h-12 w-full rounded-lg border border-gray-400 px-3 text-body2 outline-none focus:border-orange-100"
+                        style={
+                          error
+                            ? { borderColor: ERROR_COLOR, boxShadow: "none" }
+                            : undefined
+                        }
+                      />
+                      <FieldError
+                        id={`assignment-choice-${letter}-error`}
+                        message={error}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+              <fieldset className="mt-4">
+                <legend className="mb-3 text-body2">Correct answer</legend>
+                <div className="flex flex-wrap gap-8">
+                  {CHOICE_OPTIONS.map((letter) => (
+                    <label
+                      key={letter}
+                      className="flex cursor-pointer items-center gap-3 text-gray-800"
+                    >
+                      <input
+                        type="radio"
+                        name="assignment-correct-choice"
+                        value={letter}
+                        checked={form.correctChoice === letter}
+                        onChange={() => setField("correctChoice", letter)}
+                        className="size-5 accent-blue-500"
+                      />
+                      <span>{letter}</span>
+                    </label>
+                  ))}
+                </div>
+                <FieldError
+                  id="assignment-correct-choice-error"
+                  message={errors.correctChoice}
+                />
+              </fieldset>
+            </fieldset>
+          ) : null}
 
           {showFileFields ? (
             <>
