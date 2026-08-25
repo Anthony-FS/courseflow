@@ -6,11 +6,9 @@ import { LessonNav } from "@/components/course-learn/lesson-nav";
 import { getSessionUser } from "@/lib/auth";
 import {
   flattenSubLessons,
+  getAssignmentsForCourse,
   getSubLessonLearningContent,
-  MOCK_ASSIGNMENT,
-  mockProgressPercent,
   resolveActiveSubLesson,
-  withMockLessonStatuses,
 } from "@/lib/course-learn";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
@@ -60,12 +58,6 @@ export default async function CourseLearnPage({ params, searchParams }) {
     flatSubLessons,
     query?.subLessonId,
   );
-  const lessonsWithStatus = withMockLessonStatuses(
-    course.lessons,
-    active?.id,
-  );
-  const progressPercent = mockProgressPercent(lessonsWithStatus);
-
   if (!active) {
     return (
       <main className="mx-auto w-[calc(100%-3rem)] max-w-280 py-16">
@@ -79,10 +71,19 @@ export default async function CourseLearnPage({ params, searchParams }) {
     );
   }
 
-  const subLessonContent = await getSubLessonLearningContent(catalog, {
-    courseId: course.id,
-    subLessonId: active.id,
-  });
+  const [subLessonContent, courseAssignments] = await Promise.all([
+    getSubLessonLearningContent(catalog, {
+      courseId: course.id,
+      subLessonId: active.id,
+    }),
+    getAssignmentsForCourse(catalog, course.id),
+  ]);
+  const assignmentSubLessonIds = courseAssignments.map(
+    (assignment) => assignment.subLessonId,
+  );
+  const activeAssignment =
+    courseAssignments.find((assignment) => assignment.subLessonId === active.id) ??
+    null;
 
   return (
     <main className="flex flex-1 flex-col bg-white">
@@ -90,12 +91,13 @@ export default async function CourseLearnPage({ params, searchParams }) {
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <CourseCurriculumSidebar
             key={active.lessonId}
+            courseId={course.id}
             courseCode={courseCode}
             courseTitle={course.title}
             courseSummary={course.summary || course.description}
-            progressPercent={progressPercent}
-            lessons={lessonsWithStatus}
+            lessons={course.lessons}
             activeSubLessonId={active.id}
+            assignmentSubLessonIds={assignmentSubLessonIds}
           />
 
           <LessonContent
@@ -103,14 +105,18 @@ export default async function CourseLearnPage({ params, searchParams }) {
             description={subLessonContent?.description}
             coverUrl={course.coverUrl}
             videoUrl={subLessonContent?.videoUrl ?? null}
-            assignment={MOCK_ASSIGNMENT}
+            assignment={activeAssignment}
+            courseId={course.id}
+            subLessonId={active.id}
           />
         </div>
       </div>
 
       <div className="mx-auto w-[calc(100%-3rem)]">
         <LessonNav
+          courseId={course.id}
           courseCode={courseCode}
+          currentSubLessonId={active.id}
           previous={prev}
           next={next}
           className="px-0"

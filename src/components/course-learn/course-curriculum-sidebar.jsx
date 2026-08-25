@@ -1,11 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 import { LessonStatusIcon } from "@/components/course-learn/lesson-status-icon";
-import { learnSubLessonHref } from "@/lib/course-learn";
+import {
+  learnSubLessonHref,
+  mockProgressPercent,
+  withMockLessonStatuses,
+} from "@/lib/course-learn";
+import {
+  markSubLessonVisited,
+  readCompletedSubLessonIds,
+  readSubmittedAssignmentSubLessonIds,
+  readVisitedSubLessonIds,
+  SUB_LESSON_PROGRESS_EVENT,
+} from "@/lib/course-learn-progress";
 import { cn } from "@/lib/utils";
 
 function formatModuleNumber(index) {
@@ -20,12 +31,13 @@ function formatModuleNumber(index) {
  * module changes so the accordion opens on the correct section.
  */
 function CourseCurriculumSidebar({
+  courseId,
   courseCode,
   courseTitle,
   courseSummary,
-  progressPercent = 0,
   lessons = [],
   activeSubLessonId,
+  assignmentSubLessonIds = [],
 }) {
   const activeLessonId =
     lessons.find((lesson) =>
@@ -33,6 +45,39 @@ function CourseCurriculumSidebar({
     )?.id ?? lessons[0]?.id ?? null;
 
   const [openId, setOpenId] = useState(activeLessonId);
+  const [completedIds, setCompletedIds] = useState([]);
+  const [visitedIds, setVisitedIds] = useState([]);
+  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState([]);
+
+  useEffect(() => {
+    function loadProgress(event) {
+      if (event?.detail?.courseId && event.detail.courseId !== courseId) {
+        return;
+      }
+      setCompletedIds(readCompletedSubLessonIds(courseId));
+      setVisitedIds(readVisitedSubLessonIds(courseId));
+      setSubmittedAssignmentIds(readSubmittedAssignmentSubLessonIds(courseId));
+    }
+
+    markSubLessonVisited(courseId, activeSubLessonId);
+    loadProgress();
+    window.addEventListener(SUB_LESSON_PROGRESS_EVENT, loadProgress);
+    return () => {
+      window.removeEventListener(SUB_LESSON_PROGRESS_EVENT, loadProgress);
+    };
+  }, [courseId, activeSubLessonId]);
+
+  const lessonsWithStatus = withMockLessonStatuses(
+    lessons,
+    activeSubLessonId,
+    completedIds,
+    {
+      visitedIds,
+      assignmentSubLessonIds,
+      submittedAssignmentSubLessonIds: submittedAssignmentIds,
+    },
+  );
+  const progressPercent = mockProgressPercent(lessonsWithStatus);
 
   return (
     <aside className="flex h-full w-full flex-col border-r border-gray-300 bg-white px-6 py-8 lg:w-[22.5rem] lg:shrink-0 lg:px-8">
@@ -77,7 +122,7 @@ function CourseCurriculumSidebar({
           </p>
         ) : (
           <ul className="divide-y divide-gray-300 border-y border-gray-300">
-            {lessons.map((lesson, index) => {
+            {lessonsWithStatus.map((lesson, index) => {
               const isOpen = openId === lesson.id;
               const panelId = `learn-module-${lesson.id}`;
 

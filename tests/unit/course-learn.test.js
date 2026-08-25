@@ -52,13 +52,43 @@ describe("course-learn helpers", () => {
     expect(result.prev).toBeNull();
   });
 
-  it("mocks statuses relative to the active sub-lesson", () => {
-    const withStatus = withMockLessonStatuses(lessons, "s2");
+  it("shows a pending assignment badge only after the lesson was visited", () => {
+    const skipped = withMockLessonStatuses(lessons, "s3", ["s1"], {
+      visitedIds: ["s1"],
+    });
 
-    expect(withStatus[0].subLessons[0].status).toBe("completed");
-    expect(withStatus[0].subLessons[1].status).toBe("in-progress");
-    expect(withStatus[1].subLessons[0].status).toBe("not-started");
-    expect(mockProgressPercent(withStatus)).toBe(33);
+    expect(skipped[0].subLessons[0].status).toBe("completed");
+    expect(skipped[0].subLessons[1].status).toBe("not-started");
+    expect(skipped[1].subLessons[0].status).toBe("in-progress");
+    expect(mockProgressPercent(skipped)).toBe(33);
+
+    const revisited = withMockLessonStatuses(lessons, "s1", ["s1"]);
+    expect(revisited[0].subLessons[0].status).toBe("completed");
+    expect(revisited[0].subLessons[1].status).toBe("not-started");
+    expect(mockProgressPercent(revisited)).toBe(33);
+
+    const firstOnly = withMockLessonStatuses(lessons, "s2");
+    expect(firstOnly[0].subLessons[0].status).toBe("not-started");
+    expect(firstOnly[0].subLessons[1].status).toBe("in-progress");
+    expect(mockProgressPercent(firstOnly)).toBe(0);
+
+    const unvisitedWithAssignment = withMockLessonStatuses(lessons, "s1", [], {
+      assignmentSubLessonIds: ["s2"],
+    });
+    expect(unvisitedWithAssignment[0].subLessons[1].status).toBe("not-started");
+
+    const pending = withMockLessonStatuses(lessons, "s2", [], {
+      visitedIds: ["s2"],
+      assignmentSubLessonIds: ["s2"],
+    });
+    expect(pending[0].subLessons[1].status).toBe("pending-assignment");
+
+    const submitted = withMockLessonStatuses(lessons, "s2", [], {
+      visitedIds: ["s2"],
+      assignmentSubLessonIds: ["s2"],
+      submittedAssignmentSubLessonIds: ["s2"],
+    });
+    expect(submitted[0].subLessons[1].status).toBe("in-progress");
   });
 
   it("builds learn href with encoded query", () => {

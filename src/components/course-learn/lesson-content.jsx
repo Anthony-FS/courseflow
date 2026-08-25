@@ -1,13 +1,14 @@
 import { LessonAssignment } from "@/components/course-learn/lesson-assignment";
 import { LessonVideo } from "@/components/course-learn/lesson-video";
-import { MOCK_ASSIGNMENT } from "@/lib/course-learn";
 
 function LessonContent({
   title,
   description = "",
   coverUrl,
   videoUrl = null,
-  assignment = MOCK_ASSIGNMENT,
+  assignment = null,
+  courseId,
+  subLessonId,
 }) {
   return (
     <article className="flex min-w-0 flex-1 flex-col px-6 py-8 lg:px-10">
@@ -30,6 +31,8 @@ function LessonContent({
             question={assignment.question}
             status={assignment.status}
             deadlineLabel={assignment.deadlineLabel}
+            courseId={courseId}
+            subLessonId={subLessonId}
           />
         ) : null}
       </div>
