@@ -1,27 +1,40 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, Clock } from "lucide-react";
+import { BookOpen, BookmarkCheck, Clock, Loader2 } from "lucide-react";
 
+import { formatPrice } from "@/lib/format";
 import { formatLearningTime } from "@/lib/wishlist";
 
-export function WishlistCard({ course }) {
+export function WishlistCard({ course, onRemove, isRemoving = false }) {
   const {
+    id,
     code,
     title,
     summary,
     description,
     totalLearningTime,
     coverUrl,
+    price = 0,
     lessonCount = 0,
   } = course;
 
   const displayDescription = summary || description || "";
   const displayTime = formatLearningTime(totalLearningTime);
 
+  function handleRemoveClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (onRemove && !isRemoving) {
+      onRemove(id);
+    }
+  }
+
   return (
     <Link
       href={`/courses/${encodeURIComponent(code)}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       {/* Course Cover Image */}
       <div className="relative aspect-16/10 w-full overflow-hidden bg-blue-100">
@@ -33,6 +46,24 @@ export function WishlistCard({ course }) {
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           unoptimized={coverUrl.endsWith(".svg")}
         />
+
+        {/* Quick Remove Action Button */}
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={handleRemoveClick}
+            disabled={isRemoving}
+            aria-label={`Remove ${title} from wishlist`}
+            title="Remove from wishlist"
+            className="absolute top-3 right-3 z-10 grid size-9 place-items-center rounded-full bg-white/90 text-orange-500 shadow-card backdrop-blur-xs transition duration-200 hover:scale-110 hover:bg-white hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-50"
+          >
+            {isRemoving ? (
+              <Loader2 className="size-4.5 animate-spin" aria-hidden />
+            ) : (
+              <BookmarkCheck className="size-5 fill-orange-500/20" aria-hidden />
+            )}
+          </button>
+        ) : null}
       </div>
 
       {/* Card Content */}
@@ -47,13 +78,20 @@ export function WishlistCard({ course }) {
           </p>
         ) : null}
 
+        {/* Price */}
+        <p className="mt-4 text-headline3 font-medium text-gray-900">
+          THB {formatPrice(price)}
+        </p>
+
         {/* Divider & Metadata */}
         <div className="mt-auto pt-6">
           <div className="h-px w-full bg-gray-300" />
           <div className="flex items-center gap-6 pt-4 text-body3 text-blue-500">
             <div className="flex items-center gap-2">
               <BookOpen className="size-4.5 text-blue-400" aria-hidden />
-              <span className="font-normal text-gray-700">{lessonCount} Lesson</span>
+              <span className="font-normal text-gray-700">
+                {lessonCount} {lessonCount === 1 ? "Lesson" : "Lessons"}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="size-4.5 text-blue-400" aria-hidden />
@@ -65,3 +103,4 @@ export function WishlistCard({ course }) {
     </Link>
   );
 }
+

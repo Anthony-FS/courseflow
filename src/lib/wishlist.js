@@ -40,6 +40,25 @@ export async function addCourseToWishlist(courseId) {
   return data;
 }
 
+export async function removeCourseFromWishlist(courseId) {
+  const response = await fetch(`/api/wishlist?courseId=${encodeURIComponent(courseId)}`, {
+    method: "DELETE",
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to remove this course from your wishlist.");
+  }
+
+  return data;
+}
+
 export function formatLearningTime(time) {
   if (!time) return "6 Hours";
   const str = String(time).trim();
@@ -71,6 +90,7 @@ export async function getUserWishlist(supabase, userId) {
         total_learning_time,
         cover_image_url,
         cover_file_url,
+        price,
         lessons ( id )
       )
     `)
@@ -102,8 +122,10 @@ export async function getUserWishlist(supabase, userId) {
         description: course.description || "",
         totalLearningTime: course.total_learning_time || "",
         coverUrl: resolveCoverUrl(course.cover_image_url || course.cover_file_url),
+        price: course.price ?? 0,
         lessonCount,
       };
     })
     .filter(Boolean);
 }
+

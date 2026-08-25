@@ -69,3 +69,42 @@ export async function POST(request) {
 
   return jsonOk({ ok: true, already: false, id: inserted?.id ?? null }, { status: 201 });
 }
+
+export async function DELETE(request) {
+  const { supabase, user, error } = await requireUser();
+  if (error) return error;
+
+  let courseId = "";
+  try {
+    const url = new URL(request.url);
+    courseId = url.searchParams.get("courseId")?.trim() || "";
+  } catch {
+    courseId = "";
+  }
+
+  if (!courseId) {
+    try {
+      const body = await request.json();
+      courseId = String(body.courseId ?? "").trim();
+    } catch {
+      // JSON body was optional
+    }
+  }
+
+  if (!courseId) {
+    return jsonError("Course id is required", 400);
+  }
+
+  const { error: deleteError } = await supabase
+    .from("wishlists")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("course_id", courseId);
+
+  if (deleteError) {
+    return jsonError(deleteError.message || "Failed to remove from wishlist", 500);
+  }
+
+  return jsonOk({ ok: true });
+}
+
