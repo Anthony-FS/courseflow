@@ -185,6 +185,107 @@ export function embeddedCount(value) {
   return 0;
 }
 
+export const CATALOG_DEBOUNCE_MS = 300;
+export const CATALOG_MOBILE_MAX_PX = 760;
+export const CATALOG_COLUMNS =
+  "id, course_code, title, summary, cover_image_url, total_learning_time, price, created_at, lessons(count)";
+
+export function catalogPageSizeFromWidth(width) {
+  return Number(width) <= CATALOG_MOBILE_MAX_PX ? 6 : 12;
+}
+
+export function parseCatalogPageSize(value) {
+  const n = Number(value);
+  return n === 6 || n === 12 ? n : null;
+}
+
+export function catalogRange(page, pageSize) {
+  const from = (page - 1) * pageSize;
+  return { from, to: from + pageSize - 1 };
+}
+
+export function catalogSearchFilter(query) {
+  const trimmed = String(query ?? "").trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const escaped = trimmed
+    .replace(/[(),"]/g, " ")
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_");
+
+  return `title.ilike.%${escaped}%,summary.ilike.%${escaped}%`;
+}
+
+export function mapCatalogCourse(row) {
+  const hours = Number(row?.total_learning_time);
+  const code = row?.course_code ?? "";
+
+  return {
+    id: row?.id,
+    code,
+    courseCode: code,
+    title: row?.title ?? "",
+    summary: row?.summary ?? "",
+    coverUrl: resolveCoverUrl(row?.cover_image_url),
+    lessonCount: embeddedCount(row?.lessons),
+    hours: Number.isFinite(hours) && hours > 0 ? hours : 0,
+    totalLearningTime: row?.total_learning_time ?? "",
+    price: row?.price ?? 0,
+  };
+}
+
+export function catalogRequestUrl({ query, page, pageSize }) {
+  const params = new URLSearchParams({
+    q: String(query ?? "").trim(),
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+
+  return `/api/courses?${params}`;
+}
+
+export async function getCatalogCourses(
+  supabase,
+  { query = "", page = 1, pageSize = 12 } = {},
+) {
+  const resolvedPageSize = parseCatalogPageSize(pageSize);
+  const pageNumber = Number(page);
+
+  if (
+    resolvedPageSize == null ||
+    !Number.isInteger(pageNumber) ||
+    pageNumber < 1
+  ) {
+    throw new Error("Invalid catalog page");
+  }
+
+  const { from, to } = catalogRange(pageNumber, resolvedPageSize);
+  const filter = catalogSearchFilter(query);
+
+  let request = supabase
+    .from("courses")
+    .select(CATALOG_COLUMNS, { count: "exact" });
+
+  if (filter) {
+    request = request.or(filter);
+  }
+
+  const { data, error, count } = await request
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    courses: (data ?? []).map(mapCatalogCourse),
+    total: count ?? 0,
+  };
+}
+
 function mapCourse(row) {
   return {
     id: row.id,
