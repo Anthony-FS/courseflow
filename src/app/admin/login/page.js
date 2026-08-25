@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { AdminLoginForm } from "@/components/auth/admin-login-form";
 import Logo from "@/components/ui/logo";
 
@@ -17,7 +19,9 @@ export default function AdminLoginPage() {
             height={36}
           />
         </div>
-        <AdminLoginForm />
+        <Suspense fallback={null}>
+          <AdminLoginForm />
+        </Suspense>
       </main>
     </div>
   );
