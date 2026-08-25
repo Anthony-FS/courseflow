@@ -21,11 +21,22 @@ export async function POST(request) {
     return jsonError("Course id is required", 400);
   }
 
-  const { data: course, error: courseError } = await supabase
+  let { data: course, error: courseError } = await supabase
     .from("courses")
     .select("id")
     .eq("id", courseId)
     .maybeSingle();
+
+  if (!course && !courseError) {
+    const { data: byCode } = await supabase
+      .from("courses")
+      .select("id")
+      .ilike("course_code", courseId)
+      .maybeSingle();
+    if (byCode) {
+      course = byCode;
+    }
+  }
 
   if (courseError) {
     return jsonError(courseError.message || "Failed to load course", 500);
@@ -35,11 +46,13 @@ export async function POST(request) {
     return jsonError("Course not found", 404);
   }
 
+  const resolvedCourseId = course.id;
+
   const { data: existing, error: existingError } = await supabase
     .from("wishlists")
     .select("id")
     .eq("user_id", user.id)
-    .eq("course_id", courseId)
+    .eq("course_id", resolvedCourseId)
     .maybeSingle();
 
   if (existingError) {
@@ -54,7 +67,7 @@ export async function POST(request) {
     .from("wishlists")
     .insert({
       user_id: user.id,
-      course_id: courseId,
+      course_id: resolvedCourseId,
     })
     .select("id")
     .single();
@@ -95,11 +108,29 @@ export async function DELETE(request) {
     return jsonError("Course id is required", 400);
   }
 
+  let resolvedCourseId = courseId;
+  const { data: course } = await supabase
+    .from("courses")
+    .select("id")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (!course) {
+    const { data: byCode } = await supabase
+      .from("courses")
+      .select("id")
+      .ilike("course_code", courseId)
+      .maybeSingle();
+    if (byCode?.id) {
+      resolvedCourseId = byCode.id;
+    }
+  }
+
   const { error: deleteError } = await supabase
     .from("wishlists")
     .delete()
     .eq("user_id", user.id)
-    .eq("course_id", courseId);
+    .eq("course_id", resolvedCourseId);
 
   if (deleteError) {
     return jsonError(deleteError.message || "Failed to remove from wishlist", 500);

@@ -188,7 +188,7 @@ export function embeddedCount(value) {
 export const CATALOG_DEBOUNCE_MS = 300;
 export const CATALOG_MOBILE_MAX_PX = 760;
 export const CATALOG_COLUMNS =
-  "id, course_code, title, summary, cover_image_url, total_learning_time, price, created_at, lessons(count)";
+  "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, lessons(count)";
 
 export function catalogPageSizeFromWidth(width) {
   return Number(width) <= CATALOG_MOBILE_MAX_PX ? 6 : 12;
@@ -220,7 +220,7 @@ export function catalogSearchFilter(query) {
 
 export function mapCatalogCourse(row) {
   const hours = Number(row?.total_learning_time);
-  const code = row?.course_code ?? "";
+  const code = row?.course_code || row?.id || "";
 
   return {
     id: row?.id,
@@ -228,7 +228,7 @@ export function mapCatalogCourse(row) {
     courseCode: code,
     title: row?.title ?? "",
     summary: row?.summary ?? "",
-    coverUrl: resolveCoverUrl(row?.cover_image_url),
+    coverUrl: resolveCoverUrl(row?.cover_image_url || row?.cover_file_url),
     lessonCount: embeddedCount(row?.lessons),
     hours: Number.isFinite(hours) && hours > 0 ? hours : 0,
     totalLearningTime: row?.total_learning_time ?? "",
@@ -344,7 +344,10 @@ async function fetchLessonsForCourse(supabase, courseId) {
 }
 
 function isCourseCodeMatch(row, normalized) {
-  return normalizeCourseCode(row?.course_code) === normalized;
+  return (
+    normalizeCourseCode(row?.course_code) === normalized ||
+    String(row?.id ?? "").toLowerCase() === normalized
+  );
 }
 
 async function fetchCourseRowByCode(supabase, select, normalized) {
@@ -355,11 +358,23 @@ async function fetchCourseRowByCode(supabase, select, normalized) {
     .limit(1)
     .maybeSingle();
 
-  if (error || !data || !isCourseCodeMatch(data, normalized)) {
-    return null;
+  if (!error && data && isCourseCodeMatch(data, normalized)) {
+    return data;
   }
 
-  return data;
+  // Fallback: match by course id
+  const { data: byId, error: idError } = await supabase
+    .from("courses")
+    .select(select)
+    .eq("id", normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (!idError && byId) {
+    return byId;
+  }
+
+  return null;
 }
 
 export async function getCourseByCode(supabase, code, catalogSupabase) {
@@ -429,6 +444,33 @@ export function searchCourses(courses, query) {
 
     return title.includes(normalizedQuery) || courseCode.includes(normalizedQuery);
   });
+}
+
+export async function getOtherInterestingCourses(
+  supabase,
+  currentCourseId,
+  limit = 3,
+) {
+  try {
+    let request = supabase
+      .from("courses")
+      .select(CATALOG_COLUMNS);
+
+    if (currentCourseId) {
+      request = request.neq("id", currentCourseId);
+    }
+
+    const { data, error } = await request
+      .order("created_at", { ascending: false });
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data.slice(0, limit).map(mapCatalogCourse);
+  } catch {
+    return [];
+  }
 }
 
 export async function deleteCourse(id) {

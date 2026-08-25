@@ -2,14 +2,18 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { getSessionUser } from "@/lib/auth";
+import { getUserWishlistCount } from "@/lib/wishlist";
 import { UserMenu } from "@/components/user-menu";
 import MobileNavMenu from "@/components/mobile-nav-menu";
 
 export default async function Navbar() {
-  const { user, profile } = await getSessionUser();
+  const { user, profile, supabase } = await getSessionUser();
 
   const displayName =
     profile?.full_name || user?.user_metadata?.full_name || user?.email || "User";
+  const wishlistCount = user
+    ? await getUserWishlistCount(supabase, user.id)
+    : 0;
 
   return (
     <header className="relative z-10 h-22 bg-white shadow-card">
@@ -41,6 +45,7 @@ export default async function Navbar() {
               displayName={displayName}
               email={user.email}
               avatarUrl={profile?.avatar_url || user.user_metadata?.avatar_url}
+              wishlistCount={wishlistCount}
             />
           ) : (
             <div className="flex items-center gap-4">
@@ -69,6 +74,7 @@ export default async function Navbar() {
               displayName={displayName}
               email={user.email}
               avatarUrl={profile?.avatar_url || user.user_metadata?.avatar_url}
+              wishlistCount={wishlistCount}
             />
           ) : (
             <MobileNavMenu />

@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { addCourseToWishlist, removeCourseFromWishlist } from "@/lib/wishlist";
 import { cn } from "@/lib/utils";
 
 function WishlistButton({ courseId, initiallySaved = false, className }) {
+  const router = useRouter();
   const [saved, setSaved] = useState(initiallySaved);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -24,17 +27,25 @@ function WishlistButton({ courseId, initiallySaved = false, className }) {
       if (saved) {
         await removeCourseFromWishlist(courseId);
         setSaved(false);
+        toast.success("Removed course from your wishlist");
       } else {
         await addCourseToWishlist(courseId);
         setSaved(true);
+        toast.success("Added course to your wishlist", {
+          action: {
+            label: "View Wishlist",
+            onClick: () => router.push("/wishlist"),
+          },
+        });
       }
     } catch (error) {
-      setErrorMessage(
+      const msg =
         error.message ||
-          (saved
-            ? "Failed to remove this course from your wishlist."
-            : "Failed to add this course to your wishlist."),
-      );
+        (saved
+          ? "Failed to remove this course from your wishlist."
+          : "Failed to add this course to your wishlist.");
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsPending(false);
     }

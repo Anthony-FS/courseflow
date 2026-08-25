@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
+  Bookmark,
   ChevronDown,
   ClipboardCheck,
   LogOut,
-  Star,
   UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ const MENU_ITEMS = [
   { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/my-courses", label: "My Courses", icon: BookOpen },
   { href: "/assignments", label: "My Assignments", icon: ClipboardCheck },
-  { href: "/wishlist", label: "My Wishlist", icon: Star },
+  { href: "/wishlist", label: "My Wishlist", icon: Bookmark, hasBadge: true },
 ];
 
 function getInitials(name) {
@@ -32,7 +32,13 @@ function getInitials(name) {
     .toUpperCase();
 }
 
-export function UserMenu({ displayName, email, avatarUrl, compact = false }) {
+export function UserMenu({
+  displayName,
+  email,
+  avatarUrl,
+  wishlistCount = 0,
+  compact = false,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -72,7 +78,7 @@ export function UserMenu({ displayName, email, avatarUrl, compact = false }) {
       return;
     }
 
-    router.push("/");
+    router.push("/login");
     router.refresh();
   }
 
@@ -114,7 +120,7 @@ export function UserMenu({ displayName, email, avatarUrl, compact = false }) {
           role="menu"
           className="absolute top-[calc(100%+1rem)] right-0 z-30 w-56 overflow-hidden rounded-xl bg-white py-2 shadow-[0_4px_18px_rgba(34,38,158,0.12)]"
         >
-          {MENU_ITEMS.map(({ href, label, icon: Icon }) => (
+          {MENU_ITEMS.map(({ href, label, icon: Icon, hasBadge }) => (
             <Link
               key={label}
               href={href}
@@ -123,7 +129,12 @@ export function UserMenu({ displayName, email, avatarUrl, compact = false }) {
               className="flex items-center gap-4 px-4 py-3 text-body2 text-gray-700 transition-colors hover:bg-blue-50"
             >
               <Icon aria-hidden="true" className="size-5 text-blue-300" strokeWidth={1.5} />
-              {label}
+              <span className="flex-1">{label}</span>
+              {hasBadge && wishlistCount > 0 ? (
+                <span className="grid min-w-5 h-5 place-items-center rounded-full bg-orange-100 px-1.5 text-[11px] font-semibold text-orange-600">
+                  {wishlistCount}
+                </span>
+              ) : null}
             </Link>
           ))}
           <div className="my-1 border-t border-gray-200" />
