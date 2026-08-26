@@ -6,14 +6,13 @@ import {
   ArrowLeft,
   Plus,
   X,
-  Play,
   Loader2,
   Eye,
-  FileText,
   Paperclip,
 } from "lucide-react";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { SubLessonBlockBuilder } from "@/components/admin/sub-lesson-block-builder";
 import {
   uploadAdminFile,
   createAdminLesson,
@@ -21,6 +20,14 @@ import {
   deleteAdminLesson,
   getAdminLessonDetail,
 } from "@/lib/admin-courses";
+import {
+  BLOCK_TYPES,
+  hasVideoContentBlock,
+  hydrateSubLessonBlocks,
+  migrateLegacyVideoIntoBlocks,
+  parseSubLessonContent,
+  serializeSubLessonContent,
+} from "@/lib/sub-lesson-blocks";
 import { cn } from "@/lib/utils";
 
 function remapSubLessonTitleErrors(errors, fromIndex, toIndex) {
@@ -65,6 +72,13 @@ function remapSubLessonTitleErrors(errors, fromIndex, toIndex) {
   return next;
 }
 
+function hydrateSubLessons(subLessons) {
+  if (!Array.isArray(subLessons) || subLessons.length === 0) {
+    return subLessons;
+  }
+  return subLessons.map((sub) => hydrateSubLessonBlocks(sub));
+}
+
 export default function LessonForm({
   mode = "add", // 'add' | 'edit'
   courseTitle = "Service Design Essentials",
@@ -83,7 +97,7 @@ export default function LessonForm({
   const [lessonName, setLessonName] = useState(initialData?.name || "");
   const [subLessons, setSubLessons] = useState(
     () =>
-      initialData?.subLessons || [
+      hydrateSubLessons(initialData?.subLessons) || [
         {
           id: "sub-initial-1",
           title: "",
@@ -145,7 +159,7 @@ export default function LessonForm({
     if (initialData) {
       setLessonName(initialData.name || initialData.title || "");
       if (Array.isArray(initialData.subLessons) && initialData.subLessons.length > 0) {
-        setSubLessons(initialData.subLessons);
+        setSubLessons(hydrateSubLessons(initialData.subLessons));
       }
       return;
     }
@@ -157,7 +171,7 @@ export default function LessonForm({
       if (found) {
         setLessonName(found.name || found.title || "");
         if (Array.isArray(found.subLessons) && found.subLessons.length > 0) {
-          setSubLessons(found.subLessons);
+          setSubLessons(hydrateSubLessons(found.subLessons));
         }
       }
       return;
@@ -172,7 +186,7 @@ export default function LessonForm({
           if (cancelled || !detail) return;
           setLessonName(detail.name || detail.title || "");
           if (Array.isArray(detail.subLessons) && detail.subLessons.length > 0) {
-            setSubLessons(detail.subLessons);
+            setSubLessons(hydrateSubLessons(detail.subLessons));
           }
         })
         .catch((err) => {
@@ -241,30 +255,20 @@ export default function LessonForm({
   const handleSubLessonDescriptionChange = (index, value) => {
     const updated = [...subLessons];
     updated[index].description = value;
+    updated[index].blocks = parseSubLessonContent(value);
+    setSubLessons(updated);
+  };
+
+  const handleSubLessonBlocksChange = (index, newBlocks) => {
+    const updated = [...subLessons];
+    updated[index].blocks = newBlocks;
+    updated[index].description = serializeSubLessonContent(newBlocks);
     setSubLessons(updated);
   };
 
   const handleTogglePreview = (index) => {
     const updated = [...subLessons];
     updated[index].isPreview = !updated[index].isPreview;
-    setSubLessons(updated);
-  };
-
-  const handleVideoUpload = (index, file) => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const updated = [...subLessons];
-    updated[index].videoFile = file;
-    updated[index].videoUrl = url;
-    updated[index].videoName = file.name;
-    setSubLessons(updated);
-  };
-
-  const handleRemoveVideo = (index) => {
-    const updated = [...subLessons];
-    updated[index].videoFile = null;
-    updated[index].videoUrl = null;
-    updated[index].videoName = "";
     setSubLessons(updated);
   };
 
@@ -373,6 +377,13 @@ export default function LessonForm({
             finalVideoName = uploadRes.name || sub.videoName;
           }
 
+          if (
+            typeof finalVideoUrl === "string" &&
+            (finalVideoUrl.startsWith("blob:") || finalVideoUrl.startsWith("data:"))
+          ) {
+            finalVideoUrl = null;
+          }
+
           if (sub.attachmentFile) {
             const uploadRes = await uploadAdminFile(
               "attachment",
@@ -382,11 +393,37 @@ export default function LessonForm({
             finalAttachmentName = uploadRes.name || sub.attachmentName;
           }
 
+          let processedBlocks = migrateLegacyVideoIntoBlocks(
+            sub.blocks || parseSubLessonContent(sub.description),
+            finalVideoUrl,
+            finalVideoName,
+          );
+
+          if (Array.isArray(processedBlocks) && processedBlocks.length > 0) {
+            processedBlocks = await Promise.all(
+              processedBlocks.map(async (block) => {
+                if (block.type === BLOCK_TYPES.IMAGE && block.file) {
+                  const res = await uploadAdminFile("cover", block.file);
+                  return { ...block, url: res.fileUrl, file: null };
+                }
+                if (block.type === BLOCK_TYPES.VIDEO && block.file) {
+                  const res = await uploadAdminFile("trailer", block.file);
+                  return { ...block, url: res.fileUrl, file: null };
+                }
+                const { file, ...rest } = block;
+                return rest;
+              }),
+            );
+          }
+
+          const finalDescription = serializeSubLessonContent(processedBlocks);
+          const videoIsInBlocks = hasVideoContentBlock(processedBlocks);
+
           return {
             title: sub.title.trim(),
-            description: sub.description ? sub.description.trim() : "",
-            videoUrl: finalVideoUrl,
-            videoName: finalVideoName,
+            description: finalDescription ? finalDescription.trim() : "",
+            videoUrl: videoIsInBlocks ? null : finalVideoUrl,
+            videoName: videoIsInBlocks ? "" : finalVideoName,
             attachmentUrl: finalAttachmentUrl,
             attachmentName: finalAttachmentName,
             isPreview: Boolean(sub.isPreview),
@@ -528,7 +565,7 @@ export default function LessonForm({
           {/* Lesson Name Field */}
           <div>
             <label className="block text-sm font-medium text-[#2A2E3F] mb-2">
-              Lesson name *
+              Lesson name
             </label>
             <input
               type="text"
@@ -621,7 +658,7 @@ export default function LessonForm({
                               {index + 1}
                             </span>
                             <label className="block text-sm font-semibold text-[#2A2E3F]">
-                              Sub-lesson name *
+                              Sub-lesson name
                             </label>
                           </div>
 
@@ -687,109 +724,57 @@ export default function LessonForm({
                           )}
                         </div>
 
-                        {/* Text Content / Description Area */}
+                        {/* Sub-Lesson Content Blocks Builder */}
                         <div>
-                          <label className="block text-sm font-medium text-[#2A2E3F] mb-2 flex items-center gap-1.5">
-                            <FileText className="w-4 h-4 text-[#646D89]" />
-                            <span>Lesson Content / Description (Optional)</span>
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={sub.description || ""}
-                            placeholder="Write lesson notes, key takeaways, summary, or reading materials..."
-                            onChange={(e) =>
-                              handleSubLessonDescriptionChange(index, e.target.value)
+                          <SubLessonBlockBuilder
+                            blocks={
+                              sub.blocks || parseSubLessonContent(sub.description)
                             }
-                            className="w-full p-3.5 bg-white rounded-lg border border-[#D6D9E4] focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F] resize-y"
+                            onChange={(newBlocks) =>
+                              handleSubLessonBlocksChange(index, newBlocks)
+                            }
+                            subLessonIndex={index}
                           />
                         </div>
 
-                        {/* Media & Attachments Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                          {/* Video Upload Section */}
-                          <div>
-                            <label className="block text-sm font-medium text-[#2A2E3F] mb-3">
-                              Video *
-                            </label>
+                        <section className="pt-2">
+                          <label className="mb-3 flex items-center gap-1.5 text-sm font-medium text-[#2A2E3F]">
+                            <Paperclip className="w-4 h-4 text-[#646D89]" />
+                            <span>Attachment (PDF, Doc, ZIP)</span>
+                          </label>
 
-                            {sub.videoUrl ? (
-                              <div className="relative w-full max-w-[240px] h-36 bg-black rounded-2xl overflow-hidden group border border-[#D6D9E4] flex items-center justify-center shadow-xs">
-                                <video
-                                  src={sub.videoUrl}
-                                  className="w-full h-full object-cover opacity-80"
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                  <div className="w-10 h-10 rounded-full bg-white/95 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                                    <Play className="w-5 h-5 text-[#2F5FAC] fill-[#2F5FAC] ml-0.5" />
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveVideo(index)}
-                                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#F47E20] text-white flex items-center justify-center hover:bg-[#d66b16] transition-colors shadow-xs cursor-pointer"
-                                  title="Remove Video"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <label className="w-full max-w-[240px] h-36 rounded-2xl bg-[#EEF1F7] hover:bg-[#E2E8F5] flex flex-col items-center justify-center cursor-pointer transition-colors group border border-dashed border-[#C8CCDB]">
-                                <input
-                                  type="file"
-                                  accept="video/*"
-                                  className="hidden"
-                                  onChange={(e) =>
-                                    handleVideoUpload(index, e.target.files[0])
-                                  }
-                                />
-                                <Plus className="w-6 h-6 text-[#2F5FAC] stroke-[2.5]" />
-                                <span className="text-xs font-semibold text-[#2F5FAC] mt-2">
-                                  Upload Video
+                          {sub.attachmentUrl ? (
+                            <div className="flex items-center justify-between p-3.5 bg-white border border-[#D6D9E4] rounded-xl max-w-sm">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Paperclip className="w-4 h-4 text-[#2F5FAC] shrink-0" />
+                                <span className="text-xs font-medium text-[#2A2E3F] truncate">
+                                  {sub.attachmentName || "Attached File"}
                                 </span>
-                              </label>
-                            )}
-                          </div>
-
-                          {/* Supplementary Attachment (PDF / Document) */}
-                          <div>
-                            <label className="block text-sm font-medium text-[#2A2E3F] mb-3 flex items-center gap-1.5">
-                              <Paperclip className="w-4 h-4 text-[#646D89]" />
-                              <span>Attachment (PDF, Doc, ZIP)</span>
-                            </label>
-
-                            {sub.attachmentUrl ? (
-                              <div className="flex items-center justify-between p-3.5 bg-white border border-[#D6D9E4] rounded-xl max-w-sm">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <Paperclip className="w-4 h-4 text-[#2F5FAC] shrink-0" />
-                                  <span className="text-xs font-medium text-[#2A2E3F] truncate">
-                                    {sub.attachmentName || "Attached File"}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveAttachment(index)}
-                                  className="text-[#9AA1B9] hover:text-[#9B2C6B] transition-colors p-1 cursor-pointer"
-                                  title="Remove Attachment"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
                               </div>
-                            ) : (
-                              <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#C8CCDB] bg-white hover:bg-[#F6F7FC] text-[#646D89] text-xs font-medium cursor-pointer transition-colors max-w-xs">
-                                <input
-                                  type="file"
-                                  accept=".pdf,.doc,.docx,.zip,.png,.jpg"
-                                  className="hidden"
-                                  onChange={(e) =>
-                                    handleAttachmentUpload(index, e.target.files[0])
-                                  }
-                                />
-                                <Paperclip className="w-4 h-4 text-[#2F5FAC]" />
-                                <span>Attach supplementary material</span>
-                              </label>
-                            )}
-                          </div>
-                        </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAttachment(index)}
+                                className="text-[#9AA1B9] hover:text-[#9B2C6B] transition-colors p-1 cursor-pointer"
+                                title="Remove Attachment"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#C8CCDB] bg-white hover:bg-[#F6F7FC] text-[#646D89] text-xs font-medium cursor-pointer transition-colors max-w-xs">
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx,.zip,.png,.jpg"
+                                className="hidden"
+                                onChange={(e) =>
+                                  handleAttachmentUpload(index, e.target.files[0])
+                                }
+                              />
+                              <Paperclip className="w-4 h-4 text-[#2F5FAC]" />
+                              <span>Attach supplementary material</span>
+                            </label>
+                          )}
+                        </section>
                       </div>
                     </div>
                   </div>

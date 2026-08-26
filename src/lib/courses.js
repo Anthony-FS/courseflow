@@ -25,13 +25,13 @@ function toPublicStorageUrl(objectPath, supabaseUrl) {
   return `${base}/storage/v1/object/public/${encodedPath}`;
 }
 
-export function resolveCoverUrl(
+export function resolveCoverFileUrl(
   coverFileUrl,
   supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL,
 ) {
   const value = String(coverFileUrl ?? "").trim();
   if (!value) {
-    return FALLBACK_COVER;
+    return null;
   }
 
   if (/^https?:\/\//i.test(value) || value.startsWith("/")) {
@@ -41,9 +41,15 @@ export function resolveCoverUrl(
   const objectPath = value.startsWith(`${COVER_BUCKET}/`)
     ? value
     : `${COVER_BUCKET}/${value}`;
-  const publicUrl = toPublicStorageUrl(objectPath, supabaseUrl);
 
-  return publicUrl || FALLBACK_COVER;
+  return toPublicStorageUrl(objectPath, supabaseUrl);
+}
+
+export function resolveCoverUrl(
+  coverFileUrl,
+  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL,
+) {
+  return resolveCoverFileUrl(coverFileUrl, supabaseUrl) || FALLBACK_COVER;
 }
 
 export function resolveTrailerUrl(

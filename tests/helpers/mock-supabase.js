@@ -74,10 +74,12 @@ export function createMockSupabase({
     if (filter.op === "eq") return value === filter.value;
     if (filter.op === "neq") return value !== filter.value;
     if (filter.op === "ilike") {
-      return (
-        String(value ?? "").toLowerCase() ===
-        String(filter.value ?? "").toLowerCase()
-      );
+      const pattern = String(filter.value ?? "").toLowerCase();
+      const haystack = String(value ?? "").toLowerCase();
+      if (pattern.startsWith("%") && pattern.endsWith("%") && pattern.length >= 2) {
+        return haystack.includes(pattern.slice(1, -1));
+      }
+      return haystack === pattern;
     }
     if (filter.op === "is") {
       return filter.value === null ? value == null : value === filter.value;
@@ -258,6 +260,14 @@ export function createMockSupabase({
           };
           withCount.neq = (column, value) => {
             chain.neq(column, value);
+            return withCount;
+          };
+          withCount.ilike = (column, value) => {
+            chain.ilike(column, value);
+            return withCount;
+          };
+          withCount.in = (column, value) => {
+            chain.in(column, value);
             return withCount;
           };
           return withCount;

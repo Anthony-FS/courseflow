@@ -448,4 +448,59 @@ describe("lesson mutations touch courses.updated_at", () => {
     );
     expect(courseTouch).toBeTruthy();
   });
+
+  it("removes replaced lesson block images from storage", async () => {
+    const supabase = createMockSupabase({
+      courseSelect: { id: COURSE_ID },
+      subLessonsSelect: [
+        {
+          id: "sub-old",
+          lesson_id: LESSON_ID,
+          description: JSON.stringify([
+            { id: "img-old", type: "image", url: "course-covers/u/old.png" },
+          ]),
+        },
+      ],
+      materialsSelect: [
+        {
+          sub_lesson_id: "sub-old",
+          file_url: "course-attachments/u/old.pdf",
+        },
+      ],
+    });
+    mockAdmin(supabase);
+
+    const response = await updateLesson(
+      new Request(
+        `http://localhost/api/admin/courses/${COURSE_ID}/lessons/${LESSON_ID}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lessonName: "Updated lesson",
+            subLessons: [
+              {
+                title: "Sub 1",
+                description: JSON.stringify([
+                  { id: "img-new", type: "image", url: "course-covers/u/new.png" },
+                ]),
+              },
+            ],
+          }),
+        },
+      ),
+      { params: Promise.resolve({ id: COURSE_ID, lessonId: LESSON_ID }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(supabase.storageRemoves).toEqual(
+      expect.arrayContaining([
+        { bucket: "course-covers", paths: ["u/old.png"] },
+        { bucket: "course-attachments", paths: ["u/old.pdf"] },
+      ]),
+    );
+    expect(supabase.storageRemoves).not.toEqual(
+      expect.arrayContaining([{ bucket: "course-covers", paths: ["u/new.png"] }]),
+    );
+  });
 });

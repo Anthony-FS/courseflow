@@ -132,7 +132,7 @@ function ChoiceOption({
         "flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left text-body2 transition-colors",
         "focus-visible:outline-none focus-visible:shadow-focus",
         !revealed && "cursor-pointer border-gray-300 bg-white hover:border-blue-300",
-        !revealed && selected && "border-blue-500 bg-blue-100",
+        !revealed && selected && "border-blue-500 bg-blue-100 ring-2 ring-white",
         revealed && isCorrect && "border-green bg-status-submitted text-black",
         revealed &&
           isWrongSelection &&
@@ -146,17 +146,17 @@ function ChoiceOption({
     >
       <span
         className={cn(
-          "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border",
+          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2",
           revealed && isCorrect && "border-green bg-green text-white",
           revealed &&
             isWrongSelection &&
             "border-status-overdue-foreground bg-status-overdue-foreground text-white",
-          !revealed && selected && "border-blue-500 bg-blue-500",
-          !revealed && !selected && "border-gray-400 bg-transparent",
+          !revealed && selected && "border-blue-500 bg-white",
+          !revealed && !selected && "border-gray-400 bg-white",
           revealed &&
             !isCorrect &&
             !isWrongSelection &&
-            "border-gray-400 bg-transparent",
+            "border-gray-400 bg-white",
         )}
         aria-hidden
       >
@@ -164,6 +164,8 @@ function ChoiceOption({
           <Check className="size-3.5" strokeWidth={3} />
         ) : revealed && isWrongSelection ? (
           <X className="size-3.5" strokeWidth={3} />
+        ) : selected && !revealed ? (
+          <span className="size-2.5 rounded-full bg-blue-500" />
         ) : null}
       </span>
       <span className="min-w-0 flex-1">

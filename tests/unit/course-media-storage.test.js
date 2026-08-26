@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  collectLessonMediaUrls,
   groupStorageRefsByBucket,
   parseStorageObjectRef,
+  unusedMediaUrls,
 } from "@/lib/course-media-storage";
+import { createMockSupabase } from "../helpers/mock-supabase.js";
 
 describe("parseStorageObjectRef", () => {
   it("parses bucket/path storage refs", () => {
@@ -41,5 +44,48 @@ describe("groupStorageRefsByBucket", () => {
 
     expect([...grouped.get("course-covers").values()]).toEqual(["a/1.jpg"]);
     expect([...grouped.get("course-attachments").values()]).toEqual(["a/doc.pdf"]);
+  });
+});
+
+describe("unusedMediaUrls", () => {
+  it("returns previous urls that are no longer referenced", () => {
+    expect(
+      unusedMediaUrls(
+        [
+          "course-covers/a/old.png",
+          "course-covers/a/keep.png",
+          "course-covers/a/old.png",
+        ],
+        ["course-covers/a/keep.png", "course-covers/a/new.png"],
+      ),
+    ).toEqual(["course-covers/a/old.png"]);
+  });
+});
+
+describe("collectLessonMediaUrls", () => {
+  it("reads image blocks and material attachments for a lesson", async () => {
+    const supabase = createMockSupabase({
+      subLessonsSelect: [
+        {
+          id: "sub-1",
+          lesson_id: "lesson-1",
+          description: JSON.stringify([
+            { id: "i1", type: "image", url: "course-covers/u/old.png" },
+          ]),
+        },
+      ],
+      materialsSelect: [
+        {
+          sub_lesson_id: "sub-1",
+          file_url: "course-attachments/u/notes.pdf",
+        },
+      ],
+    });
+
+    const urls = await collectLessonMediaUrls(supabase, "lesson-1");
+    expect(urls).toEqual([
+      "course-covers/u/old.png",
+      "course-attachments/u/notes.pdf",
+    ]);
   });
 });

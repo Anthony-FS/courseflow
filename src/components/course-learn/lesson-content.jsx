@@ -1,5 +1,7 @@
 import { LessonAssignment } from "@/components/course-learn/lesson-assignment";
 import { LessonVideo } from "@/components/course-learn/lesson-video";
+import { SubLessonRenderer } from "@/components/course-learn/sub-lesson-renderer";
+import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
 
 function LessonContent({
   title,
@@ -11,6 +13,8 @@ function LessonContent({
   courseId,
   subLessonId,
 }) {
+  const showLegacyVideo = Boolean(videoUrl) && !hasVideoContentBlock(description);
+
   return (
     <article className="flex min-w-0 flex-1 flex-col px-6 py-8 lg:px-10">
       <div className="w-full">
@@ -18,13 +22,17 @@ function LessonContent({
           {title}
         </h1>
 
-        {description ? (
-          <p className="mt-3 text-body2 text-gray-700">{description}</p>
+        {showLegacyVideo ? (
+          <div className="mt-6">
+            <LessonVideo title={title} coverUrl={coverUrl} videoUrl={videoUrl} />
+          </div>
         ) : null}
 
-        <div className="mt-6">
-          <LessonVideo title={title} coverUrl={coverUrl} videoUrl={videoUrl} />
-        </div>
+        {description ? (
+          <div className="mt-6 rounded-2xl bg-[#0D1117] p-6 sm:p-8 text-white shadow-card">
+            <SubLessonRenderer description={description} />
+          </div>
+        ) : null}
 
         {assignment ? (
           <LessonAssignment

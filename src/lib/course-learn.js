@@ -1,4 +1,10 @@
 import { resolveTrailerUrl } from "@/lib/courses";
+import {
+  hasVideoContentBlock,
+  migrateLegacyVideoIntoBlocks,
+  parseSubLessonContent,
+  serializeSubLessonContent,
+} from "@/lib/sub-lesson-blocks";
 
 /** Flatten lessons → ordered sub-lessons for prev/next navigation. */
 export function flattenSubLessons(lessons) {
@@ -107,7 +113,15 @@ export function pickVideoMaterial(materials) {
   const rows = Array.isArray(materials) ? materials : [];
   return (
     rows.find((row) => isVideoMaterial(row) && row.file_url) ??
-    rows.find((row) => row.file_url) ??
+    rows.find((row) => {
+      const url = String(row?.file_url ?? "").toLowerCase();
+      return (
+        Boolean(row?.file_url) &&
+        (url.includes("course-trailers") ||
+          url.includes("trailer") ||
+          /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url))
+      );
+    }) ??
     null
   );
 }
@@ -146,14 +160,22 @@ export async function getSubLessonLearningContent(
   }
 
   const videoMaterial = pickVideoMaterial(materials);
+  const blocks = migrateLegacyVideoIntoBlocks(
+    parseSubLessonContent(subLesson.description ?? ""),
+    videoMaterial?.file_url,
+    videoMaterial?.name ?? "",
+  );
+  const description = serializeSubLessonContent(blocks);
+  const hasBlockVideo = hasVideoContentBlock(blocks);
 
   return {
     title: subLesson.title ?? "",
-    description: subLesson.description ?? "",
-    videoUrl: videoMaterial?.file_url
-      ? resolveTrailerUrl(videoMaterial.file_url)
-      : null,
-    videoName: videoMaterial?.name ?? "",
+    description,
+    videoUrl:
+      hasBlockVideo || !videoMaterial?.file_url
+        ? null
+        : resolveTrailerUrl(videoMaterial.file_url),
+    videoName: hasBlockVideo ? "" : (videoMaterial?.name ?? ""),
   };
 }
 
