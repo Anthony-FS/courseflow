@@ -1,10 +1,17 @@
 import { WishlistCard } from "@/components/wishlist/wishlist-card";
 
-function OtherInterestingCourses({ courses = [] }) {
+function OtherInterestingCourses({
+  courses = [],
+  enrolledCourseIds = [],
+  wishlistCourseIds = [],
+}) {
   const list = Array.isArray(courses) ? courses.slice(0, 3) : [];
-
   const enrolledSet = new Set(enrolledCourseIds);
   const wishlistSet = new Set(wishlistCourseIds);
+
+  if (list.length === 0) {
+    return null;
+  }
 
   return (
     <section
@@ -19,22 +26,20 @@ function OtherInterestingCourses({ courses = [] }) {
           Other Interesting Courses
         </h2>
 
-        {list.length === 0 ? (
-          <p className="mt-10 text-center text-body2 text-gray-700">
-            No other courses available yet.
-          </p>
-        ) : (
-          <ul className="mt-10 flex flex-wrap justify-center gap-6">
-            {list.map((course) => (
-              <li
-                key={course.id}
-                className="flex w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
-              >
-                <WishlistCard course={course} />
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="mt-10 flex flex-wrap justify-center gap-6">
+          {list.map((course) => (
+            <li
+              key={course.id}
+              className="flex w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
+            >
+              <WishlistCard
+                course={course}
+                initiallySaved={wishlistSet.has(course.id)}
+                isEnrolled={enrolledSet.has(course.id)}
+              />
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
