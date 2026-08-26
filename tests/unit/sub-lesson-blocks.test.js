@@ -3,9 +3,14 @@ import {
   BLOCK_TYPES,
   createBlock,
   getVideoEmbedInfo,
+  hasVideoContentBlock,
+  hydrateSubLessonBlocks,
+  migrateLegacyVideoIntoBlocks,
   moveBlock,
   parseSubLessonContent,
   serializeSubLessonContent,
+  getImageSrc,
+  sanitizeVideoCaption,
 } from "@/lib/sub-lesson-blocks";
 
 describe("sub-lesson-blocks utilities", () => {
@@ -35,8 +40,48 @@ describe("sub-lesson-blocks utilities", () => {
       src: "https://cdn.example.com/video.mp4",
     });
 
+    expect(getVideoEmbedInfo("blob:http://localhost:3000/abc")).toEqual({
+      type: "video",
+      src: "blob:http://localhost:3000/abc",
+    });
+
+    const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    expect(getVideoEmbedInfo("course-trailers/admin/lesson.mp4")).toEqual({
+      type: "video",
+      src: "https://example.supabase.co/storage/v1/object/public/course-trailers/admin/lesson.mp4",
+    });
+    if (previousUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    }
+
     expect(getVideoEmbedInfo("")).toBeNull();
     expect(getVideoEmbedInfo(null)).toBeNull();
+  });
+
+  it("resolves stored image paths to public storage URLs", () => {
+    expect(getImageSrc("https://cdn.example.com/diagram.png")).toBe(
+      "https://cdn.example.com/diagram.png",
+    );
+    expect(getImageSrc("/diagrams/local.png")).toBe("/diagrams/local.png");
+    expect(getImageSrc("blob:http://localhost:3000/abc")).toBe(
+      "blob:http://localhost:3000/abc",
+    );
+    expect(getImageSrc("")).toBeNull();
+    expect(getImageSrc(null)).toBeNull();
+
+    const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    expect(getImageSrc("course-covers/admin/diagram.png")).toBe(
+      "https://example.supabase.co/storage/v1/object/public/course-covers/admin/diagram.png",
+    );
+    if (previousUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    }
   });
   it("creates valid default blocks", () => {
     const textBlock = createBlock(BLOCK_TYPES.TEXT, { content: "Sample text" });
@@ -109,5 +154,90 @@ describe("sub-lesson-blocks utilities", () => {
 
     const reordered = moveBlock(blocks, 0, 2);
     expect(reordered.map((b) => b.id)).toEqual(["2", "3", "1"]);
+  });
+
+  it("migrates a stored video into a Video Player block without re-uploading", () => {
+    const text = createBlock(BLOCK_TYPES.TEXT, { content: "Read this first" });
+    const image = createBlock(BLOCK_TYPES.IMAGE, { url: "/diagram.png" });
+    const migrated = migrateLegacyVideoIntoBlocks(
+      [text, image],
+      "course-trailers/admin/lesson.mp4",
+      "Industry Overview Video",
+    );
+
+    expect(migrated).toHaveLength(3);
+    expect(migrated[0].type).toBe(BLOCK_TYPES.VIDEO);
+    expect(migrated[0].url).toBe("course-trailers/admin/lesson.mp4");
+    expect(migrated[0].caption).toBe("");
+    expect(migrated[1]).toEqual(text);
+    expect(migrated[2]).toEqual(image);
+  });
+
+  it("does not add a video block when the sub-lesson has no video", () => {
+    const text = createBlock(BLOCK_TYPES.TEXT, { content: "Text only" });
+    expect(migrateLegacyVideoIntoBlocks([text], null)).toEqual([text]);
+    expect(migrateLegacyVideoIntoBlocks([text], "")).toEqual([text]);
+    expect(migrateLegacyVideoIntoBlocks([text], "blob:http://localhost/1")).toEqual(
+      [text],
+    );
+    expect(
+      migrateLegacyVideoIntoBlocks([text], "course-attachments/a/notes.pdf"),
+    ).toEqual([text]);
+    expect(hasVideoContentBlock([text])).toBe(false);
+  });
+
+  it("does not duplicate an existing Video Player block", () => {
+    const existing = [
+      createBlock(BLOCK_TYPES.VIDEO, {
+        url: "course-trailers/admin/lesson.mp4",
+      }),
+      createBlock(BLOCK_TYPES.TEXT, { content: "Already migrated" }),
+    ];
+
+    const migrated = migrateLegacyVideoIntoBlocks(
+      existing,
+      "course-trailers/admin/lesson.mp4",
+      "Industry Overview Video",
+    );
+
+    expect(migrated).toHaveLength(2);
+    expect(migrated.filter((block) => block.type === BLOCK_TYPES.VIDEO)).toHaveLength(
+      1,
+    );
+  });
+
+  it("hydrates a sub-lesson by copying the legacy video into blocks", () => {
+    const hydrated = hydrateSubLessonBlocks({
+      title: "Industry Overview",
+      description: "Welcome to mobile and game development!",
+      videoUrl: "course-trailers/admin/lesson.mp4",
+      videoName: "Industry Overview Video",
+    });
+
+    expect(hasVideoContentBlock(hydrated.blocks)).toBe(true);
+    expect(hydrated.blocks[0].type).toBe(BLOCK_TYPES.VIDEO);
+    expect(hydrated.blocks[0].url).toBe("course-trailers/admin/lesson.mp4");
+    expect(hydrated.blocks[0].caption).toBe("");
+    expect(hydrated.blocks[1].type).toBe(BLOCK_TYPES.TEXT);
+    expect(JSON.parse(hydrated.description)[0].type).toBe("video");
+  });
+
+  it("does not use a video filename as a caption", () => {
+    expect(sanitizeVideoCaption("game_dev.mp4")).toBe("");
+    expect(sanitizeVideoCaption("clip.webm")).toBe("");
+    expect(sanitizeVideoCaption("How ads work")).toBe("How ads work");
+
+    const parsed = parseSubLessonContent(
+      JSON.stringify([
+        {
+          id: "v1",
+          type: "video",
+          url: "course-trailers/admin/game_dev.mp4",
+          caption: "game_dev.mp4",
+        },
+      ]),
+    );
+
+    expect(parsed[0].caption).toBe("");
   });
 });

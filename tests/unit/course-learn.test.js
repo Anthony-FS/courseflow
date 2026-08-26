@@ -9,6 +9,7 @@ import {
   resolveActiveSubLesson,
   withMockLessonStatuses,
 } from "@/lib/course-learn";
+import { parseSubLessonContent } from "@/lib/sub-lesson-blocks";
 
 const lessons = [
   {
@@ -121,6 +122,18 @@ describe("course-learn helpers", () => {
     expect(picked?.file_url).toBe("course-trailers/admin/lesson.mp4");
   });
 
+  it("does not treat a PDF attachment as a lesson video", () => {
+    expect(
+      pickVideoMaterial([
+        {
+          name: "notes.pdf",
+          file_url: "course-attachments/a/notes.pdf",
+          file_type: "application/pdf",
+        },
+      ]),
+    ).toBeNull();
+  });
+
   it("loads sub-lesson content with resolved video url", async () => {
     const supabaseUrl = "https://example.supabase.co";
     const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -184,12 +197,19 @@ describe("course-learn helpers", () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
     }
 
-    expect(result).toEqual({
-      title: "Industry Overview",
-      description: "Welcome to mobile and game development!",
-      videoUrl:
-        "https://example.supabase.co/storage/v1/object/public/course-trailers/admin/lesson.mp4",
-      videoName: "Industry Overview Video",
+    expect(result.title).toBe("Industry Overview");
+    expect(result.videoUrl).toBeNull();
+    expect(result.videoName).toBe("");
+
+    const blocks = parseSubLessonContent(result.description);
+    expect(blocks[0]).toMatchObject({
+      type: "video",
+      url: "course-trailers/admin/lesson.mp4",
+      caption: "",
+    });
+    expect(blocks[1]).toMatchObject({
+      type: "text",
+      content: "Welcome to mobile and game development!",
     });
   });
 });

@@ -22,6 +22,7 @@ import {
 import {
   BLOCK_TYPES,
   createBlock,
+  getImageSrc,
   getVideoEmbedInfo,
   moveBlock,
 } from "@/lib/sub-lesson-blocks";
@@ -274,6 +275,8 @@ export function SubLessonBlockBuilder({
         {blocks.map((block, index) => {
           const textareaId = `block-textarea-${subLessonIndex}-${index}`;
           const calloutTextareaId = `callout-textarea-${subLessonIndex}-${index}`;
+          const imageSrc =
+            block.type === BLOCK_TYPES.IMAGE ? getImageSrc(block.url) : null;
 
           return (
             <div
@@ -397,11 +400,11 @@ export function SubLessonBlockBuilder({
                       />
                     </div>
 
-                    {block.url ? (
+                    {imageSrc ? (
                       <div className="relative max-h-48 w-full max-w-sm overflow-hidden rounded-lg border border-[#E4E6ED] bg-white p-2 flex items-center justify-center">
                         <img
-                          src={block.url}
-                          alt="Preview"
+                          src={imageSrc}
+                          alt={block.alt || block.caption || "Diagram preview"}
                           className="max-h-40 w-auto object-contain"
                         />
                       </div>

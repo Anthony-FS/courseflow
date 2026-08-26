@@ -2,6 +2,8 @@
  * Sub-Lesson Rich Content Block Types & Utilities
  */
 
+import { resolveCoverFileUrl, resolveTrailerUrl } from "@/lib/courses";
+
 export const BLOCK_TYPES = {
   TEXT: "text",
   IMAGE: "image",
@@ -11,6 +13,15 @@ export const BLOCK_TYPES = {
 
 export function generateBlockId() {
   return "block_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now();
+}
+
+function isEphemeralMediaUrl(url) {
+  const value = String(url ?? "").trim();
+  return value.startsWith("blob:") || value.startsWith("data:");
+}
+
+function normalizeVideoUrl(url) {
+  return String(url ?? "").trim();
 }
 
 /**
@@ -44,10 +55,123 @@ export function getVideoEmbedInfo(url) {
     };
   }
 
-  // Direct video file or generic stream URL
+  const src = isEphemeralMediaUrl(trimmed)
+    ? trimmed
+    : resolveTrailerUrl(trimmed) || trimmed;
+
+  // Direct video file, storage path, or generic stream URL
   return {
     type: "video",
-    src: trimmed,
+    src,
+  };
+}
+
+/**
+ * Turns a stored image path (course-covers/...) into a playable src.
+ * Leaves blob, data, http(s), and root-relative URLs unchanged.
+ */
+export function getImageSrc(url) {
+  if (!url || typeof url !== "string") return null;
+
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (isEphemeralMediaUrl(trimmed)) return trimmed;
+
+  return resolveCoverFileUrl(trimmed) || trimmed;
+}
+
+function isMediaFilenameCaption(caption) {
+  const value = String(caption ?? "").trim();
+  if (!value) return false;
+  return /^[\w.\- ()]+\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg)$/i.test(value);
+}
+
+export function sanitizeVideoCaption(caption) {
+  const value = String(caption ?? "").trim();
+  if (!value || isMediaFilenameCaption(value)) return "";
+  return value;
+}
+
+function normalizeParsedBlock(item, idx) {
+  const type = item?.type || BLOCK_TYPES.TEXT;
+  const block = {
+    id: item?.id || `block-${idx}`,
+    type,
+    ...item,
+  };
+
+  if (type === BLOCK_TYPES.VIDEO) {
+    block.caption = sanitizeVideoCaption(block.caption);
+  }
+
+  return block;
+}
+
+function isUsableLegacyVideoUrl(url) {
+  const value = normalizeVideoUrl(url);
+  if (!value || isEphemeralMediaUrl(value)) return false;
+  if (/\.(pdf|doc|docx|zip)(\?|$)/i.test(value)) return false;
+  return true;
+}
+
+function videoBlockHasUrl(blocks, url) {
+  const target = normalizeVideoUrl(url);
+  if (!target) return false;
+
+  return (Array.isArray(blocks) ? blocks : []).some((block) => {
+    if (block?.type !== BLOCK_TYPES.VIDEO) return false;
+    const existing = normalizeVideoUrl(block.url);
+    if (!existing) return false;
+    return existing === target || existing.endsWith(target) || target.endsWith(existing);
+  });
+}
+
+export function hasVideoContentBlock(blocksOrDescription) {
+  const blocks = Array.isArray(blocksOrDescription)
+    ? blocksOrDescription
+    : parseSubLessonContent(blocksOrDescription);
+
+  return blocks.some(
+    (block) =>
+      block?.type === BLOCK_TYPES.VIDEO && isUsableLegacyVideoUrl(block.url),
+  );
+}
+
+/**
+ * Copies an already-uploaded sub-lesson video into a Video Player block.
+ * Does not re-upload. No-ops when there is no video, the URL is a local
+ * preview, or a matching video block already exists.
+ */
+export function migrateLegacyVideoIntoBlocks(blocks, videoUrl, _videoName = "") {
+  const existing = Array.isArray(blocks) ? [...blocks] : [];
+  const url = normalizeVideoUrl(videoUrl);
+  if (!isUsableLegacyVideoUrl(url) || videoBlockHasUrl(existing, url)) {
+    return existing;
+  }
+
+  const videoBlock = createBlock(BLOCK_TYPES.VIDEO, {
+    url,
+    caption: "",
+  });
+
+  // Keep previous learner order: the standalone player sat above the text.
+  return [videoBlock, ...existing];
+}
+
+export function hydrateSubLessonBlocks(sub = {}) {
+  const sourceBlocks = Array.isArray(sub.blocks)
+    ? sub.blocks.map((block, idx) => normalizeParsedBlock(block, idx))
+    : parseSubLessonContent(sub.description);
+  const blocks = migrateLegacyVideoIntoBlocks(
+    sourceBlocks,
+    sub.videoUrl,
+    sub.videoName,
+  );
+
+  return {
+    ...sub,
+    blocks,
+    description: serializeSubLessonContent(blocks),
   };
 }
 
@@ -110,11 +234,7 @@ export function parseSubLessonContent(raw) {
   }
 
   if (Array.isArray(raw)) {
-    return raw.map((item, idx) => ({
-      id: item.id || `block-${idx}-${Date.now()}`,
-      type: item.type || BLOCK_TYPES.TEXT,
-      ...item,
-    }));
+    return raw.map((item, idx) => normalizeParsedBlock(item, idx));
   }
 
   if (typeof raw === "object" && raw !== null) {
@@ -134,11 +254,7 @@ export function parseSubLessonContent(raw) {
     try {
       const parsed = JSON.parse(str);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item, idx) => ({
-          id: item.id || `block-${idx}`,
-          type: item.type || BLOCK_TYPES.TEXT,
-          ...item,
-        }));
+        return parsed.map((item, idx) => normalizeParsedBlock(item, idx));
       }
     } catch {
       // Fall through to plain text

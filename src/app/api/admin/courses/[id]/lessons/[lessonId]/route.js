@@ -77,13 +77,13 @@ export async function GET(_request, { params }) {
         : sub.materials
           ? [sub.materials]
           : [];
-      const videoMaterial =
-        materials.find(
-          (m) =>
-            m.file_type?.startsWith("video/") ||
-            m.file_url?.includes("video") ||
-            m.file_url?.includes("trailer"),
-        ) || materials[0];
+      const videoMaterial = materials.find(
+        (m) =>
+          m.file_type?.startsWith("video/") ||
+          m.file_url?.includes("course-trailers") ||
+          m.file_url?.includes("trailer") ||
+          /\.(mp4|webm|mov|m4v)(\?|$)/i.test(String(m.file_url ?? "")),
+      );
       const attachmentMaterial = materials.find((m) => m !== videoMaterial);
 
       return {

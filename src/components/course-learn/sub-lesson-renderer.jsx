@@ -1,8 +1,13 @@
 "use client";
 
-import Image from "next/image";
-import { Info, AlertTriangle, Lightbulb, Play, ExternalLink } from "lucide-react";
-import { BLOCK_TYPES, getVideoEmbedInfo, parseSubLessonContent } from "@/lib/sub-lesson-blocks";
+import { Info, AlertTriangle, Lightbulb, ExternalLink } from "lucide-react";
+import {
+  BLOCK_TYPES,
+  getImageSrc,
+  getVideoEmbedInfo,
+  parseSubLessonContent,
+  sanitizeVideoCaption,
+} from "@/lib/sub-lesson-blocks";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,7 +19,12 @@ function FormattedTextBlock({ text, className }) {
   const lines = text.split("\n");
 
   return (
-    <div className={cn("space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-[#D1D5DB]", className)}>
+    <div
+      className={cn(
+        "space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-[#D1D5DB]",
+        className,
+      )}
+    >
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) {
@@ -60,7 +70,8 @@ function InlineFormattedText({ content }) {
   if (!content) return null;
 
   // Regex to match [link text](url), **bold**, `code`, and [[highlight]]
-  const tokenRegex = /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`|\[\[[^\]]+\]\])/g;
+  const tokenRegex =
+    /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`|\[\[[^\]]+\]\])/g;
   const parts = content.split(tokenRegex);
 
   return (
@@ -125,13 +136,14 @@ function InlineFormattedText({ content }) {
  * Renders an Image or Diagram Card
  */
 function DiagramImageCard({ url, caption, alt }) {
-  if (!url) return null;
+  const src = getImageSrc(url);
+  if (!src) return null;
 
   return (
     <figure className="my-6 mx-auto flex flex-col items-center">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white p-4 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.35)] border border-white/10 flex items-center justify-center">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white  shadow-[0_8px_30px_rgba(0,0,0,0.35)] border border-white/10 flex items-center justify-center">
         <img
-          src={url}
+          src={src}
           alt={alt || caption || "Lesson diagram"}
           className="max-h-[380px] w-auto max-w-full rounded-lg object-contain"
           loading="lazy"
@@ -155,13 +167,15 @@ function InlineVideoPlayer({ url, caption }) {
   const embed = getVideoEmbedInfo(url);
   if (!embed) return null;
 
+  const visibleCaption = sanitizeVideoCaption(caption);
+
   return (
     <div className="my-6 mx-auto w-full max-w-3xl">
       <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-lg border border-white/10">
         {embed.type === "youtube" || embed.type === "vimeo" ? (
           <iframe
             src={embed.embedUrl}
-            title={caption || "Lesson Video"}
+            title={visibleCaption || "Lesson Video"}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             className="h-full w-full border-0"
@@ -175,8 +189,8 @@ function InlineVideoPlayer({ url, caption }) {
           />
         )}
       </div>
-      {caption ? (
-        <p className="mt-2 text-center text-xs text-[#9CA3AF]">{caption}</p>
+      {visibleCaption ? (
+        <p className="mt-2 text-center text-xs text-[#9CA3AF]">{visibleCaption}</p>
       ) : null}
     </div>
   );
@@ -224,7 +238,12 @@ function CalloutBox({ title = "เนื้อหาเสริม", content, v
     >
       <div className="flex items-center gap-2 mb-2">
         <Icon className={cn("size-4.5 shrink-0", styles.icon)} aria-hidden />
-        <h4 className={cn("text-xs sm:text-sm font-bold tracking-wide", styles.title)}>
+        <h4
+          className={cn(
+            "text-xs sm:text-sm font-bold tracking-wide",
+            styles.title,
+          )}
+        >
           {title}
         </h4>
       </div>
@@ -280,12 +299,7 @@ export function SubLessonRenderer({ description, className }) {
 
           case BLOCK_TYPES.TEXT:
           default:
-            return (
-              <FormattedTextBlock
-                key={block.id}
-                text={block.content}
-              />
-            );
+            return <FormattedTextBlock key={block.id} text={block.content} />;
         }
       })}
     </div>
