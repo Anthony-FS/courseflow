@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRef, useState } from "react";
-import { Calendar, UserRound } from "lucide-react";
+import { Calendar, LockKeyhole, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { validateAll, validateField, todayIsoDate } from "@/lib/register-validation";
@@ -162,6 +163,21 @@ export function ProfileForm({ initialProfile, email }) {
           {submitting ? "Updating..." : "Update Profile"}
         </Button>
         {message ? <p className="m-0 text-body4 text-blue-500" role="status">{message}</p> : null}
+
+        <section className="mt-3 border-t border-gray-200 pt-6" aria-labelledby="password-security-title">
+          <h2 id="password-security-title" className="text-headline4 text-blue-700">
+            Password &amp; Security
+          </h2>
+          <p className="mt-2 text-body3 text-gray-600">
+            Manage the password for your account.
+          </p>
+          <Button asChild variant="secondary" className="mt-4 w-fit">
+            <Link href="/profile/change-password">
+              <LockKeyhole aria-hidden="true" className="size-5" />
+              Change Password
+            </Link>
+          </Button>
+        </section>
       </div>
     </form>
   );
