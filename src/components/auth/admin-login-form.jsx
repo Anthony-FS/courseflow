@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -213,6 +214,15 @@ export function AdminLoginForm() {
       >
         {isSubmitting ? "Logging in..." : "Log in"}
       </Button>
+
+      <p className="mt-6 text-center text-body2">
+        <Link
+          href="/forgot-password"
+          className="font-bold text-blue-500 hover:text-blue-400"
+        >
+          Forgot password?
+        </Link>
+      </p>
     </form>
   );
 }
