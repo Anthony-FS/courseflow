@@ -254,7 +254,7 @@ export function catalogRequestUrl({ query, page, pageSize }) {
 
 export async function getCatalogCourses(
   supabase,
-  { query = "", page = 1, pageSize = 12 } = {},
+  { query = "", page = 1, pageSize = 12, excludeCourseIds = [] } = {},
 ) {
   const resolvedPageSize = parseCatalogPageSize(pageSize);
   const pageNumber = Number(page);
@@ -269,10 +269,21 @@ export async function getCatalogCourses(
 
   const { from, to } = catalogRange(pageNumber, resolvedPageSize);
   const filter = catalogSearchFilter(query);
+  const uniqueExcludeIds = [
+    ...new Set(
+      (Array.isArray(excludeCourseIds) ? excludeCourseIds : [])
+        .map((id) => String(id).trim())
+        .filter(Boolean),
+    ),
+  ];
 
   let request = supabase
     .from("courses")
     .select(CATALOG_COLUMNS, { count: "exact" });
+
+  if (uniqueExcludeIds.length > 0) {
+    request = request.not("id", "in", `(${uniqueExcludeIds.join(",")})`);
+  }
 
   if (filter) {
     request = request.or(filter);

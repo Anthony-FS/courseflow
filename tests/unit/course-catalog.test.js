@@ -126,6 +126,10 @@ function createCatalogSupabase({ data = [], count = 0, error = null } = {}) {
       calls.or = filter;
       return chain;
     },
+    not(column, operator, value) {
+      calls.not = { column, operator, value };
+      return chain;
+    },
     order(column, options) {
       calls.order = { column, options };
       return chain;
@@ -199,5 +203,38 @@ describe("getCatalogCourses", () => {
     await expect(
       getCatalogCourses(createCatalogSupabase(), { page: 1, pageSize: 10 }),
     ).rejects.toThrow(/invalid catalog page/i);
+  });
+
+  it("does not apply not-in when excludeCourseIds is omitted or empty", async () => {
+    const omitted = createCatalogSupabase();
+    await getCatalogCourses(omitted, { page: 1, pageSize: 12 });
+    expect(omitted.calls.not).toBeUndefined();
+
+    const empty = createCatalogSupabase();
+    await getCatalogCourses(empty, {
+      page: 1,
+      pageSize: 12,
+      excludeCourseIds: [],
+    });
+    expect(empty.calls.not).toBeUndefined();
+  });
+
+  it("excludes unique enrolled ids before search and pagination", async () => {
+    const supabase = createCatalogSupabase({ data: [], count: 0 });
+
+    await getCatalogCourses(supabase, {
+      query: "ux",
+      page: 2,
+      pageSize: 6,
+      excludeCourseIds: ["c1", " c1 ", "", "c2"],
+    });
+
+    expect(supabase.calls.not).toEqual({
+      column: "id",
+      operator: "in",
+      value: "(c1,c2)",
+    });
+    expect(supabase.calls.or).toBe("title.ilike.%ux%,summary.ilike.%ux%");
+    expect(supabase.calls.range).toEqual({ from: 6, to: 11 });
   });
 });

@@ -1,5 +1,7 @@
+import { getSessionUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { getCatalogCourses, parseCatalogPageSize } from "@/lib/courses";
+import { getUserEnrolledCourseIds } from "@/lib/enrollments";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(request) {
@@ -20,11 +22,25 @@ export async function GET(request) {
     supabase = await createClient();
   }
 
+  const { user, supabase: sessionSupabase } = await getSessionUser();
+  let excludeCourseIds = [];
+  if (user) {
+    try {
+      excludeCourseIds = await getUserEnrolledCourseIds(
+        sessionSupabase,
+        user.id,
+      );
+    } catch {
+      excludeCourseIds = [];
+    }
+  }
+
   try {
     const result = await getCatalogCourses(supabase, {
       query,
       page,
       pageSize,
+      excludeCourseIds,
     });
     return jsonOk(result);
   } catch (error) {
