@@ -9,6 +9,8 @@ import {
   catalogSearchFilter,
   mapCatalogCourse,
   parseCatalogPageSize,
+  parseCatalogSortBy,
+  parseCatalogSortDirection,
   getCatalogCourses,
   FALLBACK_COVER,
 } from "@/lib/courses";
@@ -17,7 +19,7 @@ describe("catalog constants", () => {
   it("debounces for 300ms and selects only card columns", () => {
     expect(CATALOG_DEBOUNCE_MS).toBe(300);
     expect(CATALOG_COLUMNS).toBe(
-      "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, lessons(count)",
+      "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, updated_at, lessons(count)",
     );
     expect(CATALOG_COLUMNS).not.toMatch(/description|video_trailer/);
   });
@@ -111,12 +113,15 @@ describe("catalogRequestUrl", () => {
   it("builds the catalog GET query string", () => {
     expect(
       catalogRequestUrl({ query: " design ", page: 2, pageSize: 12 }),
-    ).toBe("/api/courses?q=design&page=2&pageSize=12");
+    ).toBe(
+      "/api/courses?q=design&page=2&pageSize=12&sortBy=createdAt&sortDirection=desc",
+    );
   });
 });
 
 function createCatalogSupabase({ data = [], count = 0, error = null } = {}) {
-  const calls = {};
+  const calls = { orders: [] };
+  const result = { data, error, count };
   const chain = {
     select(columns, options) {
       calls.select = { columns, options };
@@ -131,12 +136,15 @@ function createCatalogSupabase({ data = [], count = 0, error = null } = {}) {
       return chain;
     },
     order(column, options) {
-      calls.order = { column, options };
+      calls.orders.push({ column, options });
       return chain;
     },
     range(from, to) {
       calls.range = { from, to };
-      return Promise.resolve({ data, error, count });
+      return Promise.resolve(result);
+    },
+    then(resolve, reject) {
+      return Promise.resolve(result).then(resolve, reject);
     },
   };
 
@@ -176,10 +184,10 @@ describe("getCatalogCourses", () => {
     expect(supabase.calls.select.columns).toBe(CATALOG_COLUMNS);
     expect(supabase.calls.select.options).toEqual({ count: "exact" });
     expect(supabase.calls.or).toBeUndefined();
-    expect(supabase.calls.order).toEqual({
-      column: "created_at",
-      options: { ascending: false },
-    });
+    expect(supabase.calls.orders).toEqual([
+      { column: "created_at", options: { ascending: false, nullsFirst: false } },
+      { column: "id", options: { ascending: true } },
+    ]);
     expect(supabase.calls.range).toEqual({ from: 0, to: 11 });
     expect(result.total).toBe(20);
     expect(result.courses).toHaveLength(1);
@@ -236,5 +244,108 @@ describe("getCatalogCourses", () => {
     });
     expect(supabase.calls.or).toBe("title.ilike.%ux%,summary.ilike.%ux%");
     expect(supabase.calls.range).toEqual({ from: 6, to: 11 });
+  });
+});
+
+describe("parseCatalogSort", () => {
+  it("defaults unknown or blank sort to createdAt desc", () => {
+    expect(parseCatalogSortBy(undefined)).toBe("createdAt");
+    expect(parseCatalogSortBy("nope")).toBe("createdAt");
+    expect(parseCatalogSortBy("constructor")).toBe("createdAt");
+    expect(parseCatalogSortDirection(undefined)).toBe("desc");
+    expect(parseCatalogSortDirection("up")).toBe("desc");
+    expect(parseCatalogSortDirection("asc")).toBe("asc");
+  });
+});
+
+describe("catalogRequestUrl sort", () => {
+  it("includes the requested sort params", () => {
+    expect(
+      catalogRequestUrl({
+        query: "",
+        page: 1,
+        pageSize: 12,
+        sortBy: "title",
+        sortDirection: "asc",
+      }),
+    ).toBe(
+      "/api/courses?q=&page=1&pageSize=12&sortBy=title&sortDirection=asc",
+    );
+  });
+});
+
+describe("getCatalogCourses sort", () => {
+  it("orders title then id and still ranges the page", async () => {
+    const supabase = createCatalogSupabase();
+    await getCatalogCourses(supabase, {
+      page: 2,
+      pageSize: 6,
+      sortBy: "title",
+      sortDirection: "asc",
+    });
+
+    expect(supabase.calls.orders).toEqual([
+      { column: "title", options: { ascending: true, nullsFirst: false } },
+      { column: "id", options: { ascending: true } },
+    ]);
+    expect(supabase.calls.range).toEqual({ from: 6, to: 11 });
+  });
+
+  it("falls back to created_at for invalid sortBy", async () => {
+    const supabase = createCatalogSupabase();
+    await getCatalogCourses(supabase, {
+      page: 1,
+      pageSize: 12,
+      sortBy: "nope",
+      sortDirection: "asc",
+    });
+
+    expect(supabase.calls.orders[0]).toEqual({
+      column: "created_at",
+      options: { ascending: true, nullsFirst: false },
+    });
+  });
+
+  it("sorts lesson count in memory and slices the page", async () => {
+    const supabase = createCatalogSupabase({
+      data: [
+        { id: "c1", title: "A", lessons: [{ count: 9 }], total_learning_time: "1" },
+        { id: "c2", title: "B", lessons: [{ count: 1 }], total_learning_time: "1" },
+        { id: "c3", title: "C", lessons: [{ count: 5 }], total_learning_time: "1" },
+      ],
+      count: 3,
+    });
+
+    const result = await getCatalogCourses(supabase, {
+      page: 1,
+      pageSize: 6,
+      sortBy: "lessonCount",
+      sortDirection: "asc",
+    });
+
+    expect(supabase.calls.range).toBeUndefined();
+    expect(supabase.calls.orders).toEqual([]);
+    expect(result.courses.map((course) => course.id)).toEqual(["c2", "c3", "c1"]);
+    expect(result.total).toBe(3);
+  });
+
+  it("sorts learning time numerically in memory so 2 comes before 10", async () => {
+    const supabase = createCatalogSupabase({
+      data: [
+        { id: "c1", title: "Ten", total_learning_time: "10", lessons: [] },
+        { id: "c2", title: "Two", total_learning_time: "2", lessons: [] },
+      ],
+      count: 2,
+    });
+
+    const result = await getCatalogCourses(supabase, {
+      page: 1,
+      pageSize: 12,
+      sortBy: "hours",
+      sortDirection: "asc",
+    });
+
+    expect(supabase.calls.range).toBeUndefined();
+    expect(result.courses.map((course) => course.id)).toEqual(["c2", "c1"]);
   });
 });

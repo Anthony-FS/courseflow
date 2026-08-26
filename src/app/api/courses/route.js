@@ -9,6 +9,8 @@ export async function GET(request) {
   const query = String(searchParams.get("q") ?? "");
   const page = Number(searchParams.get("page") ?? "1");
   const pageSize = parseCatalogPageSize(searchParams.get("pageSize"));
+  const sortBy = searchParams.get("sortBy") ?? "";
+  const sortDirection = searchParams.get("sortDirection") ?? "";
 
   if (pageSize == null || !Number.isInteger(page) || page < 1) {
     return jsonError("Invalid page or page size", 400);
@@ -41,6 +43,8 @@ export async function GET(request) {
       page,
       pageSize,
       excludeCourseIds,
+      sortBy,
+      sortDirection,
     });
     return jsonOk(result);
   } catch (error) {

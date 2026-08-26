@@ -68,7 +68,33 @@ describe("GET /api/courses", () => {
     expect(body.courses[0].title).toBe("Alpha");
     expect(getCatalogCourses).toHaveBeenCalledWith(
       { mocked: true },
-      { query: "alpha", page: 2, pageSize: 6, excludeCourseIds: [] },
+      {
+        query: "alpha",
+        page: 2,
+        pageSize: 6,
+        excludeCourseIds: [],
+        sortBy: "",
+        sortDirection: "",
+      },
+    );
+  });
+
+  it("forwards sortBy and sortDirection to getCatalogCourses", async () => {
+    const response = await getCourses(
+      "q=alpha&page=2&pageSize=6&sortBy=title&sortDirection=asc",
+    );
+
+    expect(response.status).toBe(200);
+    expect(getCatalogCourses).toHaveBeenCalledWith(
+      { mocked: true },
+      {
+        query: "alpha",
+        page: 2,
+        pageSize: 6,
+        excludeCourseIds: [],
+        sortBy: "title",
+        sortDirection: "asc",
+      },
     );
   });
 
@@ -88,7 +114,14 @@ describe("GET /api/courses", () => {
     );
     expect(getCatalogCourses).toHaveBeenCalledWith(
       { mocked: true },
-      { query: "", page: 1, pageSize: 12, excludeCourseIds: ["c1", "c2"] },
+      {
+        query: "",
+        page: 1,
+        pageSize: 12,
+        excludeCourseIds: ["c1", "c2"],
+        sortBy: "",
+        sortDirection: "",
+      },
     );
   });
 
@@ -104,7 +137,14 @@ describe("GET /api/courses", () => {
     expect(response.status).toBe(200);
     expect(getCatalogCourses).toHaveBeenCalledWith(
       { mocked: true },
-      { query: "", page: 1, pageSize: 12, excludeCourseIds: [] },
+      {
+        query: "",
+        page: 1,
+        pageSize: 12,
+        excludeCourseIds: [],
+        sortBy: "",
+        sortDirection: "",
+      },
     );
   });
 

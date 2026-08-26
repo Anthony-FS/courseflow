@@ -1,4 +1,5 @@
 import { normalizeCourseCode } from "@/lib/course-validation";
+import { sortItems } from "@/lib/sorting";
 import { createClient } from "@/lib/supabase/client";
 
 const FALLBACK_COVER = "/courses/service-design.svg";
@@ -194,7 +195,7 @@ export function embeddedCount(value) {
 export const CATALOG_DEBOUNCE_MS = 300;
 export const CATALOG_MOBILE_MAX_PX = 760;
 export const CATALOG_COLUMNS =
-  "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, lessons(count)";
+  "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, updated_at, lessons(count)";
 
 export function catalogPageSizeFromWidth(width) {
   return Number(width) <= CATALOG_MOBILE_MAX_PX ? 6 : 12;
@@ -224,6 +225,37 @@ export function catalogSearchFilter(query) {
   return `title.ilike.%${escaped}%,summary.ilike.%${escaped}%`;
 }
 
+const CATALOG_COLUMN_SORTS = {
+  title: "title",
+  price: "price",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+};
+
+export function parseCatalogSortBy(value) {
+  const key = String(value ?? "").trim();
+  if (
+    key === "lessonCount" ||
+    key === "hours" ||
+    Object.hasOwn(CATALOG_COLUMN_SORTS, key)
+  ) {
+    return key;
+  }
+  return "createdAt";
+}
+
+export function parseCatalogSortDirection(value) {
+  return value === "asc" || value === "desc" ? value : "desc";
+}
+
+function catalogMemorySortValue(row, sortBy) {
+  if (sortBy === "lessonCount") {
+    return embeddedCount(row?.lessons);
+  }
+  const hours = Number(row?.total_learning_time);
+  return Number.isFinite(hours) ? hours : null;
+}
+
 export function mapCatalogCourse(row) {
   const hours = Number(row?.total_learning_time);
   const code = row?.course_code || row?.id || "";
@@ -242,11 +274,19 @@ export function mapCatalogCourse(row) {
   };
 }
 
-export function catalogRequestUrl({ query, page, pageSize }) {
+export function catalogRequestUrl({
+  query,
+  page,
+  pageSize,
+  sortBy,
+  sortDirection,
+}) {
   const params = new URLSearchParams({
     q: String(query ?? "").trim(),
     page: String(page),
     pageSize: String(pageSize),
+    sortBy: parseCatalogSortBy(sortBy),
+    sortDirection: parseCatalogSortDirection(sortDirection),
   });
 
   return `/api/courses?${params}`;
@@ -254,7 +294,14 @@ export function catalogRequestUrl({ query, page, pageSize }) {
 
 export async function getCatalogCourses(
   supabase,
-  { query = "", page = 1, pageSize = 12, excludeCourseIds = [] } = {},
+  {
+    query = "",
+    page = 1,
+    pageSize = 12,
+    excludeCourseIds = [],
+    sortBy,
+    sortDirection,
+  } = {},
 ) {
   const resolvedPageSize = parseCatalogPageSize(pageSize);
   const pageNumber = Number(page);
@@ -276,6 +323,8 @@ export async function getCatalogCourses(
         .filter(Boolean),
     ),
   ];
+  const resolvedSortBy = parseCatalogSortBy(sortBy);
+  const resolvedDirection = parseCatalogSortDirection(sortDirection);
 
   let request = supabase
     .from("courses")
@@ -289,8 +338,29 @@ export async function getCatalogCourses(
     request = request.or(filter);
   }
 
+  if (resolvedSortBy === "lessonCount" || resolvedSortBy === "hours") {
+    const { data, error, count } = await request;
+    if (error) {
+      throw error;
+    }
+    const sorted = sortItems(data ?? [], {
+      type: "number",
+      direction: resolvedDirection,
+      getValue: (row) => catalogMemorySortValue(row, resolvedSortBy),
+    });
+    return {
+      courses: sorted.slice(from, to + 1).map(mapCatalogCourse),
+      total: count ?? 0,
+    };
+  }
+
+  const column = CATALOG_COLUMN_SORTS[resolvedSortBy];
   const { data, error, count } = await request
-    .order("created_at", { ascending: false })
+    .order(column, {
+      ascending: resolvedDirection === "asc",
+      nullsFirst: false,
+    })
+    .order("id", { ascending: true })
     .range(from, to);
 
   if (error) {
