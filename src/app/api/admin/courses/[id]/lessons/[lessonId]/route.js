@@ -1,6 +1,11 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { touchCourseUpdatedAt } from "@/lib/touch-course";
+import {
+  cleanupUnusedLessonMedia,
+  collectLessonMediaUrls,
+} from "@/lib/course-media-storage";
+import { collectMediaUrlsFromSubLessonRecords } from "@/lib/sub-lesson-blocks";
 
 function isValidUUID(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -159,6 +164,7 @@ export async function PUT(request, { params }) {
   }
 
   // 2. Refresh sub-lessons (clean and recreate with new video links)
+  const previousUrls = await collectLessonMediaUrls(supabase, lessonId);
   await supabase.from("sub_lessons").delete().eq("lesson_id", lessonId);
 
   for (let i = 0; i < subLessons.length; i++) {
@@ -201,6 +207,12 @@ export async function PUT(request, { params }) {
     }
   }
 
+  await cleanupUnusedLessonMedia(
+    supabase,
+    previousUrls,
+    collectMediaUrlsFromSubLessonRecords(subLessons),
+  );
+
   await touchCourseUpdatedAt(supabase, courseId);
 
   return jsonOk({ success: true });
@@ -219,6 +231,8 @@ export async function DELETE(_request, { params }) {
   if (!lessonId) {
     return jsonOk({ success: true });
   }
+
+  const previousUrls = await collectLessonMediaUrls(supabase, lessonId);
 
   const { error: subLessonError } = await supabase
     .from("sub_lessons")
@@ -241,6 +255,7 @@ export async function DELETE(_request, { params }) {
     return jsonError(deleteError.message || "Failed to delete lesson", 500);
   }
 
+  await cleanupUnusedLessonMedia(supabase, previousUrls, []);
   await touchCourseUpdatedAt(supabase, courseId);
 
   return jsonOk({ success: true });

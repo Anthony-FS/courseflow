@@ -1,4 +1,5 @@
 import { UPLOAD_KINDS } from "@/lib/admin-uploads";
+import { collectMediaUrlsFromContent } from "@/lib/sub-lesson-blocks";
 
 const COURSE_MEDIA_BUCKETS = new Set(
   Object.values(UPLOAD_KINDS).map((kind) => kind.bucket),
@@ -91,37 +92,71 @@ export async function removeStorageObjects(supabase, fileUrls) {
   return removed;
 }
 
+function escapeIlikePattern(value) {
+  return String(value ?? "").replace(/[\\%_]/g, "\\$&");
+}
+
+async function countExactColumnRefs(query) {
+  const { count } = await query;
+  return count ?? 0;
+}
+
 async function countOtherCourseMediaRefs(supabase, fileUrl, excludeCourseId) {
   const url = String(fileUrl ?? "").trim();
   if (!url) return 0;
 
-  const [{ count: coverCount }, { count: trailerCount }] = await Promise.all([
-    supabase
-      .from("courses")
-      .select("id", { count: "exact", head: true })
-      .eq("cover_image_url", url)
-      .neq("id", excludeCourseId),
-    supabase
-      .from("courses")
-      .select("id", { count: "exact", head: true })
-      .eq("video_trailer_url", url)
-      .neq("id", excludeCourseId),
+  let coverQuery = supabase
+    .from("courses")
+    .select("id", { count: "exact", head: true })
+    .eq("cover_image_url", url);
+  let trailerQuery = supabase
+    .from("courses")
+    .select("id", { count: "exact", head: true })
+    .eq("video_trailer_url", url);
+
+  if (excludeCourseId) {
+    coverQuery = coverQuery.neq("id", excludeCourseId);
+    trailerQuery = trailerQuery.neq("id", excludeCourseId);
+  }
+
+  const [coverCount, trailerCount] = await Promise.all([
+    countExactColumnRefs(coverQuery),
+    countExactColumnRefs(trailerQuery),
   ]);
 
-  return (coverCount ?? 0) + (trailerCount ?? 0);
+  return coverCount + trailerCount;
 }
 
 async function countOtherMaterialRefs(supabase, fileUrl, excludeCourseId) {
   const url = String(fileUrl ?? "").trim();
   if (!url) return 0;
 
-  const { count } = await supabase
+  let query = supabase
     .from("materials")
     .select("id", { count: "exact", head: true })
-    .eq("file_url", url)
-    .neq("course_id", excludeCourseId);
+    .eq("file_url", url);
 
-  return count ?? 0;
+  if (excludeCourseId) {
+    query = query.neq("course_id", excludeCourseId);
+  }
+
+  return countExactColumnRefs(query);
+}
+
+async function countOtherDescriptionRefs(supabase, fileUrl, excludeCourseId) {
+  const url = String(fileUrl ?? "").trim();
+  if (!url) return 0;
+
+  let query = supabase
+    .from("sub_lessons")
+    .select("id", { count: "exact", head: true })
+    .ilike("description", `%${escapeIlikePattern(url)}%`);
+
+  if (excludeCourseId) {
+    query = query.neq("course_id", excludeCourseId);
+  }
+
+  return countExactColumnRefs(query);
 }
 
 /**
@@ -130,18 +165,19 @@ async function countOtherMaterialRefs(supabase, fileUrl, excludeCourseId) {
 export async function filterRemovableMediaUrls(
   supabase,
   fileUrls,
-  { excludeCourseId },
+  { excludeCourseId } = {},
 ) {
   const unique = [...new Set((fileUrls ?? []).map((u) => String(u ?? "").trim()).filter(Boolean))];
   const removable = [];
 
   for (const fileUrl of unique) {
-    const [courseRefs, materialRefs] = await Promise.all([
+    const [courseRefs, materialRefs, descriptionRefs] = await Promise.all([
       countOtherCourseMediaRefs(supabase, fileUrl, excludeCourseId),
       countOtherMaterialRefs(supabase, fileUrl, excludeCourseId),
+      countOtherDescriptionRefs(supabase, fileUrl, excludeCourseId),
     ]);
 
-    if (courseRefs + materialRefs === 0) {
+    if (courseRefs + materialRefs + descriptionRefs === 0) {
       removable.push(fileUrl);
     }
   }
@@ -149,8 +185,48 @@ export async function filterRemovableMediaUrls(
   return removable;
 }
 
+export function unusedMediaUrls(previousUrls, nextUrls) {
+  const next = new Set(
+    (nextUrls ?? []).map((url) => String(url ?? "").trim()).filter(Boolean),
+  );
+
+  return [
+    ...new Set(
+      (previousUrls ?? []).map((url) => String(url ?? "").trim()).filter(Boolean),
+    ),
+  ].filter((url) => !next.has(url));
+}
+
+export async function collectLessonMediaUrls(supabase, lessonId) {
+  const { data: subLessons } = await supabase
+    .from("sub_lessons")
+    .select("id, description")
+    .eq("lesson_id", lessonId);
+
+  const rows = Array.isArray(subLessons) ? subLessons : [];
+  const urls = [];
+
+  for (const sub of rows) {
+    urls.push(...collectMediaUrlsFromContent(sub?.description));
+  }
+
+  const subLessonIds = rows.map((sub) => sub?.id).filter(Boolean);
+  if (subLessonIds.length > 0) {
+    const { data: materials } = await supabase
+      .from("materials")
+      .select("file_url")
+      .in("sub_lesson_id", subLessonIds);
+
+    for (const row of materials ?? []) {
+      if (row?.file_url) urls.push(row.file_url);
+    }
+  }
+
+  return [...new Set(urls.map((url) => String(url ?? "").trim()).filter(Boolean))];
+}
+
 export async function collectCourseMediaUrls(supabase, courseId) {
-  const [{ data: course }, { data: materials }] = await Promise.all([
+  const [{ data: course }, { data: materials }, { data: subLessons }] = await Promise.all([
     supabase
       .from("courses")
       .select("cover_image_url, video_trailer_url")
@@ -160,6 +236,10 @@ export async function collectCourseMediaUrls(supabase, courseId) {
       .from("materials")
       .select("file_url")
       .eq("course_id", courseId),
+    supabase
+      .from("sub_lessons")
+      .select("description")
+      .eq("course_id", courseId),
   ]);
 
   const urls = [];
@@ -168,7 +248,16 @@ export async function collectCourseMediaUrls(supabase, courseId) {
   for (const row of materials ?? []) {
     if (row?.file_url) urls.push(row.file_url);
   }
-  return urls;
+  for (const sub of subLessons ?? []) {
+    urls.push(...collectMediaUrlsFromContent(sub?.description));
+  }
+  return [...new Set(urls.map((url) => String(url ?? "").trim()).filter(Boolean))];
+}
+
+export async function cleanupUnusedLessonMedia(supabase, previousUrls, nextUrls) {
+  const candidates = unusedMediaUrls(previousUrls, nextUrls);
+  const removable = await filterRemovableMediaUrls(supabase, candidates);
+  return removeStorageObjects(supabase, removable);
 }
 
 export async function cleanupCourseMediaOnDelete(supabase, courseId) {

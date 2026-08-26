@@ -297,6 +297,48 @@ export function serializeSubLessonContent(blocks) {
 }
 
 /**
+ * Collects stored image/video URLs from sub-lesson block content.
+ * Ignores blob/data previews and empty values.
+ */
+export function collectMediaUrlsFromContent(raw) {
+  const blocks = parseSubLessonContent(raw);
+  const urls = [];
+
+  for (const block of blocks) {
+    if (
+      (block.type === BLOCK_TYPES.IMAGE || block.type === BLOCK_TYPES.VIDEO) &&
+      block.url &&
+      !isEphemeralMediaUrl(block.url)
+    ) {
+      urls.push(String(block.url).trim());
+    }
+  }
+
+  return urls;
+}
+
+export function collectMediaUrlsFromSubLessonRecords(subLessons = []) {
+  const urls = [];
+
+  for (const sub of subLessons ?? []) {
+    urls.push(...collectMediaUrlsFromContent(sub?.description));
+    if (sub?.videoUrl) urls.push(String(sub.videoUrl).trim());
+    if (sub?.attachmentUrl) urls.push(String(sub.attachmentUrl).trim());
+
+    const materials = Array.isArray(sub?.materials)
+      ? sub.materials
+      : sub?.materials
+        ? [sub.materials]
+        : [];
+    for (const material of materials) {
+      if (material?.file_url) urls.push(String(material.file_url).trim());
+    }
+  }
+
+  return [...new Set(urls.filter(Boolean))];
+}
+
+/**
  * Helper to move block in array
  */
 export function moveBlock(blocks, fromIndex, toIndex) {

@@ -11,6 +11,8 @@ import {
   serializeSubLessonContent,
   getImageSrc,
   sanitizeVideoCaption,
+  collectMediaUrlsFromContent,
+  collectMediaUrlsFromSubLessonRecords,
 } from "@/lib/sub-lesson-blocks";
 
 describe("sub-lesson-blocks utilities", () => {
@@ -239,5 +241,32 @@ describe("sub-lesson-blocks utilities", () => {
     );
 
     expect(parsed[0].caption).toBe("");
+  });
+
+  it("collects stored image and video urls from sub-lesson content", () => {
+    const description = JSON.stringify([
+      { id: "t1", type: "text", content: "Hello" },
+      { id: "i1", type: "image", url: "course-covers/admin/diagram.png" },
+      { id: "v1", type: "video", url: "course-trailers/admin/clip.mp4" },
+      { id: "i2", type: "image", url: "blob:http://localhost/preview" },
+    ]);
+
+    expect(collectMediaUrlsFromContent(description)).toEqual([
+      "course-covers/admin/diagram.png",
+      "course-trailers/admin/clip.mp4",
+    ]);
+
+    expect(
+      collectMediaUrlsFromSubLessonRecords([
+        {
+          description,
+          attachmentUrl: "course-attachments/admin/notes.pdf",
+        },
+      ]),
+    ).toEqual([
+      "course-covers/admin/diagram.png",
+      "course-trailers/admin/clip.mp4",
+      "course-attachments/admin/notes.pdf",
+    ]);
   });
 });
