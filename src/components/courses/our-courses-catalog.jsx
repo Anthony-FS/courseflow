@@ -238,7 +238,7 @@ export function OurCoursesCatalog({
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Search..."
-            className="h-12 w-80 rounded-lg border border-gray-400 bg-white pr-4 pl-12 text-body2"
+            className="h-12 w-full max-w-80 rounded-lg border border-gray-400 bg-white pr-4 pl-12 text-body2"
           />
         </label>
         <SortFilterBar

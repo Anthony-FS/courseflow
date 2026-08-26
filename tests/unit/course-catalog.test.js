@@ -324,7 +324,9 @@ describe("getCatalogCourses sort", () => {
     });
 
     expect(supabase.calls.range).toBeUndefined();
-    expect(supabase.calls.orders).toEqual([]);
+    expect(supabase.calls.orders).toEqual([
+      { column: "id", options: { ascending: true } },
+    ]);
     expect(result.courses.map((course) => course.id)).toEqual(["c2", "c3", "c1"]);
     expect(result.total).toBe(3);
   });

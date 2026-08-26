@@ -338,8 +338,13 @@ export async function getCatalogCourses(
     request = request.or(filter);
   }
 
+  // Loads matching rows (capped by PostgREST max-rows, typically 1000) then
+  // sorts/slices in process — acceptable at current catalog size; a persisted
+  // lesson_count column would be needed to paginate in the database.
   if (resolvedSortBy === "lessonCount" || resolvedSortBy === "hours") {
-    const { data, error, count } = await request;
+    const { data, error, count } = await request.order("id", {
+      ascending: true,
+    });
     if (error) {
       throw error;
     }
