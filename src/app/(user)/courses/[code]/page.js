@@ -10,6 +10,7 @@ import {
 import { ModuleSamples } from "@/components/course-detail/module-samples";
 import { OtherInterestingCourses } from "@/components/course-detail/other-interesting-courses";
 import { CourseAttachmentSection } from "@/components/course-detail/subscribed-actions";
+import Footer from "@/components/footer";
 import { getSessionUser } from "@/lib/auth";
 import {
   getCourseAttachment,
@@ -148,6 +149,7 @@ export default async function CourseDetailPage({ params }) {
         enrolledCourseIds={enrolledCourseIds}
         wishlistCourseIds={wishlistCourseIds}
       />
+      <Footer />
     </>
   );
 }
