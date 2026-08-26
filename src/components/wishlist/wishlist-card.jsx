@@ -17,6 +17,7 @@ import {
 export function WishlistCard({
   course,
   href,
+  progress,
   onRemove,
   isRemoving = false,
   initiallySaved = false,
@@ -63,6 +64,10 @@ export function WishlistCard({
 
   const displayDescription = summary || description || "";
   const displayTime = formatLearningTime(totalLearningTime);
+  const displayProgress = Math.min(
+    100,
+    Math.max(0, Number.isFinite(Number(progress)) ? Math.round(Number(progress)) : 0),
+  );
 
   function handleRemoveClick(event) {
     event.preventDefault();
@@ -194,10 +199,30 @@ export function WishlistCard({
           </p>
         ) : null}
 
-        {/* Price */}
-        <p className="mt-4 text-headline3 font-medium text-gray-900">
-          THB {formatPrice(price)}
-        </p>
+        {progress === undefined ? (
+          <p className="mt-4 text-headline3 font-medium text-gray-900">
+            THB {formatPrice(price)}
+          </p>
+        ) : (
+          <div className="mt-4">
+            <p className="text-body3 font-medium text-black">
+              {displayProgress}% Complete
+            </p>
+            <div
+              className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-300"
+              role="progressbar"
+              aria-valuenow={displayProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${title} progress`}
+            >
+              <div
+                className="h-full rounded-full bg-blue-500 transition-[width] duration-500 ease-out"
+                style={{ width: `${displayProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Optional Direct Subscribe Button */}
         {showSubscribeButton ? (

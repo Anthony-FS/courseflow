@@ -22,8 +22,22 @@ async function postEnrollment(body) {
   );
 }
 
-function createEnrollmentReadMock({ rows = [], error = null } = {}) {
+function createEnrollmentReadMock({
+  rows = [],
+  error = null,
+  progressRows = [],
+  assignmentRows = [],
+  submissionRows = [],
+} = {}) {
   const queries = [];
+
+  function rowsFor(table) {
+    if (table === "enrollments") return rows;
+    if (table === "sub_lesson_progress") return progressRows;
+    if (table === "assignments") return assignmentRows;
+    if (table === "submissions") return submissionRows;
+    return [];
+  }
 
   return {
     queries,
@@ -42,7 +56,16 @@ function createEnrollmentReadMock({ rows = [], error = null } = {}) {
         },
         order(column, options) {
           query.order = { column, options };
-          return Promise.resolve({ data: error ? null : rows, error });
+          return Promise.resolve({
+            data: error && table === "enrollments" ? null : rowsFor(table),
+            error: table === "enrollments" ? error : null,
+          });
+        },
+        then(onFulfilled, onRejected) {
+          return Promise.resolve({
+            data: rowsFor(table),
+            error: null,
+          }).then(onFulfilled, onRejected);
         },
       };
 
@@ -74,8 +97,22 @@ describe("GET /api/enrollments", () => {
             cover_image_url: "/courses/service-design.svg",
             cover_file_url: null,
             price: 3500,
-            lessons: [{ id: "lesson-1" }, { id: "lesson-2" }],
+            lessons: [
+              {
+                id: "lesson-1",
+                sub_lessons: [{ id: "sub-lesson-1" }, { id: "sub-lesson-2" }],
+              },
+              { id: "lesson-2", sub_lessons: [] },
+            ],
           },
+        },
+      ],
+      progressRows: [
+        {
+          sub_lesson_id: "sub-lesson-1",
+          visited_at: "2026-08-02T00:00:00Z",
+          completed_at: "2026-08-02T00:00:00Z",
+          assignment_submitted_at: null,
         },
       ],
     });
@@ -97,7 +134,83 @@ describe("GET /api/enrollments", () => {
       code: "SD-101",
       title: "Service Design Essentials",
       lessonCount: 2,
+      progress: 50,
     });
+  });
+
+  it("returns zero progress when the user has no progress records", async () => {
+    const supabase = createEnrollmentReadMock({
+      rows: [
+        {
+          id: "enrollment-1",
+          course_id: COURSE_ID,
+          subscribed_at: "2026-08-01T00:00:00Z",
+          courses: {
+            id: COURSE_ID,
+            course_code: "SD-101",
+            title: "Service Design Essentials",
+            lessons: [
+              { id: "lesson-1", sub_lessons: [{ id: "sub-lesson-1" }] },
+            ],
+          },
+        },
+      ],
+    });
+    requireUser.mockResolvedValue({
+      supabase,
+      user: USER,
+      profile: { id: USER.id },
+      error: null,
+    });
+
+    const response = await getEnrollments();
+    const body = await response.json();
+
+    expect(body.courses[0].progress).toBe(0);
+  });
+
+  it("clamps calculated progress to the 0–100 range", async () => {
+    const completed = (id) => ({
+      sub_lesson_id: id,
+      visited_at: "2026-08-02T00:00:00Z",
+      completed_at: "2026-08-02T00:00:00Z",
+      assignment_submitted_at: null,
+    });
+    const supabase = createEnrollmentReadMock({
+      rows: [
+        {
+          id: "enrollment-1",
+          course_id: COURSE_ID,
+          subscribed_at: "2026-08-01T00:00:00Z",
+          courses: {
+            id: COURSE_ID,
+            course_code: "SD-101",
+            title: "Service Design Essentials",
+            lessons: [
+              { id: "lesson-1", sub_lessons: [{ id: "sub-lesson-1" }] },
+            ],
+          },
+        },
+      ],
+      progressRows: [
+        completed("sub-lesson-1"),
+        completed("outside-course-1"),
+        completed("outside-course-2"),
+      ],
+    });
+    requireUser.mockResolvedValue({
+      supabase,
+      user: USER,
+      profile: { id: USER.id },
+      error: null,
+    });
+
+    const response = await getEnrollments();
+    const body = await response.json();
+
+    expect(body.courses[0].progress).toBe(100);
+    expect(body.courses[0].progress).toBeGreaterThanOrEqual(0);
+    expect(body.courses[0].progress).toBeLessThanOrEqual(100);
   });
 
   it("queries enrollment records only for the authenticated user", async () => {
