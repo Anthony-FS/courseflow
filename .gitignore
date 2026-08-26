@@ -27,6 +27,7 @@
 
 # local agent specs/plans — not for GitHub
 /docs/superpowers/
+.superpowers/
 
 # debug
 npm-debug.log*

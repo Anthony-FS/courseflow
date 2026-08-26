@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 
 import { AdminPagination } from "@/components/admin/pagination";
-import { CourseCardSkeleton } from "@/components/courses/course-card";
+import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { WishlistCard } from "@/components/wishlist/wishlist-card";
 import {
   CATALOG_DEBOUNCE_MS,
@@ -20,10 +20,57 @@ import {
 } from "@/lib/wishlist";
 import { createClient } from "@/lib/supabase/client";
 
-async function loadCatalog({ query, page, pageSize, signal }) {
-  const response = await fetch(catalogRequestUrl({ query, page, pageSize }), {
-    signal,
-  });
+const CATALOG_SORT_OPTIONS = [
+  {
+    value: "lessonCount",
+    label: "Lesson count",
+    ascendingLabel: "Low to high",
+    descendingLabel: "High to low",
+  },
+  {
+    value: "title",
+    label: "Course name",
+    ascendingLabel: "A-Z",
+    descendingLabel: "Z-A",
+  },
+  {
+    value: "price",
+    label: "Price",
+    ascendingLabel: "Low to high",
+    descendingLabel: "High to low",
+  },
+  {
+    value: "createdAt",
+    label: "Created date",
+    ascendingLabel: "Oldest first",
+    descendingLabel: "Newest first",
+  },
+  {
+    value: "updatedAt",
+    label: "Updated date",
+    ascendingLabel: "Oldest first",
+    descendingLabel: "Newest first",
+  },
+  {
+    value: "hours",
+    label: "Learning time",
+    ascendingLabel: "Low to high",
+    descendingLabel: "High to low",
+  },
+];
+
+async function loadCatalog({
+  query,
+  page,
+  pageSize,
+  sortBy,
+  sortDirection,
+  signal,
+}) {
+  const response = await fetch(
+    catalogRequestUrl({ query, page, pageSize, sortBy, sortDirection }),
+    { signal },
+  );
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
@@ -44,6 +91,8 @@ export function OurCoursesCatalog({
   const [enrolledSet] = useState(() => new Set(enrolledCourseIds));
   const [input, setInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(null);
   const [courses, setCourses] = useState([]);
@@ -142,6 +191,8 @@ export function OurCoursesCatalog({
       query: debouncedQuery,
       page,
       pageSize,
+      sortBy,
+      sortDirection,
       signal: controller.signal,
     })
       .then((result) => {
@@ -159,28 +210,44 @@ export function OurCoursesCatalog({
       });
 
     return () => controller.abort();
-  }, [debouncedQuery, page, pageSize, reloadKey]);
+  }, [debouncedQuery, page, pageSize, reloadKey, sortBy, sortDirection]);
+
+  function handleSortChange({
+    sortBy: nextSortBy,
+    sortDirection: nextDirection,
+  }) {
+    setSortBy(nextSortBy);
+    setSortDirection(nextDirection);
+    setPage(1);
+  }
 
   const totalPages = getTotalPages(total, pageSize || 12);
   const showPager = status === "ready" && total > 0;
-  const skeletonCount = pageSize ?? 12;
 
   return (
     <div>
-      <label className="relative mx-auto mt-10 block max-w-xl">
-        <span className="sr-only">Search courses</span>
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-gray-600"
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+        <label className="relative block">
+          <span className="sr-only">Search courses</span>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-gray-600"
+          />
+          <input
+            type="search"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Search..."
+            className="h-12 w-full max-w-80 rounded-lg border border-gray-400 bg-white pr-4 pl-12 text-body2"
+          />
+        </label>
+        <SortFilterBar
+          options={CATALOG_SORT_OPTIONS}
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          onSortChange={handleSortChange}
         />
-        <input
-          type="search"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Search..."
-          className="h-12 w-full rounded-lg border border-gray-400 bg-white pr-4 pl-12 text-body2"
-        />
-      </label>
+      </div>
 
       {errorMessage ? (
         <div className="mt-10 text-center" role="alert">
@@ -200,13 +267,13 @@ export function OurCoursesCatalog({
       ) : null}
 
       {status === "loading" && courses.length === 0 ? (
-        <ul className="mt-16 grid grid-cols-1 gap-6 min-[761px]:grid-cols-3">
-          {Array.from({ length: skeletonCount }, (_, index) => (
-            <li key={index}>
-              <CourseCardSkeleton />
-            </li>
-          ))}
-        </ul>
+        <div
+          className="mt-16 flex items-center justify-center gap-3 text-body2 text-gray-700"
+          role="status"
+        >
+          <Loader2 className="size-5 animate-spin text-blue-500" aria-hidden />
+          Loading courses...
+        </div>
       ) : null}
 
       {status !== "error" && courses.length > 0 ? (

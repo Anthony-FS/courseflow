@@ -13,8 +13,18 @@ vi.mock("@/lib/courses", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/auth", () => ({
+  getSessionUser: vi.fn(),
+}));
+
+vi.mock("@/lib/enrollments", () => ({
+  getUserEnrolledCourseIds: vi.fn(),
+}));
+
 import { createServiceClient } from "@/lib/supabase/server";
 import { getCatalogCourses } from "@/lib/courses";
+import { getSessionUser } from "@/lib/auth";
+import { getUserEnrolledCourseIds } from "@/lib/enrollments";
 import { GET } from "@/app/api/courses/route";
 
 function getCourses(search = "page=1&pageSize=12") {
@@ -26,6 +36,8 @@ describe("GET /api/courses", () => {
     vi.clearAllMocks();
     createServiceClient.mockReturnValue({ mocked: true });
     getCatalogCourses.mockResolvedValue({ courses: [], total: 0 });
+    getSessionUser.mockResolvedValue({ user: null, supabase: { session: true } });
+    getUserEnrolledCourseIds.mockResolvedValue([]);
   });
 
   it("returns 400 for an invalid page size", async () => {
@@ -56,7 +68,83 @@ describe("GET /api/courses", () => {
     expect(body.courses[0].title).toBe("Alpha");
     expect(getCatalogCourses).toHaveBeenCalledWith(
       { mocked: true },
-      { query: "alpha", page: 2, pageSize: 6 },
+      {
+        query: "alpha",
+        page: 2,
+        pageSize: 6,
+        excludeCourseIds: [],
+        sortBy: "",
+        sortDirection: "",
+      },
+    );
+  });
+
+  it("forwards sortBy and sortDirection to getCatalogCourses", async () => {
+    const response = await getCourses(
+      "q=alpha&page=2&pageSize=6&sortBy=title&sortDirection=asc",
+    );
+
+    expect(response.status).toBe(200);
+    expect(getCatalogCourses).toHaveBeenCalledWith(
+      { mocked: true },
+      {
+        query: "alpha",
+        page: 2,
+        pageSize: 6,
+        excludeCourseIds: [],
+        sortBy: "title",
+        sortDirection: "asc",
+      },
+    );
+  });
+
+  it("excludes enrolled course ids for a logged-in user", async () => {
+    getSessionUser.mockResolvedValue({
+      user: { id: "user-1" },
+      supabase: { session: true },
+    });
+    getUserEnrolledCourseIds.mockResolvedValue(["c1", "c2"]);
+
+    const response = await getCourses("page=1&pageSize=12");
+
+    expect(response.status).toBe(200);
+    expect(getUserEnrolledCourseIds).toHaveBeenCalledWith(
+      { session: true },
+      "user-1",
+    );
+    expect(getCatalogCourses).toHaveBeenCalledWith(
+      { mocked: true },
+      {
+        query: "",
+        page: 1,
+        pageSize: 12,
+        excludeCourseIds: ["c1", "c2"],
+        sortBy: "",
+        sortDirection: "",
+      },
+    );
+  });
+
+  it("returns the catalog without exclude ids when enrollment lookup fails", async () => {
+    getSessionUser.mockResolvedValue({
+      user: { id: "user-1" },
+      supabase: { session: true },
+    });
+    getUserEnrolledCourseIds.mockRejectedValue(new Error("enrollments down"));
+
+    const response = await getCourses("page=1&pageSize=12");
+
+    expect(response.status).toBe(200);
+    expect(getCatalogCourses).toHaveBeenCalledWith(
+      { mocked: true },
+      {
+        query: "",
+        page: 1,
+        pageSize: 12,
+        excludeCourseIds: [],
+        sortBy: "",
+        sortDirection: "",
+      },
     );
   });
 
