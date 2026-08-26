@@ -21,7 +21,7 @@ function FormattedTextBlock({ text, className }) {
   return (
     <div
       className={cn(
-        "space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-[#D1D5DB]",
+        "space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-gray-700",
         className,
       )}
     >
@@ -49,7 +49,7 @@ function FormattedTextBlock({ text, className }) {
             )}
           >
             {isBullet && (
-              <span className="select-none text-base text-[#60A5FA] shrink-0 leading-tight">
+              <span className="select-none text-base text-blue-500 shrink-0 leading-tight">
                 •
               </span>
             )}
@@ -90,7 +90,7 @@ function InlineFormattedText({ content }) {
                 href={linkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-semibold text-[#60A5FA] underline underline-offset-2 hover:text-[#93C5FD] transition-colors"
+                className="inline-flex items-center gap-1 font-semibold text-blue-500 underline underline-offset-2 hover:text-blue-400 transition-colors"
               >
                 <span>{linkText}</span>
                 <ExternalLink className="size-3 inline shrink-0" aria-hidden />
@@ -101,7 +101,7 @@ function InlineFormattedText({ content }) {
 
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
-            <strong key={index} className="font-semibold text-white">
+            <strong key={index} className="font-semibold text-black">
               {part.slice(2, -2)}
             </strong>
           );
@@ -111,7 +111,7 @@ function InlineFormattedText({ content }) {
           return (
             <code
               key={index}
-              className="rounded bg-[#1E293B] px-1.5 py-0.5 font-mono text-xs font-medium text-[#60A5FA]"
+              className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs font-medium text-blue-600"
             >
               {part.slice(1, -1)}
             </code>
@@ -120,7 +120,7 @@ function InlineFormattedText({ content }) {
 
         if (part.startsWith("[[") && part.endsWith("]]")) {
           return (
-            <span key={index} className="font-semibold text-[#4D96FF]">
+            <span key={index} className="font-semibold text-blue-500">
               {part.slice(2, -2)}
             </span>
           );
@@ -141,7 +141,7 @@ function DiagramImageCard({ url, caption, alt }) {
 
   return (
     <figure className="my-6 mx-auto flex flex-col items-center">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white  shadow-[0_8px_30px_rgba(0,0,0,0.35)] border border-white/10 flex items-center justify-center">
+      <div className="relative flex w-full max-w-2xl items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
         <img
           src={src}
           alt={alt || caption || "Lesson diagram"}
@@ -150,7 +150,7 @@ function DiagramImageCard({ url, caption, alt }) {
         />
       </div>
       {caption ? (
-        <figcaption className="mt-2.5 text-center text-xs text-[#9CA3AF]">
+        <figcaption className="mt-2.5 text-center text-xs text-gray-500">
           {caption}
         </figcaption>
       ) : null}
@@ -171,7 +171,7 @@ function InlineVideoPlayer({ url, caption }) {
 
   return (
     <div className="my-6 mx-auto w-full max-w-3xl">
-      <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-lg border border-white/10">
+      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 shadow-card">
         {embed.type === "youtube" || embed.type === "vimeo" ? (
           <iframe
             src={embed.embedUrl}
@@ -190,7 +190,7 @@ function InlineVideoPlayer({ url, caption }) {
         )}
       </div>
       {visibleCaption ? (
-        <p className="mt-2 text-center text-xs text-[#9CA3AF]">{visibleCaption}</p>
+        <p className="mt-2 text-center text-xs text-gray-500">{visibleCaption}</p>
       ) : null}
     </div>
   );
@@ -209,23 +209,23 @@ function CalloutBox({ title = "เนื้อหาเสริม", content, v
 
   const styles = isWarning
     ? {
-        bg: "bg-[#2A1E14] border-[#78350F]",
-        icon: "text-[#F59E0B]",
-        title: "text-[#FBBF24]",
-        text: "text-[#FDE68A]",
+        bg: "bg-orange-100 border-orange-100",
+        icon: "text-orange-500",
+        title: "text-orange-500",
+        text: "text-gray-700",
       }
     : isTip
       ? {
-          bg: "bg-[#14261C] border-[#065F46]",
-          icon: "text-[#10B981]",
-          title: "text-[#34D399]",
-          text: "text-[#A7F3D0]",
+          bg: "bg-status-submitted border-green/30",
+          icon: "text-green",
+          title: "text-green",
+          text: "text-gray-700",
         }
       : {
-          bg: "bg-[#131E33] border-[#1E3A5F]",
-          icon: "text-[#60A5FA]",
-          title: "text-[#93C5FD]",
-          text: "text-[#E2E8F0]",
+          bg: "bg-blue-100 border-blue-200",
+          icon: "text-blue-500",
+          title: "text-blue-700",
+          text: "text-gray-700",
         };
 
   return (

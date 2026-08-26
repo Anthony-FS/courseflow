@@ -63,7 +63,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
   );
   if (!active) {
     return (
-      <main className="mx-auto w-[calc(100%-3rem)] max-w-280 py-16">
+      <main className="mx-auto w-[calc(100%)] max-w-280 py-16">
         <h1 className="text-headline2 font-medium tracking-[-0.02em] text-black">
           {course.title}
         </h1>
@@ -105,37 +105,35 @@ export default async function CourseLearnPage({ params, searchParams }) {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-white">
-      <div className="mx-auto flex w-[calc(100%-3rem)] max-w-280 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-          <CourseCurriculumSidebar
-            key={active.lessonId}
-            courseId={course.id}
-            courseCode={courseCode}
-            courseTitle={course.title}
-            courseSummary={course.summary || course.description}
-            lessons={course.lessons}
-            activeSubLessonId={active.id}
-            assignmentSubLessonIds={assignmentSubLessonIds}
-            initialVisitedIds={progress.visitedIds}
-            initialCompletedIds={progress.completedIds}
-            initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
-          />
+    <main className="flex min-h-[calc(100vh-5.5rem)] flex-1 flex-col bg-white">
+      <div className="mx-auto flex w-[calc(100%)] max-w-280 flex-1 flex-col lg:flex-row">
+        <CourseCurriculumSidebar
+          key={active.lessonId}
+          courseId={course.id}
+          courseCode={courseCode}
+          courseTitle={course.title}
+          courseSummary={course.summary || course.description}
+          lessons={course.lessons}
+          activeSubLessonId={active.id}
+          assignmentSubLessonIds={assignmentSubLessonIds}
+          initialVisitedIds={progress.visitedIds}
+          initialCompletedIds={progress.completedIds}
+          initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
+        />
 
-          <LessonContent
-            title={subLessonContent?.title ?? active.title}
-            description={subLessonContent?.description}
-            coverUrl={course.coverUrl}
-            videoUrl={subLessonContent?.videoUrl ?? null}
-            assignment={activeAssignment}
-            submission={activeSubmission}
-            courseId={course.id}
-            subLessonId={active.id}
-          />
-        </div>
+        <LessonContent
+          title={subLessonContent?.title ?? active.title}
+          description={subLessonContent?.description}
+          coverUrl={course.coverUrl}
+          videoUrl={subLessonContent?.videoUrl ?? null}
+          assignment={activeAssignment}
+          submission={activeSubmission}
+          courseId={course.id}
+          subLessonId={active.id}
+        />
       </div>
 
-      <div className="mx-auto w-[calc(100%-3rem)]">
+      <div className="mx-auto w-[calc(100%)]">
         <LessonNav
           courseId={course.id}
           courseCode={courseCode}

@@ -29,7 +29,7 @@ function LessonContent({
         ) : null}
 
         {description ? (
-          <div className="mt-6 rounded-2xl bg-[#0D1117] p-6 sm:p-8 text-white shadow-card">
+          <div className="mt-6 text-gray-700">
             <SubLessonRenderer description={description} />
           </div>
         ) : null}

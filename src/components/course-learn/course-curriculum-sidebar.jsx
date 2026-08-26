@@ -157,7 +157,7 @@ function CourseCurriculumSidebar({
   const progressPercent = mockProgressPercent(lessonsWithStatus);
 
   return (
-    <aside className="flex h-full w-full flex-col border-r border-gray-300 bg-white px-6 py-8 lg:w-[22.5rem] lg:shrink-0 lg:px-8">
+    <aside className="flex w-full flex-col bg-white px-6 py-8 lg:w-[22.5rem] lg:shrink-0 lg:self-stretch lg:border-r lg:border-gray-300 lg:px-8">
       <p className="text-body3 font-medium text-orange-500">Course</p>
       <h2 className="mt-2 text-headline3 font-medium tracking-[-0.02em] text-black">
         {courseTitle}
