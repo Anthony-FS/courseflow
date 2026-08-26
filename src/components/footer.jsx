@@ -14,9 +14,9 @@ function TwitterIcon() {
 }
 
 const socialLinks = [
-  { label: "Facebook", href: "#facebook", icon: FacebookIcon },
-  { label: "Instagram", href: "#instagram", icon: InstagramIcon },
-  { label: "Twitter", href: "#twitter", icon: TwitterIcon },
+  { label: "Facebook", href: "https://www.facebook.com/", icon: FacebookIcon },
+  { label: "Instagram", href: "https://www.instagram.com/", icon: InstagramIcon },
+  { label: "X", href: "https://www.twitter.com/", icon: TwitterIcon },
 ];
 
 export default function Footer() {
@@ -28,9 +28,8 @@ export default function Footer() {
         </Link>
 
         <nav className="flex items-center gap-22 text-body2 text-gray-300 my-5 max-[760px]:grid max-[760px]:gap-3" aria-label="Footer navigation">
-          {/*Add navigation links here*/}
-          <Link className="transition-colors hover:text-white" href="/">All Courses</Link>
-          <Link className="transition-colors hover:text-white" href="/">Bundle Package</Link>
+          <Link className="transition-colors hover:text-white" href="/courses">All Courses</Link>
+          <Link className="transition-colors hover:text-white" href="/bundle">Bundle Package</Link>
         </nav>
 
         <nav className="flex items-center gap-4" aria-label="Social media links">
