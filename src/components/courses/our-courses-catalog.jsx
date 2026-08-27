@@ -16,9 +16,7 @@ import { getTotalPages } from "@/lib/pagination";
 import {
   getActiveWishlistSet,
   initWishlistCache,
-  setWishlistCacheIds,
 } from "@/lib/wishlist";
-import { createClient } from "@/lib/supabase/client";
 
 const CATALOG_SORT_OPTIONS = [
   {
@@ -101,32 +99,6 @@ export function OurCoursesCatalog({
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const pageSizeRef = useRef(null);
-
-  useEffect(() => {
-    async function syncWishlist() {
-      try {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          const { data } = await supabase
-            .from("wishlists")
-            .select("course_id")
-            .eq("user_id", user.id);
-          if (data) {
-            const ids = data.map((r) => r.course_id).filter(Boolean);
-            setWishlistCacheIds(ids);
-            setWishlistSet(new Set(ids));
-          }
-        }
-      } catch {
-        // Ignore background sync errors
-      }
-    }
-
-    syncWishlist();
-  }, []);
 
   useEffect(() => {
     function handleWishlistChange(event) {

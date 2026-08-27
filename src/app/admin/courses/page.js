@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
@@ -9,13 +9,9 @@ import { AdminPagination } from "@/components/admin/pagination";
 import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { deleteCourse, getCourses, searchCourses } from "@/lib/courses";
-import {
-  ITEMS_PER_PAGE,
-  getTotalPages,
-  paginateItems,
-} from "@/lib/pagination";
-import { sortItems } from "@/lib/sorting";
+import { deleteCourse } from "@/lib/courses";
+import { getAdminCoursesPage } from "@/lib/admin-courses";
+import { ITEMS_PER_PAGE, getTotalPages } from "@/lib/pagination";
 
 const COURSE_SORT_OPTIONS = [
   {
@@ -52,6 +48,7 @@ const COURSE_SORT_OPTIONS = [
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState([]);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState("courseCode");
   const [sortDirection, setSortDirection] = useState("asc");
@@ -63,13 +60,24 @@ export default function AdminCoursesPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const timer = setTimeout(() => {
+      loadCourses();
+    }, 250);
 
     async function loadCourses() {
       try {
-        const data = await getCourses();
+        setStatus("loading");
+        const data = await getAdminCoursesPage({
+          query,
+          page: currentPage,
+          pageSize: ITEMS_PER_PAGE,
+          sortBy,
+          sortDirection,
+        });
 
         if (!cancelled) {
-          setCourses(data);
+          setCourses(data.courses ?? []);
+          setTotal(data.total ?? 0);
           setStatus("ready");
           setErrorMessage("");
         }
@@ -81,57 +89,13 @@ export default function AdminCoursesPage() {
       }
     }
 
-    loadCourses();
-
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, []);
+  }, [query, currentPage, sortBy, sortDirection]);
 
-  const filteredCourses = useMemo(
-    () => searchCourses(courses, query),
-    [courses, query],
-  );
-
-  const sortedCourses = useMemo(() => {
-    const sortConfig = {
-      courseCode: {
-        type: "text",
-        getValue: (course) => course.course_code,
-      },
-      title: {
-        type: "text",
-        getValue: (course) => course.title,
-      },
-      price: {
-        type: "number",
-        getValue: (course) => course.price,
-      },
-      createdAt: {
-        type: "date",
-        getValue: (course) => course.created_at,
-      },
-      updatedAt: {
-        type: "date",
-        getValue: (course) => course.updated_at,
-      },
-    }[sortBy] ?? {
-      type: "text",
-      getValue: (course) => course.course_code,
-    };
-
-    return sortItems(filteredCourses, {
-      ...sortConfig,
-      direction: sortDirection,
-    });
-  }, [filteredCourses, sortBy, sortDirection]);
-
-  const totalPages = getTotalPages(sortedCourses.length);
-
-  const paginatedCourses = useMemo(
-    () => paginateItems(sortedCourses, currentPage),
-    [sortedCourses, currentPage],
-  );
+  const totalPages = getTotalPages(total, ITEMS_PER_PAGE);
 
   function handleSearchChange(event) {
     setQuery(event.target.value);
@@ -158,9 +122,9 @@ export default function AdminCoursesPage() {
       );
 
       setCourses(remaining);
-      setCurrentPage((page) =>
-        Math.min(page, getTotalPages(searchCourses(remaining, query).length)),
-      );
+      const nextTotal = Math.max(0, total - 1);
+      setTotal(nextTotal);
+      setCurrentPage((page) => Math.min(page, getTotalPages(nextTotal, ITEMS_PER_PAGE)));
       setCourseToDelete(null);
       setErrorMessage("");
     } catch (error) {
@@ -213,14 +177,14 @@ export default function AdminCoursesPage() {
         ) : null}
         <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-card">
           <CourseTable
-            courses={paginatedCourses}
+            courses={courses}
             isLoading={status === "loading"}
             onDelete={setCourseToDelete}
             rowOffset={(currentPage - 1) * ITEMS_PER_PAGE}
           />
         </div>
 
-        {status === "ready" && sortedCourses.length > 0 ? (
+        {status === "ready" && total > 0 ? (
           <AdminPagination
             currentPage={currentPage}
             totalPages={totalPages}

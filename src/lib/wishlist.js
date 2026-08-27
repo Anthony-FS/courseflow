@@ -191,7 +191,7 @@ export async function getUserWishlistCount(supabase, userId) {
   try {
     const { count, data, error } = await supabase
       .from("wishlists")
-      .select("id", { count: "exact" })
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId);
 
     if (error) return 0;

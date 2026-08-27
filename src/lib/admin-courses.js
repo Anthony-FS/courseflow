@@ -47,6 +47,20 @@ export async function createAdminCourse(payload) {
   return data;
 }
 
+export async function getAdminCoursesPage({
+  query = "",
+  page = 1,
+  pageSize = 10,
+  sortBy = "courseCode",
+  sortDirection = "asc",
+} = {}) {
+  const params = new URLSearchParams({ q: query, page: String(page), pageSize: String(pageSize), sortBy, sortDirection });
+  const response = await fetch(`/api/admin/courses?${params}`, { cache: "no-store" });
+  const data = await parseJson(response);
+  if (!response.ok) throw createApiError(data, "Failed to load courses");
+  return data;
+}
+
 export async function getAdminCourse(courseId) {
   const response = await fetch(`/api/admin/courses/${courseId}`, {
     method: "GET",

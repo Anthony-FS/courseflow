@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import { resolveCoverUrl } from "@/lib/courses";
 import {
   COURSE_CODE_TAKEN_MESSAGE,
   findCourseWithCode,
@@ -11,6 +12,67 @@ import {
   validateCourseFields,
   validatePromoFields,
 } from "@/lib/course-validation";
+
+const ADMIN_COURSE_COLUMNS =
+  "id, title, course_code, cover_file_url, cover_file_type, cover_image_url, price, created_at, updated_at, lessons(count)";
+
+const COURSE_SORT_COLUMNS = {
+  courseCode: "course_code",
+  title: "title",
+  price: "price",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+};
+
+function mapAdminCourse(row) {
+  const lessons = row?.lessons;
+  const lessonCount = Array.isArray(lessons)
+    ? lessons[0]?.count ?? lessons.length
+    : lessons?.count ?? 0;
+
+  return {
+    id: row.id,
+    title: row.title,
+    course_code: row.course_code ?? "",
+    cover_file_url: resolveCoverUrl(row.cover_image_url || row.cover_file_url),
+    cover_file_type: row.cover_file_type,
+    price: row.price ?? 0,
+    lesson_count: lessonCount,
+    created_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
+  };
+}
+
+export async function GET(request) {
+  const { supabase, error } = await requireAdmin();
+  if (error) return error;
+
+  const searchParams = request.nextUrl.searchParams;
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize")) || 10));
+  const query = String(searchParams.get("q") ?? "").trim();
+  const sortBy = COURSE_SORT_COLUMNS[searchParams.get("sortBy")] ?? "course_code";
+  const ascending = searchParams.get("sortDirection") !== "desc";
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let requestQuery = supabase
+    .from("courses")
+    .select(ADMIN_COURSE_COLUMNS, { count: "exact" });
+
+  if (query) {
+    const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
+    requestQuery = requestQuery.or(`title.ilike.%${escaped}%,course_code.ilike.%${escaped}%`);
+  }
+
+  const { data, count, error: queryError } = await requestQuery
+    .order(sortBy, { ascending })
+    .range(from, to);
+
+  if (queryError) return jsonError(queryError.message || "Failed to load courses", 500);
+
+  return jsonOk({ courses: (data ?? []).map(mapAdminCourse), total: count ?? 0, page, pageSize });
+}
 
 function isBlank(value) {
   return String(value ?? "").trim() === "";
