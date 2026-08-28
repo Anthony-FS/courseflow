@@ -1,9 +1,61 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
+import { formatCourseDate } from "@/lib/format";
 import {
   SUBMISSION_TYPES,
   assignmentAnswerColumns,
 } from "@/lib/assignment-validation";
+
+const ADMIN_ASSIGNMENT_COLUMNS = `
+  id,
+  title,
+  description,
+  start_at,
+  end_at,
+  course:courses ( title ),
+  subLesson:sub_lessons ( title, lesson:lessons ( title ) )
+`;
+
+function mapAdminAssignment(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? "",
+    courseTitle: row.course?.title ?? "-",
+    lessonTitle: row.subLesson?.lesson?.title ?? "-",
+    subLessonTitle: row.subLesson?.title ?? "-",
+    dateLabel: row.start_at ? formatCourseDate(row.start_at) : "-",
+  };
+}
+
+export async function GET(request) {
+  const { supabase, error } = await requireAdmin();
+  if (error) return error;
+
+  const searchParams = request.nextUrl.searchParams;
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize")) || 10));
+  const query = String(searchParams.get("q") ?? "").trim();
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let requestQuery = supabase
+    .from("assignments")
+    .select(ADMIN_ASSIGNMENT_COLUMNS, { count: "exact" });
+
+  if (query) {
+    const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
+    requestQuery = requestQuery.ilike("title", `%${escaped}%`);
+  }
+
+  const { data, count, error: queryError } = await requestQuery
+    .order("start_at", { ascending: false })
+    .range(from, to);
+
+  if (queryError) return jsonError(queryError.message || "Failed to load assignments", 500);
+
+  return jsonOk({ assignments: (data ?? []).map(mapAdminAssignment), total: count ?? 0, page, pageSize });
+}
 
 const FILE_TYPES = ["pdf", "doc", "image"];
 const MAX_FILE_SIZES = [5, 10, 20, 50];

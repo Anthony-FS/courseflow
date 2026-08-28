@@ -75,3 +75,11 @@ export async function deleteAdminAssignment(id) {
 
   return data;
 }
+
+export async function getAdminAssignmentsPage({ query = "", page = 1, pageSize = 10 } = {}) {
+  const params = new URLSearchParams({ q: query, page: String(page), pageSize: String(pageSize) });
+  const response = await fetch(`/api/admin/assignments?${params}`, { cache: "no-store" });
+  const data = await parseJson(response);
+  if (!response.ok) throw new Error(data?.error || "Failed to load assignments");
+  return data;
+}

@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { jsonError } from "@/lib/api";
+import { cache } from "react";
 
-export async function getSessionUser() {
+export const getSessionUser = cache(async function getSessionUser() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,7 +22,7 @@ export async function getSessionUser() {
     .maybeSingle();
 
   return { supabase, user, profile };
-}
+});
 
 export async function requireUser() {
   const session = await getSessionUser();

@@ -45,9 +45,10 @@ export async function updateSession(request) {
     },
   );
 
-  // Refresh the session. Do not run other logic between createServerClient
-  // and getClaims() or users may be randomly logged out.
-  await supabase.auth.getClaims();
+  // Refresh/verify the session once. The returned claims already contain the
+  // user id, so admin checks below do not need a second auth.getUser() call.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
 
   const pathname = request.nextUrl.pathname;
   const isAdminPage =
@@ -56,19 +57,17 @@ export async function updateSession(request) {
 
   // Page routes only — API handlers enforce auth via requireAdmin().
   if (isAdminPage && !isAdminApi) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const userId = claims?.sub;
 
     if (pathname === "/admin/login") {
-      if (!user) {
+      if (!userId) {
         return supabaseResponse;
       }
 
       const { data: profile } = await supabase
         .from("profiles")
         .select("role, is_active")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
       const isAdmin =
@@ -88,7 +87,7 @@ export async function updateSession(request) {
       return supabaseResponse;
     }
 
-    if (!user) {
+    if (!userId) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/admin/login";
       loginUrl.searchParams.set("next", pathname);
@@ -98,7 +97,7 @@ export async function updateSession(request) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, is_active")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     const isAdmin =

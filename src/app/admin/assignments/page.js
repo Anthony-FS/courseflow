@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
@@ -8,12 +8,12 @@ import { AssignmentTable } from "@/components/admin/assignment-table";
 import { AdminPagination } from "@/components/admin/pagination";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { deleteAdminAssignment } from "@/lib/admin-assignments";
-import { getAssignments, searchAssignments } from "@/lib/assignments";
-import { getTotalPages, paginateItems } from "@/lib/pagination";
+import { deleteAdminAssignment, getAdminAssignmentsPage } from "@/lib/admin-assignments";
+import { ITEMS_PER_PAGE, getTotalPages } from "@/lib/pagination";
 
 export default function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState([]);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState("loading");
@@ -23,13 +23,20 @@ export default function AdminAssignmentsPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const timer = setTimeout(() => loadAssignments(), 250);
 
     async function loadAssignments() {
       try {
-        const data = await getAssignments();
+        setStatus("loading");
+        const data = await getAdminAssignmentsPage({
+          query,
+          page: currentPage,
+          pageSize: ITEMS_PER_PAGE,
+        });
 
         if (!cancelled) {
-          setAssignments(data);
+          setAssignments(data.assignments ?? []);
+          setTotal(data.total ?? 0);
           setStatus("ready");
           setErrorMessage("");
         }
@@ -43,24 +50,13 @@ export default function AdminAssignmentsPage() {
       }
     }
 
-    loadAssignments();
-
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, []);
+  }, [query, currentPage]);
 
-  const visibleAssignments = useMemo(
-    () => searchAssignments(assignments, query),
-    [assignments, query],
-  );
-
-  const totalPages = getTotalPages(visibleAssignments.length);
-
-  const paginatedAssignments = useMemo(
-    () => paginateItems(visibleAssignments, currentPage),
-    [visibleAssignments, currentPage],
-  );
+  const totalPages = getTotalPages(total, ITEMS_PER_PAGE);
 
   function handleSearchChange(event) {
     setQuery(event.target.value);
@@ -92,6 +88,9 @@ export default function AdminAssignmentsPage() {
           (assignment) => assignment.id !== assignmentToDelete.id,
         ),
       );
+      const nextTotal = Math.max(0, total - 1);
+      setTotal(nextTotal);
+      setCurrentPage((page) => Math.min(page, getTotalPages(nextTotal, ITEMS_PER_PAGE)));
 
       setAssignmentToDelete(null);
       setCurrentPage(1);
@@ -146,13 +145,13 @@ export default function AdminAssignmentsPage() {
 
         <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-card">
           <AssignmentTable
-            assignments={paginatedAssignments}
+            assignments={assignments}
             isLoading={status === "loading"}
             onDelete={handleDeleteRequest}
           />
         </div>
 
-        {status === "ready" && visibleAssignments.length > 0 ? (
+        {status === "ready" && total > 0 ? (
           <AdminPagination
             currentPage={currentPage}
             totalPages={totalPages}
