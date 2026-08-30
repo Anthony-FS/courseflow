@@ -9,10 +9,13 @@ export const BLOCK_TYPES = {
   IMAGE: "image",
   VIDEO: "video",
   CALLOUT: "callout",
+  ATTACHMENT: "attachment",
 };
 
 export function generateBlockId() {
-  return "block_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now();
+  return (
+    "block_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now()
+  );
 }
 
 function isEphemeralMediaUrl(url) {
@@ -80,6 +83,31 @@ export function getImageSrc(url) {
   return resolveCoverFileUrl(trimmed) || trimmed;
 }
 
+/**
+ * Client-side attachment href for admin blob previews only.
+ * Stored paths must be resolved server-side via resolveAttachmentHref.
+ */
+export function getAttachmentSrc(url) {
+  if (!url || typeof url !== "string") return null;
+
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (isEphemeralMediaUrl(trimmed)) return trimmed;
+
+  return null;
+}
+
+function normalizeAttachmentUrl(url) {
+  return String(url ?? "").trim();
+}
+
+function isUsableLegacyAttachmentUrl(url) {
+  const value = normalizeAttachmentUrl(url);
+  if (!value || isEphemeralMediaUrl(value)) return false;
+  if (/\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg)(\?|$)/i.test(value)) return false;
+  return true;
+}
+
 function isMediaFilenameCaption(caption) {
   const value = String(caption ?? "").trim();
   if (!value) return false;
@@ -122,7 +150,11 @@ function videoBlockHasUrl(blocks, url) {
     if (block?.type !== BLOCK_TYPES.VIDEO) return false;
     const existing = normalizeVideoUrl(block.url);
     if (!existing) return false;
-    return existing === target || existing.endsWith(target) || target.endsWith(existing);
+    return (
+      existing === target ||
+      existing.endsWith(target) ||
+      target.endsWith(existing)
+    );
   });
 }
 
@@ -137,12 +169,44 @@ export function hasVideoContentBlock(blocksOrDescription) {
   );
 }
 
+function attachmentBlockHasUrl(blocks, url) {
+  const target = normalizeAttachmentUrl(url);
+  if (!target) return false;
+
+  return (Array.isArray(blocks) ? blocks : []).some((block) => {
+    if (block?.type !== BLOCK_TYPES.ATTACHMENT) return false;
+    const existing = normalizeAttachmentUrl(block.url);
+    if (!existing) return false;
+    return (
+      existing === target ||
+      existing.endsWith(target) ||
+      target.endsWith(existing)
+    );
+  });
+}
+
+export function hasAttachmentContentBlock(blocksOrDescription) {
+  const blocks = Array.isArray(blocksOrDescription)
+    ? blocksOrDescription
+    : parseSubLessonContent(blocksOrDescription);
+
+  return blocks.some(
+    (block) =>
+      block?.type === BLOCK_TYPES.ATTACHMENT &&
+      isUsableLegacyAttachmentUrl(block.url),
+  );
+}
+
 /**
  * Copies an already-uploaded sub-lesson video into a Video Player block.
  * Does not re-upload. No-ops when there is no video, the URL is a local
  * preview, or a matching video block already exists.
  */
-export function migrateLegacyVideoIntoBlocks(blocks, videoUrl, _videoName = "") {
+export function migrateLegacyVideoIntoBlocks(
+  blocks,
+  videoUrl,
+  _videoName = "",
+) {
   const existing = Array.isArray(blocks) ? [...blocks] : [];
   const url = normalizeVideoUrl(videoUrl);
   if (!isUsableLegacyVideoUrl(url) || videoBlockHasUrl(existing, url)) {
@@ -158,20 +222,59 @@ export function migrateLegacyVideoIntoBlocks(blocks, videoUrl, _videoName = "") 
   return [videoBlock, ...existing];
 }
 
+/**
+ * Copies an already-uploaded sub-lesson attachment into an Attachment block.
+ * Does not re-upload. No-ops when there is no attachment, the URL is a local
+ * preview, or a matching attachment block already exists.
+ */
+export function migrateLegacyAttachmentIntoBlocks(
+  blocks,
+  attachmentUrl,
+  attachmentName = "",
+  attachmentType = "",
+) {
+  const existing = Array.isArray(blocks) ? [...blocks] : [];
+  const url = normalizeAttachmentUrl(attachmentUrl);
+  if (
+    !isUsableLegacyAttachmentUrl(url) ||
+    attachmentBlockHasUrl(existing, url)
+  ) {
+    return existing;
+  }
+
+  const attachmentBlock = createBlock(BLOCK_TYPES.ATTACHMENT, {
+    url,
+    name: String(attachmentName || "").trim() || "Attachment",
+    fileType: String(attachmentType || "").trim(),
+  });
+
+  // Keep previous learner order: the standalone attachment sat below the content.
+  return [...existing, attachmentBlock];
+}
+
 export function hydrateSubLessonBlocks(sub = {}) {
   const sourceBlocks = Array.isArray(sub.blocks)
     ? sub.blocks.map((block, idx) => normalizeParsedBlock(block, idx))
     : parseSubLessonContent(sub.description);
-  const blocks = migrateLegacyVideoIntoBlocks(
-    sourceBlocks,
-    sub.videoUrl,
-    sub.videoName,
+  const blocks = migrateLegacyAttachmentIntoBlocks(
+    migrateLegacyVideoIntoBlocks(sourceBlocks, sub.videoUrl, sub.videoName),
+    sub.attachmentUrl,
+    sub.attachmentName,
+    sub.attachmentType,
   );
+  const attachmentInBlocks = hasAttachmentContentBlock(blocks);
+  const videoInBlocks = hasVideoContentBlock(blocks);
 
   return {
     ...sub,
     blocks,
     description: serializeSubLessonContent(blocks),
+    attachmentUrl: attachmentInBlocks ? null : (sub.attachmentUrl ?? null),
+    attachmentName: attachmentInBlocks ? "" : (sub.attachmentName ?? ""),
+    attachmentFile: null,
+    videoUrl: videoInBlocks ? null : (sub.videoUrl ?? null),
+    videoName: videoInBlocks ? "" : (sub.videoName ?? ""),
+    videoFile: null,
   };
 }
 
@@ -210,6 +313,17 @@ export function createBlock(type, initial = {}) {
         title: initial.title || "เนื้อหาเสริม",
         content: initial.content || "",
         variant: initial.variant || "info", // "info" | "tip" | "warning"
+        ...initial,
+      };
+
+    case BLOCK_TYPES.ATTACHMENT:
+      return {
+        id,
+        type: BLOCK_TYPES.ATTACHMENT,
+        url: initial.url || "",
+        file: initial.file || null,
+        name: initial.name || "",
+        fileType: initial.fileType || "",
         ...initial,
       };
 
@@ -286,10 +400,15 @@ export function serializeSubLessonContent(blocks) {
     (b) =>
       b.type === BLOCK_TYPES.IMAGE ||
       b.type === BLOCK_TYPES.VIDEO ||
-      b.type === BLOCK_TYPES.CALLOUT,
+      b.type === BLOCK_TYPES.CALLOUT ||
+      b.type === BLOCK_TYPES.ATTACHMENT,
   );
 
-  if (cleanBlocks.length === 1 && cleanBlocks[0].type === BLOCK_TYPES.TEXT && !hasRichBlocks) {
+  if (
+    cleanBlocks.length === 1 &&
+    cleanBlocks[0].type === BLOCK_TYPES.TEXT &&
+    !hasRichBlocks
+  ) {
     return cleanBlocks[0].content || "";
   }
 
@@ -306,7 +425,9 @@ export function collectMediaUrlsFromContent(raw) {
 
   for (const block of blocks) {
     if (
-      (block.type === BLOCK_TYPES.IMAGE || block.type === BLOCK_TYPES.VIDEO) &&
+      (block.type === BLOCK_TYPES.IMAGE ||
+        block.type === BLOCK_TYPES.VIDEO ||
+        block.type === BLOCK_TYPES.ATTACHMENT) &&
       block.url &&
       !isEphemeralMediaUrl(block.url)
     ) {

@@ -1,6 +1,8 @@
-import { resolveTrailerUrl } from "@/lib/courses";
+import { resolveAttachmentHref, resolveTrailerUrl } from "@/lib/courses";
 import {
+  BLOCK_TYPES,
   hasVideoContentBlock,
+  migrateLegacyAttachmentIntoBlocks,
   migrateLegacyVideoIntoBlocks,
   parseSubLessonContent,
   serializeSubLessonContent,
@@ -126,6 +128,39 @@ export function pickVideoMaterial(materials) {
   );
 }
 
+export function pickAttachmentMaterial(materials) {
+  const rows = Array.isArray(materials) ? materials : [];
+  const videoMaterial = pickVideoMaterial(rows);
+
+  return (
+    rows.find(
+      (row) =>
+        row !== videoMaterial &&
+        row?.file_url &&
+        !isVideoMaterial(row) &&
+        !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(String(row.file_url ?? "")),
+    ) ?? null
+  );
+}
+
+async function withAttachmentDownloadUrls(supabase, blocks) {
+  return Promise.all(
+    (blocks ?? []).map(async (block) => {
+      if (block?.type !== BLOCK_TYPES.ATTACHMENT || !block.url) {
+        return block;
+      }
+
+      const value = String(block.url).trim();
+      if (!value || value.startsWith("blob:") || value.startsWith("data:")) {
+        return block;
+      }
+
+      const downloadUrl = await resolveAttachmentHref(supabase, value);
+      return downloadUrl ? { ...block, downloadUrl } : block;
+    }),
+  );
+}
+
 /**
  * Load learner-facing sub-lesson content (title, description, video).
  * Uses service/catalog client after enrollment is verified on the page.
@@ -140,33 +175,45 @@ export async function getSubLessonLearningContent(
     return null;
   }
 
-  const [{ data: subLesson, error: subError }, { data: materials, error: materialsError }] =
-    await Promise.all([
-      supabase
-        .from("sub_lessons")
-        .select("id, title, description")
-        .eq("id", id)
-        .eq("course_id", course)
-        .maybeSingle(),
-      supabase
-        .from("materials")
-        .select("name, file_url, file_type")
-        .eq("sub_lesson_id", id)
-        .eq("course_id", course),
-    ]);
+  const [
+    { data: subLesson, error: subError },
+    { data: materials, error: materialsError },
+  ] = await Promise.all([
+    supabase
+      .from("sub_lessons")
+      .select("id, title, description")
+      .eq("id", id)
+      .eq("course_id", course)
+      .maybeSingle(),
+    supabase
+      .from("materials")
+      .select("name, file_url, file_type")
+      .eq("sub_lesson_id", id)
+      .eq("course_id", course),
+  ]);
 
   if (subError || materialsError || !subLesson) {
     return null;
   }
 
   const videoMaterial = pickVideoMaterial(materials);
-  const blocks = migrateLegacyVideoIntoBlocks(
-    parseSubLessonContent(subLesson.description ?? ""),
-    videoMaterial?.file_url,
-    videoMaterial?.name ?? "",
+  const attachmentMaterial = pickAttachmentMaterial(materials);
+  const blocks = migrateLegacyAttachmentIntoBlocks(
+    migrateLegacyVideoIntoBlocks(
+      parseSubLessonContent(subLesson.description ?? ""),
+      videoMaterial?.file_url,
+      videoMaterial?.name ?? "",
+    ),
+    attachmentMaterial?.file_url,
+    attachmentMaterial?.name ?? "",
+    attachmentMaterial?.file_type ?? "",
   );
-  const description = serializeSubLessonContent(blocks);
-  const hasBlockVideo = hasVideoContentBlock(blocks);
+  const blocksWithDownloadUrls = await withAttachmentDownloadUrls(
+    supabase,
+    blocks,
+  );
+  const description = serializeSubLessonContent(blocksWithDownloadUrls);
+  const hasBlockVideo = hasVideoContentBlock(blocksWithDownloadUrls);
 
   return {
     title: subLesson.title ?? "",
@@ -209,7 +256,8 @@ export async function getAssignmentsForCourse(supabase, courseId) {
     .select(
       "id, sub_lesson_id, title, description, submission_type, choice_a, choice_b, choice_c, choice_d, allowed_file_types, max_file_size_mb",
     )
-    .eq("course_id", course);
+    .eq("course_id", course)
+    .order("title", { ascending: true });
 
   if (error || !Array.isArray(data)) {
     return [];
@@ -266,8 +314,7 @@ export async function withAssignmentAnswerKeys(supabase, assignment) {
   const type = data.submission_type ?? assignment.submissionType;
   return {
     ...assignment,
-    answerText:
-      type === "text" ? String(data.answer_text ?? "").trim() : "",
+    answerText: type === "text" ? String(data.answer_text ?? "").trim() : "",
     correctChoice:
       type === "choice" ? String(data.correct_choice ?? "").trim() : "",
   };

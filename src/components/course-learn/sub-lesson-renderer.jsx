@@ -1,8 +1,11 @@
 "use client";
 
-import { Info, AlertTriangle, Lightbulb, ExternalLink } from "lucide-react";
+import { Info, AlertTriangle, Lightbulb, ExternalLink, File } from "lucide-react";
+
+import { DirectFileVideoPlayer } from "@/components/course-learn/lesson-video";
 import {
   BLOCK_TYPES,
+  getAttachmentSrc,
   getImageSrc,
   getVideoEmbedInfo,
   parseSubLessonContent,
@@ -181,18 +184,47 @@ function InlineVideoPlayer({ url, caption }) {
             className="h-full w-full border-0"
           />
         ) : (
-          <video
-            src={embed.src}
-            controls
-            className="h-full w-full object-contain"
-            playsInline
+          <DirectFileVideoPlayer
+            title={visibleCaption || "Lesson Video"}
+            videoUrl={embed.src}
+            className="rounded-2xl border border-gray-200 bg-gray-900 shadow-card"
+            videoClassName="object-contain"
           />
         )}
       </div>
       {visibleCaption ? (
-        <p className="mt-2 text-center text-xs text-gray-500">{visibleCaption}</p>
+        <p className="mt-2 text-center text-xs text-gray-500">
+          {visibleCaption}
+        </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Renders a downloadable attachment card
+ */
+function AttachmentCard({ url, name, downloadUrl }) {
+  const href = downloadUrl || getAttachmentSrc(url);
+  if (!href) return null;
+
+  const displayName = String(name || "").trim() || "Download attachment";
+
+  return (
+    <a
+      href={href}
+      download={displayName}
+      target="_blank"
+      rel="noreferrer"
+      className="my-6 inline-flex max-w-full items-center gap-4 rounded-lg bg-blue-100 p-4 transition-colors hover:bg-blue-200"
+    >
+      <span className="grid size-12 shrink-0 place-items-center rounded-md bg-white">
+        <File className="size-6 text-blue-400" aria-hidden />
+      </span>
+      <span className="min-w-0 text-body2 font-medium text-black">
+        {displayName}
+      </span>
+    </a>
   );
 }
 
@@ -297,6 +329,16 @@ export function SubLessonRenderer({ description, className }) {
                 title={block.title}
                 content={block.content}
                 variant={block.variant}
+              />
+            );
+
+          case BLOCK_TYPES.ATTACHMENT:
+            return (
+              <AttachmentCard
+                key={block.id}
+                url={block.url}
+                name={block.name}
+                downloadUrl={block.downloadUrl}
               />
             );
 

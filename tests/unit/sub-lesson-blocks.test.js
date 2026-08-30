@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   BLOCK_TYPES,
   createBlock,
+  getAttachmentSrc,
   getVideoEmbedInfo,
+  hasAttachmentContentBlock,
   hasVideoContentBlock,
   hydrateSubLessonBlocks,
+  migrateLegacyAttachmentIntoBlocks,
   migrateLegacyVideoIntoBlocks,
   moveBlock,
   parseSubLessonContent,
@@ -121,7 +124,12 @@ describe("sub-lesson-blocks utilities", () => {
     const rawBlocks = [
       { id: "b1", type: "text", content: "Introduction" },
       { id: "b2", type: "image", url: "https://example.com/diagram.png" },
-      { id: "b3", type: "callout", title: "เนื้อหาเสริม", content: "Code info" },
+      {
+        id: "b3",
+        type: "callout",
+        title: "เนื้อหาเสริม",
+        content: "Code info",
+      },
     ];
     const jsonStr = JSON.stringify(rawBlocks);
 
@@ -179,9 +187,9 @@ describe("sub-lesson-blocks utilities", () => {
     const text = createBlock(BLOCK_TYPES.TEXT, { content: "Text only" });
     expect(migrateLegacyVideoIntoBlocks([text], null)).toEqual([text]);
     expect(migrateLegacyVideoIntoBlocks([text], "")).toEqual([text]);
-    expect(migrateLegacyVideoIntoBlocks([text], "blob:http://localhost/1")).toEqual(
-      [text],
-    );
+    expect(
+      migrateLegacyVideoIntoBlocks([text], "blob:http://localhost/1"),
+    ).toEqual([text]);
     expect(
       migrateLegacyVideoIntoBlocks([text], "course-attachments/a/notes.pdf"),
     ).toEqual([text]);
@@ -203,9 +211,9 @@ describe("sub-lesson-blocks utilities", () => {
     );
 
     expect(migrated).toHaveLength(2);
-    expect(migrated.filter((block) => block.type === BLOCK_TYPES.VIDEO)).toHaveLength(
-      1,
-    );
+    expect(
+      migrated.filter((block) => block.type === BLOCK_TYPES.VIDEO),
+    ).toHaveLength(1);
   });
 
   it("hydrates a sub-lesson by copying the legacy video into blocks", () => {
@@ -222,6 +230,50 @@ describe("sub-lesson-blocks utilities", () => {
     expect(hydrated.blocks[0].caption).toBe("");
     expect(hydrated.blocks[1].type).toBe(BLOCK_TYPES.TEXT);
     expect(JSON.parse(hydrated.description)[0].type).toBe("video");
+    expect(hydrated.videoUrl).toBeNull();
+  });
+
+  it("migrates a stored attachment into an Attachment block without re-uploading", () => {
+    const text = createBlock(BLOCK_TYPES.TEXT, { content: "Read this first" });
+    const migrated = migrateLegacyAttachmentIntoBlocks(
+      [text],
+      "course-attachments/admin/notes.pdf",
+      "Course Notes",
+      "application/pdf",
+    );
+
+    expect(migrated).toHaveLength(2);
+    expect(migrated[1].type).toBe(BLOCK_TYPES.ATTACHMENT);
+    expect(migrated[1].url).toBe("course-attachments/admin/notes.pdf");
+    expect(migrated[1].name).toBe("Course Notes");
+    expect(migrated[0]).toEqual(text);
+  });
+
+  it("hydrates legacy attachment and video into blocks and clears legacy fields", () => {
+    const hydrated = hydrateSubLessonBlocks({
+      title: "Intro",
+      description: "Welcome",
+      videoUrl: "course-trailers/admin/lesson.mp4",
+      attachmentUrl: "course-attachments/admin/backend.jpg",
+      attachmentName: "backend.jpg",
+      attachmentType: "image/jpeg",
+    });
+
+    expect(hydrated.blocks[0].type).toBe(BLOCK_TYPES.VIDEO);
+    expect(hydrated.blocks[1].type).toBe(BLOCK_TYPES.TEXT);
+    expect(hydrated.blocks[2].type).toBe(BLOCK_TYPES.ATTACHMENT);
+    expect(hydrated.videoUrl).toBeNull();
+    expect(hydrated.attachmentUrl).toBeNull();
+    expect(hasAttachmentContentBlock(hydrated.blocks)).toBe(true);
+  });
+
+  it("returns blob preview URLs only for client-side attachment previews", () => {
+    expect(getAttachmentSrc("blob:http://localhost:3000/abc")).toBe(
+      "blob:http://localhost:3000/abc",
+    );
+    expect(getAttachmentSrc("course-attachments/admin/notes.pdf")).toBeNull();
+    expect(getAttachmentSrc("")).toBeNull();
+    expect(getAttachmentSrc(null)).toBeNull();
   });
 
   it("does not use a video filename as a caption", () => {
@@ -254,6 +306,13 @@ describe("sub-lesson-blocks utilities", () => {
     expect(collectMediaUrlsFromContent(description)).toEqual([
       "course-covers/admin/diagram.png",
       "course-trailers/admin/clip.mp4",
+    ]);
+
+    const withAttachment = JSON.stringify([
+      { id: "a1", type: "attachment", url: "course-attachments/admin/notes.pdf" },
+    ]);
+    expect(collectMediaUrlsFromContent(withAttachment)).toEqual([
+      "course-attachments/admin/notes.pdf",
     ]);
 
     expect(

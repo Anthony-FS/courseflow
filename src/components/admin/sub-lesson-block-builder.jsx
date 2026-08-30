@@ -6,6 +6,7 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   MessageSquare,
+  Paperclip,
   ArrowUp,
   ArrowDown,
   Trash2,
@@ -212,9 +213,20 @@ export function SubLessonBlockBuilder({
     onChange(moveBlock(blocks, index, index + 1));
   }
 
-  function handleFileUpload(index, file, isVideo = false) {
+  function handleFileUpload(index, file, mediaKind = "image") {
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
+
+    if (mediaKind === "attachment") {
+      handleUpdateBlock(index, {
+        file,
+        url: previewUrl,
+        name: file.name,
+        fileType: file.type,
+      });
+      return;
+    }
+
     handleUpdateBlock(index, {
       file,
       url: previewUrl,
@@ -291,22 +303,32 @@ export function SubLessonBlockBuilder({
                   </span>
                   {block.type === BLOCK_TYPES.TEXT && (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2A2E3F]">
-                      <FileText className="size-3.5 text-[#2F5FAC]" /> Text Block
+                      <FileText className="size-3.5 text-[#2F5FAC]" /> Text
+                      Block
                     </span>
                   )}
                   {block.type === BLOCK_TYPES.IMAGE && (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2A2E3F]">
-                      <ImageIcon className="size-3.5 text-[#10B981]" /> Image / Diagram Card
+                      <ImageIcon className="size-3.5 text-[#10B981]" /> Image /
+                      Diagram Card
                     </span>
                   )}
                   {block.type === BLOCK_TYPES.VIDEO && (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2A2E3F]">
-                      <VideoIcon className="size-3.5 text-[#8B5CF6]" /> Video Player
+                      <VideoIcon className="size-3.5 text-[#8B5CF6]" /> Video
+                      Player
                     </span>
                   )}
                   {block.type === BLOCK_TYPES.CALLOUT && (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2A2E3F]">
-                      <MessageSquare className="size-3.5 text-[#F47E20]" /> Callout Note (เนื้อหาเสริม)
+                      <MessageSquare className="size-3.5 text-[#F47E20]" />{" "}
+                      Callout Note (เนื้อหาเสริม)
+                    </span>
+                  )}
+                  {block.type === BLOCK_TYPES.ATTACHMENT && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2A2E3F]">
+                      <Paperclip className="size-3.5 text-[#2F5FAC]" />{" "}
+                      Attachment
                     </span>
                   )}
                 </div>
@@ -367,7 +389,9 @@ export function SubLessonBlockBuilder({
                       />
                     </div>
                     <p className="text-[11px] text-[#9AA1B9]">
-                      💡 Tip: Select any text and click <strong className="text-[#2F5FAC]">Link 🔗</strong> to wrap into a hyperlink.
+                      💡 Tip: Select any text and click{" "}
+                      <strong className="text-[#2F5FAC]">Link 🔗</strong> to
+                      wrap into a hyperlink.
                     </p>
                   </div>
                 )}
@@ -384,7 +408,7 @@ export function SubLessonBlockBuilder({
                           accept="image/*"
                           className="hidden"
                           onChange={(e) =>
-                            handleFileUpload(index, e.target.files?.[0], false)
+                            handleFileUpload(index, e.target.files?.[0])
                           }
                         />
                       </label>
@@ -445,7 +469,7 @@ export function SubLessonBlockBuilder({
                           accept="video/*"
                           className="hidden"
                           onChange={(e) =>
-                            handleFileUpload(index, e.target.files?.[0], true)
+                            handleFileUpload(index, e.target.files?.[0], "video")
                           }
                         />
                       </label>
@@ -461,30 +485,33 @@ export function SubLessonBlockBuilder({
                       />
                     </div>
 
-                    {block.url ? (() => {
-                      const embed = getVideoEmbedInfo(block.url);
-                      if (!embed) return null;
+                    {block.url
+                      ? (() => {
+                          const embed = getVideoEmbedInfo(block.url);
+                          if (!embed) return null;
 
-                      return (
-                        <div className="relative aspect-video max-w-sm overflow-hidden rounded-lg bg-black">
-                          {embed.type === "youtube" || embed.type === "vimeo" ? (
-                            <iframe
-                              src={embed.embedUrl}
-                              title="Video Preview"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                              className="h-full w-full border-0"
-                            />
-                          ) : (
-                            <video
-                              src={embed.src}
-                              controls
-                              className="h-full w-full object-contain"
-                            />
-                          )}
-                        </div>
-                      );
-                    })() : null}
+                          return (
+                            <div className="relative aspect-video max-w-sm overflow-hidden rounded-lg bg-black">
+                              {embed.type === "youtube" ||
+                              embed.type === "vimeo" ? (
+                                <iframe
+                                  src={embed.embedUrl}
+                                  title="Video Preview"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                  className="h-full w-full border-0"
+                                />
+                              ) : (
+                                <video
+                                  src={embed.src}
+                                  controls
+                                  className="h-full w-full object-contain"
+                                />
+                              )}
+                            </div>
+                          );
+                        })()
+                      : null}
 
                     <input
                       type="text"
@@ -494,6 +521,67 @@ export function SubLessonBlockBuilder({
                         handleUpdateBlock(index, { caption: e.target.value })
                       }
                       className="h-8.5 w-full rounded-lg border border-[#D6D9E4] bg-white px-3 text-xs text-[#2A2E3F] outline-none focus:border-[#8B5CF6]"
+                    />
+                  </div>
+                )}
+
+                {/* 5. ATTACHMENT BLOCK */}
+                {block.type === BLOCK_TYPES.ATTACHMENT && (
+                  <div className="space-y-3">
+                    {block.url ? (
+                      <div className="flex max-w-md items-center justify-between rounded-xl border border-[#D6D9E4] bg-white p-3.5">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <Paperclip
+                            className="size-4 shrink-0 text-[#2F5FAC]"
+                            aria-hidden
+                          />
+                          <span className="truncate text-xs font-medium text-[#2A2E3F]">
+                            {block.name || "Attached File"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleUpdateBlock(index, {
+                              url: "",
+                              file: null,
+                              name: "",
+                              fileType: "",
+                            })
+                          }
+                          className="cursor-pointer p-1 text-[#9AA1B9] transition-colors hover:text-[#9B2C6B]"
+                          title="Remove Attachment"
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="inline-flex max-w-xs cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#C8CCDB] bg-white px-4 py-2.5 text-xs font-medium text-[#646D89] transition-colors hover:bg-[#F6F7FC]">
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.zip,.png,.jpg,.jpeg,.webp"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleFileUpload(
+                              index,
+                              e.target.files?.[0],
+                              "attachment",
+                            )
+                          }
+                        />
+                        <Paperclip className="size-4 text-[#2F5FAC]" aria-hidden />
+                        <span>Upload attachment file</span>
+                      </label>
+                    )}
+
+                    <input
+                      type="text"
+                      value={block.name || ""}
+                      placeholder="Display name (optional)"
+                      onChange={(e) =>
+                        handleUpdateBlock(index, { name: e.target.value })
+                      }
+                      className="h-8.5 w-full rounded-lg border border-[#D6D9E4] bg-white px-3 text-xs text-[#2A2E3F] outline-none focus:border-[#2F5FAC]"
                     />
                   </div>
                 )}
@@ -590,6 +678,15 @@ export function SubLessonBlockBuilder({
         >
           <Plus className="size-3.5" />
           <span>Callout Box (เนื้อหาเสริม)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleAddBlock(BLOCK_TYPES.ATTACHMENT)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6D9E4] bg-[#F8F9FD] px-3 py-1.5 text-xs font-semibold text-[#2A2E3F] transition-all hover:bg-[#E2E8F5] hover:text-[#2F5FAC] cursor-pointer"
+        >
+          <Plus className="size-3.5" />
+          <span>Attachment (PDF, Doc, ZIP)</span>
         </button>
       </div>
     </div>

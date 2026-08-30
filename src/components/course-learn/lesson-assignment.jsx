@@ -1,10 +1,6 @@
 "use client";
 
 import { AssignmentSubmissionCard } from "@/components/assignment-submission-card";
-import {
-  markAssignmentSubmitted,
-  notifyAssignmentSubmitted,
-} from "@/lib/course-learn-progress";
 
 /**
  * Learn-page assignment card: real submission UX + progress sidebar sync.
@@ -15,6 +11,7 @@ function LessonAssignment({
   courseId,
   subLessonId,
   className,
+  onSubmitted,
 }) {
   if (!assignment?.id) {
     return null;
@@ -25,15 +22,8 @@ function LessonAssignment({
       className={className}
       assignment={assignment}
       submission={submission}
-      onSubmitted={async () => {
-        // Update sidebar immediately; persist progress in the background.
-        notifyAssignmentSubmitted(courseId, subLessonId);
-        try {
-          await markAssignmentSubmitted(courseId, subLessonId);
-        } catch {
-          // Submission is already saved; progress will reconcile on next load
-          // via submissions → submittedAssignmentIds.
-        }
+      onSubmitted={async (result) => {
+        await onSubmitted?.(result);
       }}
     />
   );

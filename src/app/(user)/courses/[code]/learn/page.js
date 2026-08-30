@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CourseCurriculumSidebar } from "@/components/course-learn/course-curriculum-sidebar";
 import { LessonContent } from "@/components/course-learn/lesson-content";
 import { LessonNav } from "@/components/course-learn/lesson-nav";
+import { ScrollToLessonContentOnNavigate } from "@/components/course-learn/scroll-to-lesson-content";
 import { getSessionUser } from "@/lib/auth";
 import {
   flattenSubLessons,
@@ -85,25 +86,26 @@ export default async function CourseLearnPage({ params, searchParams }) {
   const assignmentSubLessonIds = courseAssignments.map(
     (assignment) => assignment.subLessonId,
   );
-  let activeAssignment =
-    courseAssignments.find(
-      (assignment) => assignment.subLessonId === active.id,
-    ) ?? null;
-  let activeSubmission = null;
-
-  if (activeAssignment) {
-    activeSubmission = await getUserAssignmentSubmission(
-      supabase,
-      user.id,
-      activeAssignment.id,
-    );
-    if (activeSubmission) {
-      activeAssignment = await withAssignmentAnswerKeys(
-        catalog,
-        activeAssignment,
+  const activeAssignments = courseAssignments.filter(
+    (assignment) => assignment.subLessonId === active.id,
+  );
+  const assignmentEntries = await Promise.all(
+    activeAssignments.map(async (assignment) => {
+      const submission = await getUserAssignmentSubmission(
+        supabase,
+        user.id,
+        assignment.id,
       );
-    }
-  }
+      const enrichedAssignment = submission
+        ? await withAssignmentAnswerKeys(catalog, assignment)
+        : assignment;
+
+      return {
+        assignment: enrichedAssignment,
+        submission,
+      };
+    }),
+  );
 
   return (
     <main className="flex min-h-[calc(100vh-5.5rem)] flex-1 flex-col bg-white">
@@ -127,11 +129,12 @@ export default async function CourseLearnPage({ params, searchParams }) {
           description={subLessonContent?.description}
           coverUrl={course.coverUrl}
           videoUrl={subLessonContent?.videoUrl ?? null}
-          assignment={activeAssignment}
-          submission={activeSubmission}
+          assignmentEntries={assignmentEntries}
           courseId={course.id}
           subLessonId={active.id}
         />
+
+        <ScrollToLessonContentOnNavigate subLessonId={active.id} />
       </div>
 
       <div className="mx-auto w-[calc(100%)]">
