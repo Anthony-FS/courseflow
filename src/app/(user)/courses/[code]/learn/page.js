@@ -86,8 +86,9 @@ export default async function CourseLearnPage({ params, searchParams }) {
     (assignment) => assignment.subLessonId,
   );
   let activeAssignment =
-    courseAssignments.find((assignment) => assignment.subLessonId === active.id) ??
-    null;
+    courseAssignments.find(
+      (assignment) => assignment.subLessonId === active.id,
+    ) ?? null;
   let activeSubmission = null;
 
   if (activeAssignment) {
@@ -140,7 +141,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
           currentSubLessonId={active.id}
           previous={prev}
           next={next}
-          className="px-0"
+          className="px-2 "
         />
       </div>
     </main>
