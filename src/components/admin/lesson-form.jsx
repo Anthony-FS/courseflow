@@ -2,14 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
-import {
-  ArrowLeft,
-  Plus,
-  X,
-  Loader2,
-  Eye,
-  Paperclip,
-} from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, Eye } from "lucide-react";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { SubLessonBlockBuilder } from "@/components/admin/sub-lesson-block-builder";
@@ -22,8 +15,10 @@ import {
 } from "@/lib/admin-courses";
 import {
   BLOCK_TYPES,
+  hasAttachmentContentBlock,
   hasVideoContentBlock,
   hydrateSubLessonBlocks,
+  migrateLegacyAttachmentIntoBlocks,
   migrateLegacyVideoIntoBlocks,
   parseSubLessonContent,
   serializeSubLessonContent,
@@ -158,7 +153,10 @@ export default function LessonForm({
 
     if (initialData) {
       setLessonName(initialData.name || initialData.title || "");
-      if (Array.isArray(initialData.subLessons) && initialData.subLessons.length > 0) {
+      if (
+        Array.isArray(initialData.subLessons) &&
+        initialData.subLessons.length > 0
+      ) {
         setSubLessons(hydrateSubLessons(initialData.subLessons));
       }
       return;
@@ -185,7 +183,10 @@ export default function LessonForm({
         .then((detail) => {
           if (cancelled || !detail) return;
           setLessonName(detail.name || detail.title || "");
-          if (Array.isArray(detail.subLessons) && detail.subLessons.length > 0) {
+          if (
+            Array.isArray(detail.subLessons) &&
+            detail.subLessons.length > 0
+          ) {
             setSubLessons(hydrateSubLessons(detail.subLessons));
           }
         })
@@ -272,24 +273,6 @@ export default function LessonForm({
     setSubLessons(updated);
   };
 
-  const handleAttachmentUpload = (index, file) => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const updated = [...subLessons];
-    updated[index].attachmentFile = file;
-    updated[index].attachmentUrl = url;
-    updated[index].attachmentName = file.name;
-    setSubLessons(updated);
-  };
-
-  const handleRemoveAttachment = (index) => {
-    const updated = [...subLessons];
-    updated[index].attachmentFile = null;
-    updated[index].attachmentUrl = null;
-    updated[index].attachmentName = "";
-    setSubLessons(updated);
-  };
-
   function handleDragHandleMouseDown(event) {
     event.stopPropagation();
     allowDragRef.current = true;
@@ -328,7 +311,9 @@ export default function LessonForm({
       next.splice(index, 0, moved);
       return next;
     });
-    setErrors((current) => remapSubLessonTitleErrors(current, dragIndex, index));
+    setErrors((current) =>
+      remapSubLessonTitleErrors(current, dragIndex, index),
+    );
     setDragIndex(index);
   }
 
@@ -363,13 +348,11 @@ export default function LessonForm({
     setSubmitError("");
 
     try {
-      // 1. Upload any newly selected video or attachment files to Supabase Storage
+      // 1. Upload any newly selected video or block media files to Supabase Storage
       const preparedSubLessons = await Promise.all(
         subLessons.map(async (sub) => {
           let finalVideoUrl = sub.videoUrl || null;
           let finalVideoName = sub.videoName || "";
-          let finalAttachmentUrl = sub.attachmentUrl || null;
-          let finalAttachmentName = sub.attachmentName || "";
 
           if (sub.videoFile) {
             const uploadRes = await uploadAdminFile("trailer", sub.videoFile);
@@ -379,24 +362,21 @@ export default function LessonForm({
 
           if (
             typeof finalVideoUrl === "string" &&
-            (finalVideoUrl.startsWith("blob:") || finalVideoUrl.startsWith("data:"))
+            (finalVideoUrl.startsWith("blob:") ||
+              finalVideoUrl.startsWith("data:"))
           ) {
             finalVideoUrl = null;
           }
 
-          if (sub.attachmentFile) {
-            const uploadRes = await uploadAdminFile(
-              "attachment",
-              sub.attachmentFile,
-            );
-            finalAttachmentUrl = uploadRes.fileUrl;
-            finalAttachmentName = uploadRes.name || sub.attachmentName;
-          }
-
-          let processedBlocks = migrateLegacyVideoIntoBlocks(
-            sub.blocks || parseSubLessonContent(sub.description),
-            finalVideoUrl,
-            finalVideoName,
+          let processedBlocks = migrateLegacyAttachmentIntoBlocks(
+            migrateLegacyVideoIntoBlocks(
+              sub.blocks || parseSubLessonContent(sub.description),
+              finalVideoUrl,
+              finalVideoName,
+            ),
+            sub.attachmentUrl,
+            sub.attachmentName,
+            sub.attachmentType,
           );
 
           if (Array.isArray(processedBlocks) && processedBlocks.length > 0) {
@@ -410,6 +390,16 @@ export default function LessonForm({
                   const res = await uploadAdminFile("trailer", block.file);
                   return { ...block, url: res.fileUrl, file: null };
                 }
+                if (block.type === BLOCK_TYPES.ATTACHMENT && block.file) {
+                  const res = await uploadAdminFile("attachment", block.file);
+                  return {
+                    ...block,
+                    url: res.fileUrl,
+                    name: block.name || res.name || block.file.name,
+                    fileType: block.fileType || block.file.type || "",
+                    file: null,
+                  };
+                }
                 const { file, ...rest } = block;
                 return rest;
               }),
@@ -418,14 +408,18 @@ export default function LessonForm({
 
           const finalDescription = serializeSubLessonContent(processedBlocks);
           const videoIsInBlocks = hasVideoContentBlock(processedBlocks);
+          const attachmentIsInBlocks =
+            hasAttachmentContentBlock(processedBlocks);
 
           return {
             title: sub.title.trim(),
             description: finalDescription ? finalDescription.trim() : "",
             videoUrl: videoIsInBlocks ? null : finalVideoUrl,
             videoName: videoIsInBlocks ? "" : finalVideoName,
-            attachmentUrl: finalAttachmentUrl,
-            attachmentName: finalAttachmentName,
+            attachmentUrl: attachmentIsInBlocks
+              ? null
+              : sub.attachmentUrl || null,
+            attachmentName: attachmentIsInBlocks ? "" : sub.attachmentName || "",
             isPreview: Boolean(sub.isPreview),
           };
         }),
@@ -551,266 +545,264 @@ export default function LessonForm({
             <p className="text-sm font-medium">Loading lesson details...</p>
           </div>
         ) : (
-        <>
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-2xl border border-[#E4E6ED] p-8 sm:p-10 space-y-8"
-        >
-          {submitError && (
-            <div className="p-4 rounded-xl bg-[#FAE7F4] border border-[#9B2C6B] text-[#9B2C6B] text-sm font-medium">
-              {submitError}
-            </div>
-          )}
-
-          {/* Lesson Name Field */}
-          <div>
-            <label className="block text-sm font-medium text-[#2A2E3F] mb-2">
-              Lesson name
-            </label>
-            <input
-              type="text"
-              value={lessonName}
-              placeholder="e.g. Introduction to Service Design"
-              onChange={(e) => {
-                setLessonName(e.target.value);
-                if (errors.lessonName)
-                  setErrors({ ...errors, lessonName: null });
-              }}
-              className={`w-full h-12 px-4 bg-white rounded-lg border ${
-                errors.lessonName ? "border-[#9B2C6B]" : "border-[#D6D9E4]"
-              } focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F]`}
-            />
-            {errors.lessonName && (
-              <p className="text-xs text-[#9B2C6B] mt-1.5">
-                {errors.lessonName}
-              </p>
-            )}
-          </div>
-
-          <hr className="border-t border-[#E4E6ED] my-8" />
-
-          {/* Sub-Lesson Section */}
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-base font-bold text-[#646D89]">
-                Sub-Lessons
-              </h2>
-              <span className="text-xs text-[#9AA1B9] font-medium">
-                {subLessons.length} {subLessons.length === 1 ? "lesson" : "lessons"}
-              </span>
-            </div>
-
-            {/* Sub-lesson Cards List */}
-            <div
-              className={cn(
-                "space-y-6",
-                isDragging && "relative overflow-visible",
+          <>
+            <form
+              onSubmit={handleSubmit}
+              className="bg-white rounded-2xl border border-[#E4E6ED] p-8 sm:p-10 space-y-8"
+            >
+              {submitError && (
+                <div className="p-4 rounded-xl bg-[#FAE7F4] border border-[#9B2C6B] text-[#9B2C6B] text-sm font-medium">
+                  {submitError}
+                </div>
               )}
-            >
-              {subLessons.map((sub, index) => {
-                const isLifted = dragIndex === index;
 
-                return (
-                  <div
-                    key={sub.id}
-                    draggable
-                    onDragStart={(event) => handleDragStart(event, index)}
-                    onDragOver={(event) => handleDragOver(event, index)}
-                    onDragEnd={handleDragEnd}
-                    className={cn(
-                      "sub-lesson-tile bg-[#F8F9FD] border border-[#E4E6ED] rounded-2xl p-6 sm:p-8 relative transition-shadow hover:shadow-xs",
-                      isDragging && !isLifted && "opacity-70",
-                      isLifted && "sub-lesson-tile--dragging",
-                    )}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* 6-dot drag icon — only this handle starts reorder */}
+              {/* Lesson Name Field */}
+              <div>
+                <label className="block text-sm font-medium text-[#2A2E3F] mb-2">
+                  Lesson name
+                </label>
+                <input
+                  type="text"
+                  value={lessonName}
+                  placeholder="e.g. Introduction to Service Design"
+                  onChange={(e) => {
+                    setLessonName(e.target.value);
+                    if (errors.lessonName)
+                      setErrors({ ...errors, lessonName: null });
+                  }}
+                  className={`w-full h-12 px-4 bg-white rounded-lg border ${
+                    errors.lessonName ? "border-[#9B2C6B]" : "border-[#D6D9E4]"
+                  } focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F]`}
+                />
+                {errors.lessonName && (
+                  <p className="text-xs text-[#9B2C6B] mt-1.5">
+                    {errors.lessonName}
+                  </p>
+                )}
+              </div>
+
+              <hr className="border-t border-[#E4E6ED] my-8" />
+
+              {/* Sub-Lesson Section */}
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-base font-bold text-[#646D89]">
+                    Sub-Lessons
+                  </h2>
+                  <span className="text-xs text-[#9AA1B9] font-medium">
+                    {subLessons.length}{" "}
+                    {subLessons.length === 1 ? "lesson" : "lessons"}
+                  </span>
+                </div>
+
+                {/* Sub-lesson Cards List */}
+                <div
+                  className={cn(
+                    "space-y-6",
+                    isDragging && "relative overflow-visible",
+                  )}
+                >
+                  {subLessons.map((sub, index) => {
+                    const isLifted = dragIndex === index;
+
+                    return (
                       <div
-                        data-drag-handle
-                        onMouseDown={handleDragHandleMouseDown}
-                        onTouchStart={handleDragHandleMouseDown}
-                        className="pt-2.5 text-[#C8CCDB] hover:text-[#9AA1B9] cursor-grab active:cursor-grabbing select-none shrink-0"
-                        aria-label={`Reorder sub-lesson ${index + 1}`}
+                        key={sub.id}
+                        draggable
+                        onDragStart={(event) => handleDragStart(event, index)}
+                        onDragOver={(event) => handleDragOver(event, index)}
+                        onDragEnd={handleDragEnd}
+                        className={cn(
+                          "sub-lesson-tile bg-[#F8F9FD] border border-[#E4E6ED] rounded-2xl p-6 sm:p-8 relative transition-shadow hover:shadow-xs",
+                          isDragging && !isLifted && "opacity-70",
+                          isLifted && "sub-lesson-tile--dragging",
+                        )}
                       >
-                        <svg
-                          width="12"
-                          height="18"
-                          viewBox="0 0 12 18"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          aria-hidden="true"
-                        >
-                          <circle cx="3" cy="3" r="1.5" fill="currentColor" />
-                          <circle cx="9" cy="3" r="1.5" fill="currentColor" />
-                          <circle cx="3" cy="9" r="1.5" fill="currentColor" />
-                          <circle cx="9" cy="9" r="1.5" fill="currentColor" />
-                          <circle cx="3" cy="15" r="1.5" fill="currentColor" />
-                          <circle cx="9" cy="15" r="1.5" fill="currentColor" />
-                        </svg>
-                      </div>
-
-                      {/* Sub-Lesson Inputs */}
-                      <div className="flex-1 space-y-6">
-                        {/* Top Row: Label, Free Preview Toggle & Delete Button */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#E2E8F5] text-[#2F5FAC] text-xs font-bold">
-                              {index + 1}
-                            </span>
-                            <label className="block text-sm font-semibold text-[#2A2E3F]">
-                              Sub-lesson name
-                            </label>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            {/* Free Preview Toggle */}
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePreview(index)}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border",
-                                sub.isPreview
-                                  ? "bg-[#E6F4EA] text-[#137333] border-[#CEEAD6]"
-                                  : "bg-white text-[#646D89] border-[#D6D9E4] hover:bg-[#F1F3F9]",
-                              )}
+                        <div className="flex items-start gap-4">
+                          {/* 6-dot drag icon — only this handle starts reorder */}
+                          <div
+                            data-drag-handle
+                            onMouseDown={handleDragHandleMouseDown}
+                            onTouchStart={handleDragHandleMouseDown}
+                            className="pt-2.5 text-[#C8CCDB] hover:text-[#9AA1B9] cursor-grab active:cursor-grabbing select-none shrink-0"
+                            aria-label={`Reorder sub-lesson ${index + 1}`}
+                          >
+                            <svg
+                              width="12"
+                              height="18"
+                              viewBox="0 0 12 18"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                              aria-hidden="true"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>
-                                {sub.isPreview ? "Free Preview ON" : "Free Preview OFF"}
-                              </span>
-                            </button>
-
-                            {/* Delete Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSubLesson(index)}
-                              disabled={subLessons.length <= 1}
-                              className={`text-sm font-semibold transition-colors ${
-                                subLessons.length <= 1
-                                  ? "text-[#C8CCDB] cursor-not-allowed"
-                                  : "text-[#9AA1B9] hover:text-[#9B2C6B] cursor-pointer"
-                              }`}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Sub-lesson Name Input */}
-                        <div>
-                          <input
-                            type="text"
-                            value={sub.title}
-                            placeholder="e.g. What is Service Design?"
-                            onChange={(e) => {
-                              handleSubLessonTitleChange(index, e.target.value);
-                              if (errors[`subLessonTitle_${index}`]) {
-                                setErrors({
-                                  ...errors,
-                                  [`subLessonTitle_${index}`]: null,
-                                });
-                              }
-                            }}
-                            className={`w-full h-11 px-4 bg-white rounded-lg border ${
-                              errors[`subLessonTitle_${index}`]
-                                ? "border-[#9B2C6B]"
-                                : "border-[#D6D9E4]"
-                            } focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F]`}
-                          />
-                          {errors[`subLessonTitle_${index}`] && (
-                            <p className="text-xs text-[#9B2C6B] mt-1.5">
-                              {errors[`subLessonTitle_${index}`]}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Sub-Lesson Content Blocks Builder */}
-                        <div>
-                          <SubLessonBlockBuilder
-                            blocks={
-                              sub.blocks || parseSubLessonContent(sub.description)
-                            }
-                            onChange={(newBlocks) =>
-                              handleSubLessonBlocksChange(index, newBlocks)
-                            }
-                            subLessonIndex={index}
-                          />
-                        </div>
-
-                        <section className="pt-2">
-                          <label className="mb-3 flex items-center gap-1.5 text-sm font-medium text-[#2A2E3F]">
-                            <Paperclip className="w-4 h-4 text-[#646D89]" />
-                            <span>Attachment (PDF, Doc, ZIP)</span>
-                          </label>
-
-                          {sub.attachmentUrl ? (
-                            <div className="flex items-center justify-between p-3.5 bg-white border border-[#D6D9E4] rounded-xl max-w-sm">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <Paperclip className="w-4 h-4 text-[#2F5FAC] shrink-0" />
-                                <span className="text-xs font-medium text-[#2A2E3F] truncate">
-                                  {sub.attachmentName || "Attached File"}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveAttachment(index)}
-                                className="text-[#9AA1B9] hover:text-[#9B2C6B] transition-colors p-1 cursor-pointer"
-                                title="Remove Attachment"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#C8CCDB] bg-white hover:bg-[#F6F7FC] text-[#646D89] text-xs font-medium cursor-pointer transition-colors max-w-xs">
-                              <input
-                                type="file"
-                                accept=".pdf,.doc,.docx,.zip,.png,.jpg"
-                                className="hidden"
-                                onChange={(e) =>
-                                  handleAttachmentUpload(index, e.target.files[0])
-                                }
+                              <circle
+                                cx="3"
+                                cy="3"
+                                r="1.5"
+                                fill="currentColor"
                               />
-                              <Paperclip className="w-4 h-4 text-[#2F5FAC]" />
-                              <span>Attach supplementary material</span>
-                            </label>
-                          )}
-                        </section>
+                              <circle
+                                cx="9"
+                                cy="3"
+                                r="1.5"
+                                fill="currentColor"
+                              />
+                              <circle
+                                cx="3"
+                                cy="9"
+                                r="1.5"
+                                fill="currentColor"
+                              />
+                              <circle
+                                cx="9"
+                                cy="9"
+                                r="1.5"
+                                fill="currentColor"
+                              />
+                              <circle
+                                cx="3"
+                                cy="15"
+                                r="1.5"
+                                fill="currentColor"
+                              />
+                              <circle
+                                cx="9"
+                                cy="15"
+                                r="1.5"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </div>
+
+                          {/* Sub-Lesson Inputs */}
+                          <div className="flex-1 space-y-6">
+                            {/* Top Row: Label, Free Preview Toggle & Delete Button */}
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#E2E8F5] text-[#2F5FAC] text-xs font-bold">
+                                  {index + 1}
+                                </span>
+                                <label className="block text-sm font-semibold text-[#2A2E3F]">
+                                  Sub-lesson name
+                                </label>
+                              </div>
+
+                              <div className="flex items-center gap-4">
+                                {/* Free Preview Toggle */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePreview(index)}
+                                  className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border",
+                                    sub.isPreview
+                                      ? "bg-[#E6F4EA] text-[#137333] border-[#CEEAD6]"
+                                      : "bg-white text-[#646D89] border-[#D6D9E4] hover:bg-[#F1F3F9]",
+                                  )}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>
+                                    {sub.isPreview
+                                      ? "Free Preview ON"
+                                      : "Free Preview OFF"}
+                                  </span>
+                                </button>
+
+                                {/* Delete Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSubLesson(index)}
+                                  disabled={subLessons.length <= 1}
+                                  className={`text-sm font-semibold transition-colors ${
+                                    subLessons.length <= 1
+                                      ? "text-[#C8CCDB] cursor-not-allowed"
+                                      : "text-[#9AA1B9] hover:text-[#9B2C6B] cursor-pointer"
+                                  }`}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Sub-lesson Name Input */}
+                            <div>
+                              <input
+                                type="text"
+                                value={sub.title}
+                                placeholder="e.g. What is Service Design?"
+                                onChange={(e) => {
+                                  handleSubLessonTitleChange(
+                                    index,
+                                    e.target.value,
+                                  );
+                                  if (errors[`subLessonTitle_${index}`]) {
+                                    setErrors({
+                                      ...errors,
+                                      [`subLessonTitle_${index}`]: null,
+                                    });
+                                  }
+                                }}
+                                className={`w-full h-11 px-4 bg-white rounded-lg border ${
+                                  errors[`subLessonTitle_${index}`]
+                                    ? "border-[#9B2C6B]"
+                                    : "border-[#D6D9E4]"
+                                } focus:border-[#FBAA1C] focus:shadow-[0_0_0_3px_rgba(251,170,28,0.28)] outline-none transition-all text-sm text-[#2A2E3F]`}
+                              />
+                              {errors[`subLessonTitle_${index}`] && (
+                                <p className="text-xs text-[#9B2C6B] mt-1.5">
+                                  {errors[`subLessonTitle_${index}`]}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Sub-Lesson Content Blocks Builder */}
+                            <div>
+                              <SubLessonBlockBuilder
+                                blocks={
+                                  sub.blocks ||
+                                  parseSubLessonContent(sub.description)
+                                }
+                                onChange={(newBlocks) =>
+                                  handleSubLessonBlocksChange(index, newBlocks)
+                                }
+                                subLessonIndex={index}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
 
-            {/* Add Sub-Lesson Button */}
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={handleAddSubLesson}
-                className="px-6 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-sm bg-white hover:bg-[#FFF7F0] active:scale-[0.98] transition-all cursor-pointer"
-              >
-                + Add Sub-lesson
-              </button>
-            </div>
-          </div>
-        </form>
+                {/* Add Sub-Lesson Button */}
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={handleAddSubLesson}
+                    className="px-6 py-2.5 rounded-xl border border-[#F47E20] text-[#F47E20] font-bold text-sm bg-white hover:bg-[#FFF7F0] active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    + Add Sub-lesson
+                  </button>
+                </div>
+              </div>
+            </form>
 
-        {/* Delete Lesson Option (Edit Mode Only) */}
-        {mode === "edit" && (
-          <div className="mt-8 flex justify-end">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setIsDeleteModalOpen(true);
-              }}
-              className="text-sm font-semibold text-[#646D89] hover:text-[#9B2C6B] transition-colors cursor-pointer underline decoration-dotted"
-            >
-              Delete Lesson
-            </button>
-          </div>
-        )}
-        </>
+            {/* Delete Lesson Option (Edit Mode Only) */}
+            {mode === "edit" && (
+              <div className="mt-8 flex justify-end">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsDeleteModalOpen(true);
+                  }}
+                  className="text-sm font-semibold text-[#646D89] hover:text-[#9B2C6B] transition-colors cursor-pointer underline decoration-dotted"
+                >
+                  Delete Lesson
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

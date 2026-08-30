@@ -1,6 +1,7 @@
-import { LessonAssignment } from "@/components/course-learn/lesson-assignment";
+import { LessonAssignmentList } from "@/components/course-learn/lesson-assignment-list";
 import { LessonVideo } from "@/components/course-learn/lesson-video";
 import { SubLessonRenderer } from "@/components/course-learn/sub-lesson-renderer";
+import { LEARN_LESSON_CONTENT_ID } from "@/lib/course-learn-scroll";
 import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
 
 function LessonContent({
@@ -8,15 +9,18 @@ function LessonContent({
   description = "",
   coverUrl,
   videoUrl = null,
-  assignment = null,
-  submission = null,
+  assignmentEntries = [],
   courseId,
   subLessonId,
 }) {
-  const showLegacyVideo = Boolean(videoUrl) && !hasVideoContentBlock(description);
+  const showLegacyVideo =
+    Boolean(videoUrl) && !hasVideoContentBlock(description);
 
   return (
-    <article className="flex min-w-0 flex-1 flex-col px-6 py-8 lg:px-10">
+    <article
+      id={LEARN_LESSON_CONTENT_ID}
+      className="flex min-w-0 flex-1 scroll-mt-22 flex-col px-6 py-8 lg:px-10"
+    >
       <div className="w-full">
         <h1 className="text-headline2 font-medium tracking-[-0.02em] text-black">
           {title}
@@ -24,7 +28,11 @@ function LessonContent({
 
         {showLegacyVideo ? (
           <div className="mt-6">
-            <LessonVideo title={title} coverUrl={coverUrl} videoUrl={videoUrl} />
+            <LessonVideo
+              title={title}
+              coverUrl={coverUrl}
+              videoUrl={videoUrl}
+            />
           </div>
         ) : null}
 
@@ -34,12 +42,10 @@ function LessonContent({
           </div>
         ) : null}
 
-        {assignment ? (
-          <LessonAssignment
-            key={assignment.id}
+        {assignmentEntries.length > 0 ? (
+          <LessonAssignmentList
             className="mt-8"
-            assignment={assignment}
-            submission={submission}
+            entries={assignmentEntries}
             courseId={courseId}
             subLessonId={subLessonId}
           />

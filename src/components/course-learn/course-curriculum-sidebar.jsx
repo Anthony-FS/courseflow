@@ -11,6 +11,11 @@ import {
   withMockLessonStatuses,
 } from "@/lib/course-learn";
 import {
+  isMobileLearnLayout,
+  markScrollToLessonContentIntent,
+  scrollToLessonContent,
+} from "@/lib/course-learn-scroll";
+import {
   markSubLessonVisited,
   SUB_LESSON_PROGRESS_EVENT,
 } from "@/lib/course-learn-progress";
@@ -233,6 +238,18 @@ function CourseCurriculumSidebar({
                           <li key={subLesson.id}>
                             <Link
                               href={learnSubLessonHref(courseCode, subLesson.id)}
+                              onClick={() => {
+                                if (!isMobileLearnLayout()) {
+                                  return;
+                                }
+
+                                if (isActive) {
+                                  scrollToLessonContent();
+                                  return;
+                                }
+
+                                markScrollToLessonContentIntent();
+                              }}
                               className={cn(
                                 "flex items-start gap-3 rounded-lg px-3 py-2.5 text-body3 text-gray-700 transition-colors",
                                 isActive

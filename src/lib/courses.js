@@ -73,7 +73,7 @@ export function resolveTrailerUrl(
   return toPublicStorageUrl(objectPath, supabaseUrl);
 }
 
-async function resolveAttachmentHref(supabase, fileUrl) {
+export async function resolveAttachmentHref(supabase, fileUrl) {
   const value = String(fileUrl ?? "").trim();
   if (!value) {
     return null;
@@ -128,10 +128,12 @@ async function getAttachmentFileSize(supabase, fileUrl) {
   const fileName = slash === -1 ? objectPath : objectPath.slice(slash + 1);
 
   try {
-    const { data } = await supabase.storage.from(ATTACHMENT_BUCKET).list(folder, {
-      search: fileName,
-      limit: 20,
-    });
+    const { data } = await supabase.storage
+      .from(ATTACHMENT_BUCKET)
+      .list(folder, {
+        search: fileName,
+        limit: 20,
+      });
     const match = Array.isArray(data)
       ? data.find((item) => item.name === fileName)
       : null;
@@ -162,7 +164,8 @@ export async function getCourseAttachment(supabase, courseId) {
   }
 
   const rows = Array.isArray(data) ? data : [];
-  const row = rows.find((item) => item.sub_lesson_id == null) ?? rows[0] ?? null;
+  const row =
+    rows.find((item) => item.sub_lesson_id == null) ?? rows[0] ?? null;
   if (!row) {
     return null;
   }
@@ -585,7 +588,9 @@ export function searchCourses(courses, query) {
     const title = course.title.toLowerCase();
     const courseCode = (course.course_code ?? "").toLowerCase();
 
-    return title.includes(normalizedQuery) || courseCode.includes(normalizedQuery);
+    return (
+      title.includes(normalizedQuery) || courseCode.includes(normalizedQuery)
+    );
   });
 }
 

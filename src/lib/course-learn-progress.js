@@ -65,41 +65,53 @@ async function getSubmittedAssignmentSubLessonIds(supabase, userId, courseId) {
     .select("id, sub_lesson_id")
     .eq("course_id", courseId);
 
-  if (assignmentsError || !Array.isArray(assignments) || assignments.length === 0) {
+  if (
+    assignmentsError ||
+    !Array.isArray(assignments) ||
+    assignments.length === 0
+  ) {
     return [];
   }
 
-  const byAssignmentId = new Map(
-    assignments
-      .filter((row) => row?.id && row?.sub_lesson_id)
-      .map((row) => [row.id, row.sub_lesson_id]),
-  );
-  if (byAssignmentId.size === 0) {
+  const assignmentsBySubLesson = new Map();
+  for (const row of assignments) {
+    if (!row?.id || !row?.sub_lesson_id) continue;
+    const list = assignmentsBySubLesson.get(row.sub_lesson_id) ?? [];
+    list.push(row.id);
+    assignmentsBySubLesson.set(row.sub_lesson_id, list);
+  }
+
+  if (assignmentsBySubLesson.size === 0) {
     return [];
   }
 
+  const assignmentIds = [...assignmentsBySubLesson.values()].flat();
   const { data: submissions, error: submissionsError } = await supabase
     .from("submissions")
     .select("assignment_id, status, submitted_at")
     .eq("user_id", userId)
-    .in("assignment_id", [...byAssignmentId.keys()]);
+    .in("assignment_id", assignmentIds);
 
   if (submissionsError || !Array.isArray(submissions)) {
     return [];
   }
 
-  const submitted = [];
+  const submittedAssignmentIds = new Set();
   for (const row of submissions) {
-    const isSubmitted =
-      row?.submitted_at || row?.status === "submitted";
-    if (!isSubmitted) continue;
-    const subLessonId = byAssignmentId.get(row.assignment_id);
-    if (subLessonId) {
-      submitted.push(subLessonId);
+    const isSubmitted = row?.submitted_at || row?.status === "submitted";
+    if (isSubmitted && row?.assignment_id) {
+      submittedAssignmentIds.add(row.assignment_id);
     }
   }
 
-  return [...new Set(submitted)];
+  const completedSubLessons = [];
+  for (const [subLessonId, ids] of assignmentsBySubLesson.entries()) {
+    if (ids.every((id) => submittedAssignmentIds.has(id))) {
+      completedSubLessons.push(subLessonId);
+    }
+  }
+
+  return completedSubLessons;
 }
 
 export async function getCourseProgress(supabase, userId, courseId) {
@@ -174,8 +186,7 @@ async function upsertSubLessonProgress(
   }
 
   if (action === "submit_assignment") {
-    patch.assignment_submitted_at =
-      existing?.assignment_submitted_at || now;
+    patch.assignment_submitted_at = existing?.assignment_submitted_at || now;
   }
 
   if (existing?.id) {
@@ -198,8 +209,7 @@ async function upsertSubLessonProgress(
       course_id: courseId,
       sub_lesson_id: subLessonId,
       completed_at: action === "complete" ? now : null,
-      assignment_submitted_at:
-        action === "submit_assignment" ? now : null,
+      assignment_submitted_at: action === "submit_assignment" ? now : null,
       ...patch,
     })
     .select("id")
