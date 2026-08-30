@@ -247,8 +247,11 @@ function CalloutBox({ title = "เนื้อหาเสริม", content, v
           {title}
         </h4>
       </div>
-      <div className={cn("text-xs sm:text-sm leading-relaxed", styles.text)}>
-        <InlineFormattedText content={content} />
+      <div className={cn("leading-relaxed", styles.text)}>
+        <FormattedTextBlock
+          text={content}
+          className="space-y-2.5 text-xs sm:text-sm text-inherit"
+        />
       </div>
     </div>
   );
