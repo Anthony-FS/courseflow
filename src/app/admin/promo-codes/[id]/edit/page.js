@@ -234,6 +234,15 @@ export default function EditPromoCodePage() {
                 {courses.length === 0 ? <p className="px-2 py-2 text-body3 text-gray-600">No courses found.</p> : null}
               </div>
             ) : null}
+            {form.courseIds.length >= 2 ? (
+              <button
+                type="button"
+                onClick={toggleAllCourses}
+                className="ml-auto mt-2 block rounded px-2 py-1 text-body3 font-medium text-blue-500 hover:bg-blue-50 hover:text-blue-600"
+              >
+                Clear all
+              </button>
+            ) : null}
           </div>
         </div>
         {errorMessage ? <p role="alert" className="mt-6 text-body2 text-orange-500">{errorMessage}</p> : null}
