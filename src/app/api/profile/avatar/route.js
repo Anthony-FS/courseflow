@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 
 const BUCKET = "profile-avatars";
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MIME_EXTENSIONS = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -29,7 +29,7 @@ export async function POST(request) {
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return jsonError("Photo must be 10 MB or smaller", 400);
+    return jsonError("Photo must be 5 MB or smaller", 400);
   }
 
   const path = `${user.id}/${crypto.randomUUID()}.${MIME_EXTENSIONS[file.type]}`;
