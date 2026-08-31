@@ -170,9 +170,10 @@ function courseLessonsForProgress(course) {
 }
 
 async function getEnrollmentProgress(supabase, userId, course) {
+  const assignmentsPromise = getAssignmentsForCourse(supabase, course.id);
   const [progress, assignments] = await Promise.all([
-    getCourseProgress(supabase, userId, course.id),
-    getAssignmentsForCourse(supabase, course.id),
+    getCourseProgress(supabase, userId, course.id, { assignmentsPromise }),
+    assignmentsPromise,
   ]);
   const lessonsWithStatus = withMockLessonStatuses(
     courseLessonsForProgress(course),

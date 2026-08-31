@@ -295,6 +295,48 @@ export async function getUserAssignmentSubmission(
   };
 }
 
+export async function getUserAssignmentSubmissions(
+  supabase,
+  userId,
+  assignmentIds,
+) {
+  const user = String(userId ?? "").trim();
+  const ids = [
+    ...new Set(
+      (Array.isArray(assignmentIds) ? assignmentIds : [])
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (!supabase || !user || ids.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("assignment_id, content, status, submitted_at")
+    .eq("user_id", user)
+    .in("assignment_id", ids);
+
+  if (error || !Array.isArray(data)) {
+    return new Map();
+  }
+
+  return new Map(
+    data
+      .filter((row) => row?.assignment_id)
+      .map((row) => [
+        row.assignment_id,
+        {
+          content: row.content ?? "",
+          status: row.status ?? null,
+          submittedAt: row.submitted_at ?? null,
+        },
+      ]),
+  );
+}
+
 /** Attach answer keys only after the learner has submitted. */
 export async function withAssignmentAnswerKeys(supabase, assignment) {
   if (!supabase || !assignment?.id) {
@@ -318,4 +360,42 @@ export async function withAssignmentAnswerKeys(supabase, assignment) {
     correctChoice:
       type === "choice" ? String(data.correct_choice ?? "").trim() : "",
   };
+}
+
+export async function getAssignmentAnswerKeys(supabase, assignments) {
+  const rows = Array.isArray(assignments) ? assignments : [];
+  const ids = [
+    ...new Set(rows.map((assignment) => assignment?.id).filter(Boolean)),
+  ];
+
+  if (!supabase || ids.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("assignments")
+    .select("id, answer_text, correct_choice, submission_type")
+    .in("id", ids);
+
+  if (error || !Array.isArray(data)) {
+    return new Map();
+  }
+
+  return new Map(
+    data
+      .filter((row) => row?.id)
+      .map((row) => [
+        row.id,
+        {
+          answerText:
+            row.submission_type === "text"
+              ? String(row.answer_text ?? "").trim()
+              : "",
+          correctChoice:
+            row.submission_type === "choice"
+              ? String(row.correct_choice ?? "").trim()
+              : "",
+        },
+      ]),
+  );
 }

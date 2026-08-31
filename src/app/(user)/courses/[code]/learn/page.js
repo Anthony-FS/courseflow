@@ -7,11 +7,11 @@ import { ScrollToLessonContentOnNavigate } from "@/components/course-learn/scrol
 import { getSessionUser } from "@/lib/auth";
 import {
   flattenSubLessons,
+  getAssignmentAnswerKeys,
   getAssignmentsForCourse,
   getSubLessonLearningContent,
-  getUserAssignmentSubmission,
+  getUserAssignmentSubmissions,
   resolveActiveSubLesson,
-  withAssignmentAnswerKeys,
 } from "@/lib/course-learn";
 import { getCourseProgress } from "@/lib/course-learn-progress";
 import { getCourseByCode } from "@/lib/courses";
@@ -72,13 +72,20 @@ export default async function CourseLearnPage({ params, searchParams }) {
     );
   }
 
+  const assignmentsPromise = getAssignmentsForCourse(catalog, course.id);
+  const progressPromise = getCourseProgress(
+    supabase,
+    user.id,
+    course.id,
+    { assignmentsPromise },
+  );
   const [subLessonContent, courseAssignments, progress] = await Promise.all([
     getSubLessonLearningContent(catalog, {
       courseId: course.id,
       subLessonId: active.id,
     }),
-    getAssignmentsForCourse(catalog, course.id),
-    getCourseProgress(supabase, user.id, course.id),
+    assignmentsPromise,
+    progressPromise,
   ]);
   const assignmentSubLessonIds = courseAssignments.map(
     (assignment) => assignment.subLessonId,
@@ -86,23 +93,32 @@ export default async function CourseLearnPage({ params, searchParams }) {
   const activeAssignments = courseAssignments.filter(
     (assignment) => assignment.subLessonId === active.id,
   );
-  const assignmentEntries = await Promise.all(
-    activeAssignments.map(async (assignment) => {
-      const submission = await getUserAssignmentSubmission(
-        supabase,
-        user.id,
-        assignment.id,
-      );
-      const enrichedAssignment = submission
-        ? await withAssignmentAnswerKeys(catalog, assignment)
-        : assignment;
-
-      return {
-        assignment: enrichedAssignment,
-        submission,
-      };
-    }),
+  const {
+    submissions: submissionsByAssignment,
+    answerKeys: answerKeysByAssignment,
+  } = await getUserAssignmentSubmissions(
+    supabase,
+    user.id,
+    activeAssignments.map((assignment) => assignment.id),
+  ).then((submissions) =>
+    getAssignmentAnswerKeys(
+      catalog,
+      activeAssignments.filter((assignment) => submissions.has(assignment.id)),
+    ).then((answerKeys) => ({ submissions, answerKeys })),
   );
+  const assignmentEntries = activeAssignments.map((assignment) => {
+    const submission = submissionsByAssignment.get(assignment.id) ?? null;
+    const answerKeys = submission
+      ? answerKeysByAssignment.get(assignment.id)
+      : null;
+
+    return {
+      assignment: answerKeys
+        ? { ...assignment, ...answerKeys }
+        : assignment,
+      submission,
+    };
+  });
 
   return (
     <main className="flex min-h-[calc(100vh-5.5rem)] flex-1 flex-col bg-white">
