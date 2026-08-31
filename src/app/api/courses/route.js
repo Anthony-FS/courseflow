@@ -22,6 +22,7 @@ export async function GET(request) {
   const pageSize = parseCatalogPageSize(searchParams.get("pageSize"));
   const sortBy = searchParams.get("sortBy") ?? "";
   const sortDirection = searchParams.get("sortDirection") ?? "";
+  const includeUserState = searchParams.get("includeUserState") === "1";
 
   if (pageSize == null || !Number.isInteger(page) || page < 1) {
     return jsonError("Invalid page or page size", 400);
@@ -49,15 +50,29 @@ export async function GET(request) {
 
   const { user, supabase: sessionSupabase } = await getSessionUser();
   let excludeCourseIds = [];
+  let wishlistCourseIds = [];
   if (user) {
-    try {
-      excludeCourseIds = await getUserEnrolledCourseIds(
-        sessionSupabase,
-        user.id,
-      );
-    } catch {
-      excludeCourseIds = [];
-    }
+    const enrolledPromise = Promise.resolve()
+      .then(() => getUserEnrolledCourseIds(sessionSupabase, user.id))
+      .catch(() => []);
+    const wishlistPromise = includeUserState
+      ? Promise.resolve()
+          .then(async () => {
+            if (!sessionSupabase?.from) return [];
+            const { data, error } = await sessionSupabase
+              .from("wishlists")
+              .select("course_id")
+              .eq("user_id", user.id);
+            if (error || !Array.isArray(data)) return [];
+            return data.map((row) => row?.course_id).filter(Boolean);
+          })
+          .catch(() => [])
+      : Promise.resolve([]);
+
+    [excludeCourseIds, wishlistCourseIds] = await Promise.all([
+      enrolledPromise,
+      wishlistPromise,
+    ]);
   }
 
   try {
@@ -69,7 +84,11 @@ export async function GET(request) {
       sortBy,
       sortDirection,
     });
-    return jsonOk(result);
+    return jsonOk({
+      ...result,
+      enrolledCourseIds: excludeCourseIds,
+      ...(includeUserState ? { wishlistIds: wishlistCourseIds } : {}),
+    });
   } catch (error) {
     return jsonError(error.message || "Failed to load courses", 500);
   }
