@@ -1,5 +1,12 @@
 import { requireAdmin } from "@/lib/auth";
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonError, jsonOk, jsonTooManyRequests } from "@/lib/api";
+import {
+  ADMIN_SEARCH_RATE_LIMIT,
+  ADMIN_SEARCH_RATE_WINDOW_MS,
+  adminSearchRateLimitKey,
+  checkRateLimit,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { resolveCoverUrl } from "@/lib/courses";
 import {
   COURSE_CODE_TAKEN_MESSAGE,
@@ -46,6 +53,14 @@ function mapAdminCourse(row) {
 export async function GET(request) {
   const { supabase, error } = await requireAdmin();
   if (error) return error;
+
+  const limited = checkRateLimit(adminSearchRateLimitKey(getClientIp(request)), {
+    limit: ADMIN_SEARCH_RATE_LIMIT,
+    windowMs: ADMIN_SEARCH_RATE_WINDOW_MS,
+  });
+  if (!limited.allowed) {
+    return jsonTooManyRequests(limited.retryAfterSec);
+  }
 
   const searchParams = request.nextUrl.searchParams;
   const page = Math.max(1, Number(searchParams.get("page")) || 1);

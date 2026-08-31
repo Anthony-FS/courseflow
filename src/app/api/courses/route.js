@@ -1,7 +1,18 @@
 import { getSessionUser } from "@/lib/auth";
-import { jsonError, jsonOk } from "@/lib/api";
-import { getCatalogCourses, parseCatalogPageSize } from "@/lib/courses";
+import { jsonError, jsonOk, jsonTooManyRequests } from "@/lib/api";
+import {
+  getCatalogCourses,
+  isCatalogSearchQueryTooLong,
+  parseCatalogPageSize,
+} from "@/lib/courses";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
+import {
+  CATALOG_RATE_LIMIT,
+  CATALOG_RATE_WINDOW_MS,
+  catalogRateLimitKey,
+  checkRateLimit,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(request) {
@@ -14,6 +25,18 @@ export async function GET(request) {
 
   if (pageSize == null || !Number.isInteger(page) || page < 1) {
     return jsonError("Invalid page or page size", 400);
+  }
+
+  if (isCatalogSearchQueryTooLong(query)) {
+    return jsonError("Search query is too long", 400);
+  }
+
+  const limited = checkRateLimit(catalogRateLimitKey(getClientIp(request)), {
+    limit: CATALOG_RATE_LIMIT,
+    windowMs: CATALOG_RATE_WINDOW_MS,
+  });
+  if (!limited.allowed) {
+    return jsonTooManyRequests(limited.retryAfterSec);
   }
 
   let supabase = createServiceClient();
