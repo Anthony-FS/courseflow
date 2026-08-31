@@ -30,17 +30,20 @@ export async function POST(request) {
     return jsonError("Invalid progress action", 400);
   }
 
-  const enrolled = await isCourseEnrolled(supabase, user.id, courseId);
+  const [enrolled, subLessonResult] = await Promise.all([
+    isCourseEnrolled(supabase, user.id, courseId),
+    supabase
+      .from("sub_lessons")
+      .select("id, course_id")
+      .eq("id", subLessonId)
+      .eq("course_id", courseId)
+      .maybeSingle(),
+  ]);
   if (!enrolled) {
     return jsonError("You must be enrolled in this course", 403);
   }
 
-  const { data: subLesson, error: subLessonError } = await supabase
-    .from("sub_lessons")
-    .select("id, course_id")
-    .eq("id", subLessonId)
-    .eq("course_id", courseId)
-    .maybeSingle();
+  const { data: subLesson, error: subLessonError } = subLessonResult;
 
   if (subLessonError) {
     return jsonError(subLessonError.message || "Failed to load sub-lesson", 500);

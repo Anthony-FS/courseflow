@@ -24,8 +24,21 @@ export const getSessionUser = cache(async function getSessionUser() {
   return { supabase, user, profile };
 });
 
+export const getAuthenticatedUser = cache(async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  return {
+    supabase,
+    user: error || !user ? null : user,
+  };
+});
+
 export async function requireUser() {
-  const session = await getSessionUser();
+  const session = await getAuthenticatedUser();
 
   if (!session.user) {
     return {

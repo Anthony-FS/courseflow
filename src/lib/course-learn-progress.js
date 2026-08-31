@@ -59,11 +59,29 @@ export function notifyAssignmentSubmitted(courseId, subLessonId) {
  * Sidebar uses this so Submitted assignments don't stay yellow when
  * `sub_lesson_progress.assignment_submitted_at` was never synced.
  */
-async function getSubmittedAssignmentSubLessonIds(supabase, userId, courseId) {
-  const { data: assignments, error: assignmentsError } = await supabase
-    .from("assignments")
-    .select("id, sub_lesson_id")
-    .eq("course_id", courseId);
+async function getSubmittedAssignmentSubLessonIds(
+  supabase,
+  userId,
+  courseId,
+  assignmentsPromise,
+) {
+  let assignments = null;
+  let assignmentsError = null;
+
+  if (assignmentsPromise) {
+    try {
+      assignments = await assignmentsPromise;
+    } catch (error) {
+      assignmentsError = error;
+    }
+  } else {
+    const result = await supabase
+      .from("assignments")
+      .select("id, sub_lesson_id")
+      .eq("course_id", courseId);
+    assignments = result.data;
+    assignmentsError = result.error;
+  }
 
   if (
     assignmentsError ||
@@ -75,10 +93,11 @@ async function getSubmittedAssignmentSubLessonIds(supabase, userId, courseId) {
 
   const assignmentsBySubLesson = new Map();
   for (const row of assignments) {
-    if (!row?.id || !row?.sub_lesson_id) continue;
-    const list = assignmentsBySubLesson.get(row.sub_lesson_id) ?? [];
+    const subLessonId = row?.sub_lesson_id ?? row?.subLessonId;
+    if (!row?.id || !subLessonId) continue;
+    const list = assignmentsBySubLesson.get(subLessonId) ?? [];
     list.push(row.id);
-    assignmentsBySubLesson.set(row.sub_lesson_id, list);
+    assignmentsBySubLesson.set(subLessonId, list);
   }
 
   if (assignmentsBySubLesson.size === 0) {
@@ -114,7 +133,12 @@ async function getSubmittedAssignmentSubLessonIds(supabase, userId, courseId) {
   return completedSubLessons;
 }
 
-export async function getCourseProgress(supabase, userId, courseId) {
+export async function getCourseProgress(
+  supabase,
+  userId,
+  courseId,
+  { assignmentsPromise } = {},
+) {
   const user = String(userId ?? "").trim();
   const course = String(courseId ?? "").trim();
   if (!supabase || !user || !course) {
@@ -129,7 +153,12 @@ export async function getCourseProgress(supabase, userId, courseId) {
       )
       .eq("user_id", user)
       .eq("course_id", course),
-    getSubmittedAssignmentSubLessonIds(supabase, user, course),
+    getSubmittedAssignmentSubLessonIds(
+      supabase,
+      user,
+      course,
+      assignmentsPromise,
+    ),
   ]);
 
   if (error || !Array.isArray(data)) {
@@ -164,15 +193,38 @@ async function upsertSubLessonProgress(
 ) {
   const now = new Date().toISOString();
 
-  const { data: existing, error: existingError } = await supabase
-    .from("sub_lesson_progress")
-    .select("id, completed_at, assignment_submitted_at")
-    .eq("user_id", userId)
-    .eq("sub_lesson_id", subLessonId)
-    .maybeSingle();
+  if (action === "visit") {
+    const { data: updated, error: updateError } = await supabase
+      .from("sub_lesson_progress")
+      .update({ visited_at: now, updated_at: now })
+      .eq("user_id", userId)
+      .eq("sub_lesson_id", subLessonId)
+      .select("id")
+      .maybeSingle();
 
-  if (existingError) {
-    throw new Error(existingError.message || "Failed to load progress.");
+    if (updateError) {
+      throw new Error(updateError.message || "Failed to update progress.");
+    }
+
+    if (updated?.id) {
+      return { id: updated.id, created: false };
+    }
+  }
+
+  let existing = null;
+  if (action !== "visit") {
+    const result = await supabase
+      .from("sub_lesson_progress")
+      .select("id, completed_at, assignment_submitted_at")
+      .eq("user_id", userId)
+      .eq("sub_lesson_id", subLessonId)
+      .maybeSingle();
+
+    if (result.error) {
+      throw new Error(result.error.message || "Failed to load progress.");
+    }
+
+    existing = result.data;
   }
 
   const patch = {
