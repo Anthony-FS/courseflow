@@ -392,7 +392,7 @@ export async function getCatalogCourses(
 
 export async function getOtherInterestingCourses(
   supabase,
-  { excludeCourseId, userId, limit = 3 } = {},
+  { excludeCourseId, userId, enrolledCourseIds, limit = 3 } = {},
 ) {
   if (!supabase) {
     return [];
@@ -404,8 +404,14 @@ export async function getOtherInterestingCourses(
     excludeIds.add(currentId);
   }
 
-  const enrolledUserId = String(userId ?? "").trim();
-  if (enrolledUserId) {
+  if (Array.isArray(enrolledCourseIds)) {
+    for (const id of enrolledCourseIds) {
+      const courseId = String(id ?? "").trim();
+      if (courseId) excludeIds.add(courseId);
+    }
+  } else {
+    const enrolledUserId = String(userId ?? "").trim();
+    if (enrolledUserId) {
     const { data: enrollments } = await supabase
       .from("enrollments")
       .select("course_id")
@@ -416,6 +422,7 @@ export async function getOtherInterestingCourses(
       if (courseId) {
         excludeIds.add(courseId);
       }
+    }
     }
   }
 
