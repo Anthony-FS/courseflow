@@ -151,6 +151,8 @@ export function OurCoursesCatalog({
 
     syncUserData();
   }, []);
+
+  useEffect(() => {
     function handleWishlistChange(event) {
       const detail = event?.detail;
       if (!detail?.courseId) return;
