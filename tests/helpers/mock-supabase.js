@@ -23,51 +23,94 @@ export function createMockSupabase({
   const storageRemoves = [];
 
   function selectRows(table) {
+    let rows = [];
     if (table === "wishlists" && wishlistsSelect) {
-      return Array.isArray(wishlistsSelect) ? wishlistsSelect : [wishlistsSelect];
-    }
-    if (table === "courses" && courseSelect) {
-      return Array.isArray(courseSelect) ? courseSelect : [courseSelect];
-    }
-    if (table === "promo_codes" && promoSelect) {
-      return Array.isArray(promoSelect) ? promoSelect : [promoSelect];
-    }
-    if (table === "materials") {
-      return materialsSelect ?? [];
-    }
-    if (table === "lessons") {
-      return lessonsSelect ?? [];
-    }
-    if (table === "assignments" && assignmentsSelect !== null) {
-      return Array.isArray(assignmentsSelect)
+      rows = Array.isArray(wishlistsSelect) ? wishlistsSelect : [wishlistsSelect];
+    } else if (table === "courses" && courseSelect) {
+      rows = Array.isArray(courseSelect) ? courseSelect : [courseSelect];
+    } else if (table === "promo_codes" && promoSelect) {
+      rows = Array.isArray(promoSelect) ? promoSelect : [promoSelect];
+    } else if (table === "materials") {
+      rows = materialsSelect ?? [];
+      rows = Array.isArray(rows) ? rows : [rows];
+    } else if (table === "lessons") {
+      rows = lessonsSelect ?? [];
+      rows = Array.isArray(rows) ? rows : [rows];
+    } else if (table === "assignments" && assignmentsSelect !== null) {
+      rows = Array.isArray(assignmentsSelect)
         ? assignmentsSelect
         : [assignmentsSelect];
-    }
-    if (table === "submissions" && submissionsSelect !== null) {
-      return Array.isArray(submissionsSelect)
+    } else if (table === "submissions" && submissionsSelect !== null) {
+      rows = Array.isArray(submissionsSelect)
         ? submissionsSelect
         : [submissionsSelect];
-    }
-    if (table === "enrollments" && enrollmentsSelect !== null) {
-      return Array.isArray(enrollmentsSelect)
+    } else if (table === "enrollments" && enrollmentsSelect !== null) {
+      rows = Array.isArray(enrollmentsSelect)
         ? enrollmentsSelect
         : [enrollmentsSelect];
-    }
-    if (table === "sub_lesson_progress" && progressSelect !== null) {
-      return Array.isArray(progressSelect) ? progressSelect : [progressSelect];
-    }
-    if (table === "sub_lessons" && subLessonsSelect !== null) {
-      return Array.isArray(subLessonsSelect)
+    } else if (table === "sub_lesson_progress" && progressSelect !== null) {
+      rows = Array.isArray(progressSelect) ? progressSelect : [progressSelect];
+    } else if (table === "sub_lessons" && subLessonsSelect !== null) {
+      rows = Array.isArray(subLessonsSelect)
         ? subLessonsSelect
         : [subLessonsSelect];
     }
-    return [];
+
+    if (table === "materials") {
+      const subLessonDeletes = deletes.filter((d) => d.table === "sub_lessons");
+      const rawSubLessons = Array.isArray(subLessonsSelect)
+        ? subLessonsSelect
+        : subLessonsSelect
+          ? [subLessonsSelect]
+          : [];
+      const deletedSubIds = new Set();
+      for (const del of subLessonDeletes) {
+        for (const sub of rawSubLessons) {
+          if (
+            del.filters.length > 0 &&
+            del.filters.every((f) =>
+              matchesFilter(sub, { op: "eq", column: f.column, value: f.value }),
+            )
+          ) {
+            if (sub.id) deletedSubIds.add(sub.id);
+          }
+        }
+      }
+      rows = rows.filter((r) => !deletedSubIds.has(r.sub_lesson_id));
+    }
+
+    const tableDeletes = deletes.filter((d) => d.table === table);
+    if (tableDeletes.length === 0) return rows;
+
+    return rows.filter((row) => {
+      for (const del of tableDeletes) {
+        if (
+          del.filters.length > 0 &&
+          del.filters.every((f) =>
+            matchesFilter(row, { op: "eq", column: f.column, value: f.value }),
+          )
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
   }
 
   function matchesFilter(row, filter) {
-    // Fixtures often omit join/filter columns; only enforce when present.
+    // Fixtures often omit join/filter columns (e.g. course_id, lesson_id, sub_lesson_id)
     if (!Object.prototype.hasOwnProperty.call(row ?? {}, filter.column)) {
-      return true;
+      if (
+        ["course_id", "lesson_id", "sub_lesson_id", "user_id"].includes(
+          filter.column,
+        )
+      ) {
+        if (filter.op === "neq" || filter.op === "not") {
+          return false;
+        }
+        return true;
+      }
+      return false;
     }
 
     const value = row[filter.column];
@@ -86,6 +129,14 @@ export function createMockSupabase({
     }
     if (filter.op === "in") {
       return Array.isArray(filter.value) && filter.value.includes(value);
+    }
+    if (filter.op === "not") {
+      if (filter.subOp === "in") {
+        const raw = String(filter.value ?? "").replace(/^\(|\)$/g, "");
+        const excluded = raw.split(",").map((s) => s.trim());
+        return !excluded.includes(String(value ?? ""));
+      }
+      return value !== filter.value;
     }
     return true;
   }
@@ -108,6 +159,10 @@ export function createMockSupabase({
           filters.push({ op: "neq", column, value });
           return chain;
         },
+        not(column, subOp, value) {
+          filters.push({ op: "not", column, subOp, value });
+          return chain;
+        },
         ilike(column, value) {
           filters.push({ op: "ilike", column, value });
           return chain;
@@ -124,12 +179,7 @@ export function createMockSupabase({
           return chain;
         },
         order() {
-          const filtered = applyFilters(selectRows(table), filters);
-          return Promise.resolve({
-            data: filtered,
-            error: null,
-            count: filtered.length,
-          });
+          return chain;
         },
         maybeSingle: async () => ({
           data: applyFilters(selectRows(table), filters)[0] ?? null,
@@ -239,40 +289,7 @@ export function createMockSupabase({
         return chain;
       },
       select(_columns, options = {}) {
-        const chain = selectChain(options);
-        if (options?.head && options?.count === "exact") {
-          const withCount = {
-            ...chain,
-            async maybeSingle() {
-              return { data: null, error: null, count: 0 };
-            },
-            then(onFulfilled, onRejected) {
-              return Promise.resolve({
-                data: null,
-                error: null,
-                count: 0,
-              }).then(onFulfilled, onRejected);
-            },
-          };
-          withCount.eq = (column, value) => {
-            chain.eq(column, value);
-            return withCount;
-          };
-          withCount.neq = (column, value) => {
-            chain.neq(column, value);
-            return withCount;
-          };
-          withCount.ilike = (column, value) => {
-            chain.ilike(column, value);
-            return withCount;
-          };
-          withCount.in = (column, value) => {
-            chain.in(column, value);
-            return withCount;
-          };
-          return withCount;
-        }
-        return chain;
+        return selectChain(options);
       },
       update(payload) {
         const entry = { table, payload, filters: [] };
