@@ -18,6 +18,7 @@ function validCourseBody(overrides = {}) {
   return {
     title: "Service Design Essentials",
     courseCode: "SD101",
+    tag: "development",
     summary: "Learn service design fundamentals",
     description: "Detailed course content",
     price: 3559,
@@ -84,6 +85,7 @@ describe("POST /api/admin/courses integration", () => {
       created_by: ADMIN_USER.id,
       title: "Service Design Essentials",
       course_code: "SD101",
+      tag_id: "tag-development",
       summary: "Learn service design fundamentals",
       description: "Detailed course content",
       price: 3559,

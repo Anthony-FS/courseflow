@@ -7,9 +7,19 @@ export const COURSE_LIMITS = {
   courseCode: 32,
 };
 
+export const COURSE_TAG_OPTIONS = [
+  { slug: "development", name: "Development" },
+  { slug: "marketing", name: "Marketing" },
+  { slug: "business", name: "Business" },
+];
+
+export const COURSE_TAG_SLUGS = COURSE_TAG_OPTIONS.map((tag) => tag.slug);
+export const DEFAULT_COURSE_TAG = "development";
+
 export const EMPTY_FIELD_MESSAGE = "Please fill out this field";
 export const COURSE_CODE_TAKEN_MESSAGE = "Course code already exists.";
 export const COURSE_CODE_PATTERN = /^[a-z0-9]+$/i;
+export const INVALID_COURSE_TAG_MESSAGE = "Please select a valid course tag";
 
 function isBlank(value) {
   return String(value ?? "").trim() === "";
@@ -48,6 +58,32 @@ function asNumber(value) {
  * Validate Add Course text/number fields (not files).
  * @returns {Record<string, string>} map of field key → error message
  */
+export function normalizeCourseTag(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+export function isValidCourseTag(value) {
+  return COURSE_TAG_SLUGS.includes(normalizeCourseTag(value));
+}
+
+/**
+ * Resolve a course tag slug to its row id.
+ * @returns {Promise<string | null>}
+ */
+export async function resolveCourseTagId(supabase, tagSlug) {
+  const slug = normalizeCourseTag(tagSlug);
+  if (!isValidCourseTag(slug)) return null;
+
+  const { data, error } = await supabase
+    .from("course_tags")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
 export function validateCourseFields({
   courseName,
   courseCode,
@@ -55,6 +91,7 @@ export function validateCourseFields({
   learningTime,
   courseSummary,
   courseDetail,
+  tag,
 }) {
   const errors = {};
 
@@ -73,6 +110,12 @@ export function validateCourseFields({
       "Course code must contain alphabet and number characters only.";
   } else if (trimmedCode.length > COURSE_LIMITS.courseCode) {
     errors.courseCode = `Course code cannot exceed ${COURSE_LIMITS.courseCode} characters`;
+  }
+
+  if (isBlank(tag)) {
+    errors.tag = EMPTY_FIELD_MESSAGE;
+  } else if (!isValidCourseTag(tag)) {
+    errors.tag = INVALID_COURSE_TAG_MESSAGE;
   }
 
   if (isBlank(price)) {

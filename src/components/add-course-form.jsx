@@ -24,6 +24,8 @@ import {
 import { validateUpload } from "@/lib/admin-uploads";
 import {
   COURSE_LIMITS,
+  COURSE_TAG_OPTIONS,
+  DEFAULT_COURSE_TAG,
   EMPTY_FIELD_MESSAGE,
   isFreePrice,
   trimCourseCode,
@@ -102,6 +104,34 @@ function TextInput({ id, className, error, onChange, hint, ...props }) {
       {hint && !hasError ? (
         <p className="mt-1.5 text-body4 font-medium text-green">{hint}</p>
       ) : null}
+      <FieldError id={`${id}-error`} message={error} />
+    </div>
+  );
+}
+
+function FieldSelect({ id, className, error, onChange, children, ...props }) {
+  const hasError = Boolean(error);
+
+  return (
+    <div>
+      <select
+        id={id}
+        {...props}
+        aria-invalid={hasError || undefined}
+        aria-describedby={hasError ? `${id}-error` : undefined}
+        onChange={onChange}
+        className={cn(
+          "h-12 min-h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-body3",
+          className,
+        )}
+        style={
+          hasError
+            ? { borderColor: ERROR_COLOR, boxShadow: "none" }
+            : undefined
+        }
+      >
+        {children}
+      </select>
       <FieldError id={`${id}-error`} message={error} />
     </div>
   );
@@ -351,6 +381,7 @@ function AddCourseForm({
   const [valuesState, setValues] = useState({
     courseName: "",
     courseCode: "",
+    tag: DEFAULT_COURSE_TAG,
     price: "",
     learningTime: "",
     courseSummary: "",
@@ -399,6 +430,7 @@ function AddCourseForm({
         setValues({
           courseName: data.title ?? "",
           courseCode: data.courseCode ?? "",
+          tag: data.tag || DEFAULT_COURSE_TAG,
           price: data.price == null ? "" : String(data.price),
           learningTime: data.totalLearningTime ?? "",
           courseSummary: data.summary ?? "",
@@ -620,6 +652,7 @@ function AddCourseForm({
       const payload = {
         title: values.courseName.trim(),
         courseCode: trimCourseCode(values.courseCode),
+        tag: values.tag,
         summary: values.courseSummary.trim(),
         description: values.courseDetail.trim(),
         price: Number(values.price),
@@ -748,6 +781,26 @@ function AddCourseForm({
                 error={errors.courseCode}
                 placeholder="Enter course code"
               />
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="course-tag" required>
+                Tag
+              </FieldLabel>
+              <FieldSelect
+                id="course-tag"
+                name="tag"
+                value={values.tag || DEFAULT_COURSE_TAG}
+                required
+                onChange={(event) => updateField("tag", event.target.value)}
+                error={errors.tag}
+              >
+                {COURSE_TAG_OPTIONS.map((option) => (
+                  <option key={option.slug} value={option.slug}>
+                    {option.name}
+                  </option>
+                ))}
+              </FieldSelect>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
