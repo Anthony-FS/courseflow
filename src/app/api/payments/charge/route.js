@@ -119,8 +119,10 @@ export async function POST(request) {
   }
 
   let qrImage = null;
+  let expiresAt = null;
   if (paymentMethod === "qr") {
     qrImage = await fetchQrDataUrl(getPromptPayQrUri(charge));
+    expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   }
 
   return jsonOk({
@@ -132,5 +134,6 @@ export async function POST(request) {
     chargeId: charge.id,
     amount: priced.total,
     qrImage,
+    expiresAt,
   });
 }

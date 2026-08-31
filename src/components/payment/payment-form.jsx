@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
   InputGroup,
@@ -20,6 +29,30 @@ const METHOD_LABEL = {
   card: "Credit card / Debit card",
   qr: "QR Payment",
 };
+
+const QR_PAYMENT_TIMEOUT_MS = 5 * 60 * 1000;
+
+const QR_TIMEOUT_MESSAGE =
+  "Payment was not completed within 5 minutes. Please place your order again.";
+
+const QR_FAILED_MESSAGE =
+  "Payment was not successful. Please place your order again.";
+
+function formatCountdown(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function resolveQrExpiresAt(expiresAt) {
+  if (expiresAt) {
+    const parsed = new Date(expiresAt).getTime();
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now() + QR_PAYMENT_TIMEOUT_MS;
+}
 
 function VisaMark() {
   return (
@@ -190,52 +223,154 @@ export function PaymentForm({ course }) {
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [qrImage, setQrImage] = useState("");
   const [pendingChargeId, setPendingChargeId] = useState("");
+  const [qrExpiresAt, setQrExpiresAt] = useState(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const qrSessionEndedRef = useRef(false);
+  const paymentSuccessRedirectedRef = useRef(false);
 
   const discountAmount = appliedPromo?.discountAmount ?? 0;
   const total = appliedPromo?.total ?? checkout.subtotal;
   const isWaitingForQrPayment = Boolean(pendingChargeId);
 
+  const resetQrWaitingState = useCallback(() => {
+    setPendingChargeId("");
+    setQrImage("");
+    setQrExpiresAt(null);
+    setRemainingSeconds(0);
+  }, []);
+
+  const handleQrPaymentEnded = useCallback(
+    (message, { notify = true } = {}) => {
+      if (qrSessionEndedRef.current) return;
+      qrSessionEndedRef.current = true;
+      resetQrWaitingState();
+      setCheckoutMessage("");
+      setCheckoutError(message);
+      if (notify) {
+        toast.error(message);
+      }
+    },
+    [resetQrWaitingState],
+  );
+
+  const handleQrTimeout = useCallback(() => {
+    handleQrPaymentEnded(QR_TIMEOUT_MESSAGE);
+  }, [handleQrPaymentEnded]);
+
+  const handleQrPaymentFailed = useCallback(() => {
+    handleQrPaymentEnded(QR_FAILED_MESSAGE);
+  }, [handleQrPaymentEnded]);
+
+  const startQrWaiting = useCallback((chargeId, image, expiresAt) => {
+    qrSessionEndedRef.current = false;
+    paymentSuccessRedirectedRef.current = false;
+    const expires = resolveQrExpiresAt(expiresAt);
+    setQrImage(image || "");
+    setPendingChargeId(chargeId || "");
+    setQrExpiresAt(expires);
+    setRemainingSeconds(Math.max(0, Math.ceil((expires - Date.now()) / 1000)));
+    setCheckoutError("");
+    setCheckoutMessage(
+      "Scan the QR code with your banking app. You have 5 minutes to complete payment.",
+    );
+  }, []);
+
+  const goToCourseAfterPayment = useCallback(() => {
+    if (paymentSuccessRedirectedRef.current) return;
+    paymentSuccessRedirectedRef.current = true;
+    router.push(checkout.coursePath);
+    router.refresh();
+  }, [checkout.coursePath, router]);
+
+  const completePaymentSuccess = useCallback(() => {
+    resetQrWaitingState();
+    setCheckoutError("");
+    setCheckoutMessage("");
+    setShowPaymentSuccess(true);
+  }, [resetQrWaitingState]);
+
+  const handlePaymentSuccessClose = useCallback(() => {
+    setShowPaymentSuccess(false);
+    goToCourseAfterPayment();
+  }, [goToCourseAfterPayment]);
+
   useEffect(() => {
     loadOmise().catch(() => {});
   }, []);
 
-  async function checkChargeStatus(chargeId) {
-    const response = await fetch(`/api/payments/charges/${chargeId}`);
-    const data = await readJson(response);
+  useEffect(() => {
+    if (!pendingChargeId || !qrExpiresAt) return undefined;
 
-    if (!response.ok) {
-      const message =
-        data?.error ||
-        "Could not confirm payment status. Try Refresh status.";
-      if (response.status === 409 && data?.paid) {
-        setCheckoutError("");
+    function tick() {
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((qrExpiresAt - Date.now()) / 1000),
+      );
+      setRemainingSeconds(secondsLeft);
+      if (secondsLeft <= 0) {
+        handleQrTimeout();
+      }
+    }
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [pendingChargeId, qrExpiresAt, handleQrTimeout]);
+
+  const checkChargeStatus = useCallback(
+    async (chargeId) => {
+      if (qrExpiresAt && Date.now() >= qrExpiresAt) {
+        handleQrTimeout();
+        return { ok: false, timedOut: true };
+      }
+
+      const response = await fetch(`/api/payments/charges/${chargeId}`);
+      const data = await readJson(response);
+
+      if (!response.ok) {
+        const message =
+          data?.error ||
+          "Could not confirm payment status. Try Refresh status.";
+        if (response.status === 409 && data?.paid) {
+          setCheckoutError("");
+          setCheckoutMessage(
+            "Payment received. Finishing enrollment… you can tap Refresh status.",
+          );
+        } else {
+          setCheckoutError(message);
+        }
+        return { ok: false, data };
+      }
+
+      if (data?.status === "expired" || data?.status === "failed") {
+        handleQrPaymentFailed();
+        return { ok: false, data, failed: true };
+      }
+
+      if (data?.paid && data?.enrolled) {
+        completePaymentSuccess();
+        return { ok: true, data };
+      }
+
+      if (data?.paid && !data?.enrolled) {
         setCheckoutMessage(
           "Payment received. Finishing enrollment… you can tap Refresh status.",
         );
-      } else {
-        setCheckoutError(message);
+        return { ok: false, data };
       }
+
       return { ok: false, data };
-    }
-
-    if (data?.paid && data?.enrolled) {
-      setCheckoutError("");
-      setCheckoutMessage("Payment confirmed. Opening your course…");
-      router.push(checkout.coursePath);
-      router.refresh();
-      return { ok: true, data };
-    }
-
-    if (data?.paid && !data?.enrolled) {
-      setCheckoutMessage(
-        "Payment received. Finishing enrollment… you can tap Refresh status.",
-      );
-      return { ok: false, data };
-    }
-
-    return { ok: false, data };
-  }
+    },
+    [
+      checkout.coursePath,
+      completePaymentSuccess,
+      handleQrPaymentFailed,
+      handleQrTimeout,
+      qrExpiresAt,
+    ],
+  );
 
   useEffect(() => {
     if (!pendingChargeId) return undefined;
@@ -244,9 +379,9 @@ export function PaymentForm({ course }) {
 
     async function pollCharge() {
       const result = await checkChargeStatus(pendingChargeId);
-      if (cancelled) return;
+      if (cancelled || result.timedOut || result.failed) return;
       if (result.ok) {
-        setPendingChargeId("");
+        return;
       }
     }
 
@@ -257,8 +392,7 @@ export function PaymentForm({ course }) {
       cancelled = true;
       clearInterval(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- poll only while charge id is set
-  }, [pendingChargeId, checkout.coursePath, router]);
+  }, [pendingChargeId, checkChargeStatus]);
 
   async function handleRefreshStatus() {
     if (!pendingChargeId || isRefreshingStatus) return;
@@ -266,9 +400,10 @@ export function PaymentForm({ course }) {
     setCheckoutError("");
     try {
       const result = await checkChargeStatus(pendingChargeId);
-      if (result.ok) {
-        setPendingChargeId("");
-      } else if (!result.data?.paid) {
+      if (result.ok || result.timedOut || result.failed) {
+        return;
+      }
+      if (!result.data?.paid) {
         setCheckoutMessage(
           "Still waiting for payment. After paying in your bank app (or marking successful in Omise Dashboard), tap Refresh status.",
         );
@@ -340,13 +475,13 @@ export function PaymentForm({ course }) {
     setCheckoutError("");
     setCheckoutMessage("");
     if (nextMethod !== "qr") {
-      setQrImage("");
-      setPendingChargeId("");
+      resetQrWaitingState();
     }
   }
 
   async function handlePlaceOrder(event) {
     event.preventDefault();
+    paymentSuccessRedirectedRef.current = false;
     setCheckoutError("");
     setCheckoutMessage("");
 
@@ -411,17 +546,12 @@ export function PaymentForm({ course }) {
       }
 
       if (method === "qr") {
-        setQrImage(data.qrImage || "");
-        setPendingChargeId(data.chargeId || "");
-        setCheckoutMessage(
-          "Scan the QR code with your banking app. This page checks payment status automatically. In Omise test mode, open the charge in the Dashboard → Actions → Mark as Successful.",
-        );
+        startQrWaiting(data.chargeId, data.qrImage, data.expiresAt);
         return;
       }
 
       if (data.paid && data.enrolled !== false) {
-        router.push(checkout.coursePath);
-        router.refresh();
+        completePaymentSuccess();
         return;
       }
 
@@ -442,7 +572,8 @@ export function PaymentForm({ course }) {
   }
 
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_21.5rem] lg:gap-x-10">
+    <>
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_21.5rem] lg:gap-x-10">
       <section aria-labelledby="payment-methods-heading" className="min-w-0">
         <h2
           id="payment-methods-heading"
@@ -556,6 +687,12 @@ export function PaymentForm({ course }) {
               </p>
               {isWaitingForQrPayment ? (
                 <div className="flex w-full flex-col items-center gap-2">
+                  <p
+                    className="text-center text-body3 font-medium text-orange-500"
+                    aria-live="polite"
+                  >
+                    Complete payment within {formatCountdown(remainingSeconds)}
+                  </p>
                   <p className="text-center text-body4 text-gray-600" aria-live="polite">
                     Waiting for payment confirmation…
                   </p>
@@ -676,6 +813,56 @@ export function PaymentForm({ course }) {
               : "Place order"}
         </Button>
       </aside>
-    </div>
+      </div>
+
+      <Dialog
+        open={showPaymentSuccess}
+        onOpenChange={(open) => {
+          if (!open) {
+            handlePaymentSuccessClose();
+          }
+        }}
+      >
+        <DialogContent
+          aria-describedby="payment-success-description"
+          className="w-[min(420px,calc(100%-2rem))] overflow-hidden p-0"
+        >
+          <header className="flex items-center justify-end px-4 pt-4">
+            <DialogClose
+              aria-label="Close and go to course"
+              className="rounded-md p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            >
+              <X aria-hidden="true" className="size-6" />
+            </DialogClose>
+          </header>
+
+          <div className="flex flex-col items-center px-6 pb-8 pt-2 text-center">
+            <CheckCircle2
+              aria-hidden="true"
+              className="size-16 text-green"
+              strokeWidth={1.75}
+            />
+            <DialogTitle className="mt-6 text-headline3 font-medium text-gray-900">
+              Payment successful!
+            </DialogTitle>
+            <DialogDescription
+              id="payment-success-description"
+              className="mt-3 text-body2 text-gray-700"
+            >
+              You&apos;re subscribed to{" "}
+              <span className="font-medium text-gray-900">{checkout.title}</span>.
+              Close this window to start learning.
+            </DialogDescription>
+            <Button
+              type="button"
+              className="mt-8 w-full"
+              onClick={handlePaymentSuccessClose}
+            >
+              Go to course
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
