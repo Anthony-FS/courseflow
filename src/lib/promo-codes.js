@@ -1,5 +1,17 @@
 import { createClient } from "@/lib/supabase/client";
 
+async function parseJson(response) {
+  try { return await response.json(); } catch { return null; }
+}
+
+export async function getAdminPromoCodesPage({ query = "", page = 1, pageSize = 10, sortBy = "code", sortDirection = "asc" } = {}) {
+  const params = new URLSearchParams({ q: query, page: String(page), pageSize: String(pageSize), sortBy, sortDirection });
+  const response = await fetch(`/api/admin/promo-codes?${params}`, { cache: "no-store" });
+  const data = await parseJson(response);
+  if (!response.ok) throw new Error(data?.error || "Failed to load promo codes.");
+  return data;
+}
+
 export async function getPromoCodes() {
   const supabase = createClient();
   const { data, error } = await supabase

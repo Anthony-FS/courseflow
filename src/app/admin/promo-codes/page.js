@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
@@ -9,9 +9,8 @@ import { AdminPagination } from "@/components/admin/pagination";
 import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { getPromoCodes, searchPromoCodes } from "@/lib/promo-codes";
-import { getTotalPages, paginateItems } from "@/lib/pagination";
-import { sortItems } from "@/lib/sorting";
+import { getAdminPromoCodesPage } from "@/lib/promo-codes";
+import { getTotalPages, ITEMS_PER_PAGE } from "@/lib/pagination";
 
 const PROMO_SORT_OPTIONS = [
   {
@@ -48,6 +47,7 @@ const PROMO_SORT_OPTIONS = [
 
 export default function AdminPromoCodesPage() {
   const [promoCodes, setPromoCodes] = useState([]);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState("code");
   const [sortDirection, setSortDirection] = useState("asc");
@@ -59,52 +59,38 @@ export default function AdminPromoCodesPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const timer = setTimeout(() => loadPromoCodes(), 250);
 
-    getPromoCodes()
-      .then((data) => {
+    async function loadPromoCodes() {
+      try {
+        setStatus("loading");
+        const data = await getAdminPromoCodesPage({
+          query,
+          page: currentPage,
+          pageSize: ITEMS_PER_PAGE,
+          sortBy,
+          sortDirection,
+        });
         if (!cancelled) {
-          setPromoCodes(data);
+          setPromoCodes(data.promoCodes ?? []);
+          setTotal(data.total ?? 0);
           setStatus("ready");
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         if (!cancelled) {
           setStatus("error");
           setErrorMessage(error.message ?? "Failed to load promo codes.");
         }
-      });
+      }
+    }
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, []);
+  }, [query, currentPage, sortBy, sortDirection]);
 
-  const filteredPromoCodes = useMemo(
-    () => searchPromoCodes(promoCodes, query),
-    [promoCodes, query],
-  );
-
-  const sortedPromoCodes = useMemo(() => {
-    const sortConfig = {
-      code: { type: "text", getValue: (promo) => promo.code },
-      minPurchase: { type: "number", getValue: (promo) => promo.min_purchase_amount },
-      discountValue: { type: "number", getValue: (promo) => promo.discount_value },
-      createdAt: { type: "date", getValue: (promo) => promo.starts_at },
-      updatedAt: { type: "date", getValue: (promo) => promo.updated_at },
-    }[sortBy] ?? { type: "text", getValue: (promo) => promo.code };
-
-    return sortItems(filteredPromoCodes, {
-      ...sortConfig,
-      direction: sortDirection,
-    });
-  }, [filteredPromoCodes, sortBy, sortDirection]);
-
-  const totalPages = getTotalPages(sortedPromoCodes.length);
-
-  const paginatedPromoCodes = useMemo(
-    () => paginateItems(sortedPromoCodes, currentPage),
-    [sortedPromoCodes, currentPage],
-  );
+  const totalPages = getTotalPages(total, ITEMS_PER_PAGE);
 
   function handleSearchChange(event) {
     setQuery(event.target.value);
@@ -127,9 +113,9 @@ export default function AdminPromoCodesPage() {
       const remaining = promoCodes.filter((promo) => promo.id !== promoToDelete.id);
 
       setPromoCodes(remaining);
-      setCurrentPage((page) =>
-        Math.min(page, getTotalPages(searchPromoCodes(remaining, query).length)),
-      );
+      const nextTotal = Math.max(0, total - 1);
+      setTotal(nextTotal);
+      setCurrentPage((page) => Math.min(page, getTotalPages(nextTotal, ITEMS_PER_PAGE)));
       setPromoToDelete(null);
     } catch (error) {
       setErrorMessage(error.message);
@@ -173,10 +159,10 @@ export default function AdminPromoCodesPage() {
       <section className="p-10">
         {errorMessage ? <p className="mb-4 text-body2 text-orange-500" role="alert">{errorMessage}</p> : null}
         <div className="overflow-hidden rounded-lg bg-white shadow-card">
-          <PromoCodeTable promoCodes={paginatedPromoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
+          <PromoCodeTable promoCodes={promoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
         </div>
 
-        {status === "ready" && sortedPromoCodes.length > 0 ? (
+        {status === "ready" && total > 0 ? (
           <AdminPagination
             currentPage={currentPage}
             totalPages={totalPages}
