@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   CATALOG_COLUMNS,
   CATALOG_DEBOUNCE_MS,
+  CATALOG_SEARCH_MAX_LENGTH,
   catalogPageSizeFromWidth,
   catalogRange,
   catalogRequestUrl,
   catalogSearchFilter,
+  isCatalogSearchQueryTooLong,
   mapCatalogCourse,
   parseCatalogPageSize,
   parseCatalogSortBy,
@@ -18,6 +20,7 @@ import {
 describe("catalog constants", () => {
   it("debounces for 300ms and selects only card columns", () => {
     expect(CATALOG_DEBOUNCE_MS).toBe(300);
+    expect(CATALOG_SEARCH_MAX_LENGTH).toBe(100);
     expect(CATALOG_COLUMNS).toBe(
       "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, updated_at, lessons(count)",
     );
@@ -75,6 +78,25 @@ describe("catalogSearchFilter", () => {
     const filter = catalogSearchFilter('Design (UX) "Basics"');
 
     expect(filter).not.toMatch(/[()"]/);
+  });
+});
+
+describe("isCatalogSearchQueryTooLong", () => {
+  it("accepts queries up to the max length after trim", () => {
+    expect(isCatalogSearchQueryTooLong("")).toBe(false);
+    expect(isCatalogSearchQueryTooLong("ux")).toBe(false);
+    expect(isCatalogSearchQueryTooLong("a".repeat(CATALOG_SEARCH_MAX_LENGTH))).toBe(
+      false,
+    );
+    expect(
+      isCatalogSearchQueryTooLong(`  ${"a".repeat(CATALOG_SEARCH_MAX_LENGTH)}  `),
+    ).toBe(false);
+  });
+
+  it("rejects queries longer than the max length", () => {
+    expect(
+      isCatalogSearchQueryTooLong("a".repeat(CATALOG_SEARCH_MAX_LENGTH + 1)),
+    ).toBe(true);
   });
 });
 

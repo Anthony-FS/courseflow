@@ -9,6 +9,7 @@ import { WishlistCard } from "@/components/wishlist/wishlist-card";
 import {
   CATALOG_DEBOUNCE_MS,
   CATALOG_MOBILE_MAX_PX,
+  CATALOG_SEARCH_MAX_LENGTH,
   catalogPageSizeFromWidth,
   catalogRequestUrl,
 } from "@/lib/courses";
@@ -72,6 +73,11 @@ async function loadCatalog({
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error(
+        body.error || "Too many searches, try again in a moment",
+      );
+    }
     throw new Error(body.error || "Failed to load courses.");
   }
 
@@ -210,6 +216,7 @@ export function OurCoursesCatalog({
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Search..."
+            maxLength={CATALOG_SEARCH_MAX_LENGTH}
             className="h-12 w-full max-w-80 rounded-lg border border-gray-400 bg-white pr-4 pl-12 text-body2"
           />
         </label>

@@ -196,6 +196,7 @@ export function embeddedCount(value) {
 }
 
 export const CATALOG_DEBOUNCE_MS = 300;
+export const CATALOG_SEARCH_MAX_LENGTH = 100;
 export const CATALOG_MOBILE_MAX_PX = 760;
 export const CATALOG_COLUMNS =
   "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, updated_at, lessons(count)";
@@ -212,6 +213,10 @@ export function parseCatalogPageSize(value) {
 export function catalogRange(page, pageSize) {
   const from = (page - 1) * pageSize;
   return { from, to: from + pageSize - 1 };
+}
+
+export function isCatalogSearchQueryTooLong(query) {
+  return String(query ?? "").trim().length > CATALOG_SEARCH_MAX_LENGTH;
 }
 
 export function catalogSearchFilter(query) {

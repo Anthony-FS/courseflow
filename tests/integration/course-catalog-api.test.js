@@ -21,10 +21,19 @@ vi.mock("@/lib/enrollments", () => ({
   getUserEnrolledCourseIds: vi.fn(),
 }));
 
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    checkRateLimit: vi.fn(),
+  };
+});
+
 import { createServiceClient } from "@/lib/supabase/server";
 import { getCatalogCourses } from "@/lib/courses";
 import { getSessionUser } from "@/lib/auth";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { GET } from "@/app/api/courses/route";
 
 function getCourses(search = "page=1&pageSize=12") {
@@ -38,6 +47,7 @@ describe("GET /api/courses", () => {
     getCatalogCourses.mockResolvedValue({ courses: [], total: 0 });
     getSessionUser.mockResolvedValue({ user: null, supabase: { session: true } });
     getUserEnrolledCourseIds.mockResolvedValue([]);
+    checkRateLimit.mockReturnValue({ allowed: true, retryAfterSec: 0 });
   });
 
   it("returns 400 for an invalid page size", async () => {
@@ -52,6 +62,31 @@ describe("GET /api/courses", () => {
   it("returns 400 for page 0", async () => {
     const response = await getCourses("page=0&pageSize=12");
     expect(response.status).toBe(400);
+  });
+
+  it("returns 400 when the search query is longer than 100 characters", async () => {
+    const response = await getCourses(
+      `q=${"a".repeat(101)}&page=1&pageSize=12`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/too long/i);
+    expect(getCatalogCourses).not.toHaveBeenCalled();
+    expect(getSessionUser).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 without querying when the catalog rate limit is exceeded", async () => {
+    checkRateLimit.mockReturnValue({ allowed: false, retryAfterSec: 12 });
+
+    const response = await getCourses("page=1&pageSize=12");
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("12");
+    expect(body.error).toMatch(/too many searches/i);
+    expect(getCatalogCourses).not.toHaveBeenCalled();
+    expect(getSessionUser).not.toHaveBeenCalled();
   });
 
   it("returns the current page of mapped courses", async () => {
