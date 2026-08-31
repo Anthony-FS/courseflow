@@ -17,16 +17,9 @@ import {
   getCourseByCode,
   getOtherInterestingCourses,
 } from "@/lib/courses";
-import {
-  getUserEnrolledCourseIds,
-  isCourseEnrolled,
-} from "@/lib/enrollments";
+import { getUserEnrolledCourseIds } from "@/lib/enrollments";
 import { createServiceClient } from "@/lib/supabase/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import {
-  getUserWishlistCourseIds,
-  isCourseWishlisted,
-} from "@/lib/wishlist";
 
 function catalogClient(sessionSupabase) {
   return createServiceClient() ?? sessionSupabase;
@@ -62,25 +55,24 @@ export default async function CourseDetailPage({ params }) {
   }
 
   const catalog = catalogClient(supabase);
-  const [
-    inWishlist,
-    isSubscribed,
-    attachment,
-    otherCourses,
-    enrolledCourseIds,
-    wishlistCourseIds,
-  ] = await Promise.all([
-    isCourseWishlisted(supabase, user.id, course.id),
-    isCourseEnrolled(catalog, user.id, course.id),
-    getCourseAttachment(catalog, course.id),
-    getOtherInterestingCourses(catalog, {
-      excludeCourseId: course.id,
-      userId: user.id,
-      limit: 3,
-    }),
+  const [enrolledCourseIds, wishlistResult, attachment] = await Promise.all([
     getUserEnrolledCourseIds(catalog, user.id),
-    getUserWishlistCourseIds(supabase, user.id),
+    supabase
+      .from("wishlists")
+      .select("course_id")
+      .eq("user_id", user.id),
+    getCourseAttachment(catalog, course.id),
   ]);
+  const wishlistCourseIds = wishlistResult.error
+    ? []
+    : (wishlistResult.data ?? []).map((row) => row?.course_id).filter(Boolean);
+  const isSubscribed = enrolledCourseIds.includes(course.id);
+  const inWishlist = wishlistCourseIds.includes(course.id);
+  const otherCourses = await getOtherInterestingCourses(catalog, {
+    excludeCourseId: course.id,
+    enrolledCourseIds,
+    limit: 3,
+  });
 
   return (
     <>
