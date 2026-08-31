@@ -5,9 +5,23 @@ import {
 } from "@/lib/course-learn";
 import { getCourseProgress } from "@/lib/course-learn-progress";
 import { resolveCoverUrl } from "@/lib/courses";
+import { dispatchWishlistChange, updateWishlistCache } from "@/lib/wishlist";
 
 function isUniqueViolation(error) {
   return error?.code === "23505";
+}
+
+async function deleteUserCourseWishlist(supabase, userId, courseId) {
+  if (!supabase || !userId || !courseId) return;
+  try {
+    await supabase
+      .from("wishlists")
+      .delete()
+      .eq("user_id", userId)
+      .eq("course_id", courseId);
+  } catch {
+    // Ignore wishlist deletion errors
+  }
 }
 
 export async function enrollUserInCourse(supabase, userId, courseId) {
@@ -27,6 +41,7 @@ export async function enrollUserInCourse(supabase, userId, courseId) {
   }
 
   if (existing?.id) {
+    await deleteUserCourseWishlist(supabase, userId, courseId);
     return { already: true, id: existing.id };
   }
 
@@ -41,10 +56,13 @@ export async function enrollUserInCourse(supabase, userId, courseId) {
 
   if (insertError) {
     if (isUniqueViolation(insertError)) {
+      await deleteUserCourseWishlist(supabase, userId, courseId);
       return { already: true, id: null };
     }
     throw new Error(insertError.message || "Failed to subscribe to this course.");
   }
+
+  await deleteUserCourseWishlist(supabase, userId, courseId);
 
   return { already: false, id: inserted?.id ?? null };
 }
@@ -103,6 +121,9 @@ export async function enrollInCourse(courseId) {
   if (!response.ok) {
     throw new Error(data?.error || "Failed to subscribe to this course.");
   }
+
+  updateWishlistCache("remove", courseId);
+  dispatchWishlistChange({ action: "remove", courseId, enrolled: true });
 
   return data;
 }

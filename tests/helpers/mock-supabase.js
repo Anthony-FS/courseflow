@@ -239,6 +239,10 @@ export function createMockSupabase({
           entry.filters.push({ column, value });
           return chain;
         },
+        in(column, value) {
+          entry.filters.push({ column, value });
+          return chain;
+        },
         then(onFulfilled, onRejected) {
           return Promise.resolve({ error: null }).then(onFulfilled, onRejected);
         },

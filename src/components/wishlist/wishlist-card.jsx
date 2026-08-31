@@ -37,10 +37,7 @@ export function WishlistCard({
     lessonCount = 0,
   } = course;
 
-  const [saved, setSaved] = useState(initiallySaved);
-  const [isPending, setIsPending] = useState(false);
-
-  const enrolled =
+  const isCurrentlyEnrolled =
     Boolean(isEnrolled) ||
     Boolean(
       course?.isEnrolled ||
@@ -49,18 +46,29 @@ export function WishlistCard({
         course?.enrollmentId,
     );
 
-  useEffect(() => {
-    setSaved(initiallySaved);
-  }, [initiallySaved]);
+  const [enrolledEvent, setEnrolledEvent] = useState(null);
+  const [savedOverride, setSavedOverride] = useState(null);
+  const [isPending, setIsPending] = useState(false);
+
+  const enrolled = enrolledEvent !== null ? enrolledEvent : isCurrentlyEnrolled;
+  const saved = savedOverride !== null ? savedOverride : initiallySaved;
 
   useEffect(() => {
     function handleWishlistChange(event) {
       const detail = event?.detail;
       if (detail?.courseId === id) {
         if (detail.action === "add") {
-          setSaved(true);
+          setSavedOverride(true);
         } else if (detail.action === "remove") {
-          setSaved(false);
+          setSavedOverride(false);
+        }
+        if (
+          detail.enrolled ||
+          detail.action === "enroll" ||
+          detail.action === "purchase"
+        ) {
+          setEnrolledEvent(true);
+          setSavedOverride(false);
         }
       }
     }
@@ -96,12 +104,12 @@ export function WishlistCard({
     try {
       if (saved) {
         await removeCourseFromWishlist(id);
-        setSaved(false);
+        setSavedOverride(false);
         router.refresh();
         toast.success(`Removed "${title || "Course"}" from your wishlist`);
       } else {
         await addCourseToWishlist(id);
-        setSaved(true);
+        setSavedOverride(true);
         router.refresh();
         toast.success(`Added "${title || "Course"}" to your wishlist`, {
           action: {

@@ -129,6 +129,38 @@ export async function getUserWishlist(supabase, userId) {
     return [];
   }
 
+  const enrolledIds = new Set();
+  try {
+    const { data: enrollments } = await supabase
+      .from("enrollments")
+      .select("course_id")
+      .eq("user_id", userId);
+
+    if (enrollments && Array.isArray(enrollments)) {
+      for (const row of enrollments) {
+        if (row?.course_id) {
+          enrolledIds.add(row.course_id);
+        }
+      }
+    }
+  } catch {
+    // Ignore enrollment fetch error
+  }
+
+  if (enrolledIds.size > 0) {
+    try {
+      for (const enrolledId of enrolledIds) {
+        await supabase
+          .from("wishlists")
+          .delete()
+          .eq("user_id", userId)
+          .eq("course_id", enrolledId);
+      }
+    } catch {
+      // Ignore cleanup error
+    }
+  }
+
   const { data, error } = await supabase
     .from("wishlists")
     .select(`
@@ -158,7 +190,9 @@ export async function getUserWishlist(supabase, userId) {
   return data
     .map((item) => {
       const course = Array.isArray(item.courses) ? item.courses[0] : item.courses;
-      if (!course) return null;
+      if (!course || enrolledIds.has(course.id) || enrolledIds.has(item.course_id)) {
+        return null;
+      }
 
       const lessons = course.lessons;
       const lessonCount = Array.isArray(lessons)
@@ -189,15 +223,31 @@ export async function getUserWishlistCount(supabase, userId) {
   }
 
   try {
-    const { count, data, error } = await supabase
+    const enrolledIds = new Set();
+    try {
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("course_id")
+        .eq("user_id", userId);
+
+      if (enrollments && Array.isArray(enrollments)) {
+        for (const row of enrollments) {
+          if (row?.course_id) {
+            enrolledIds.add(row.course_id);
+          }
+        }
+      }
+    } catch {
+      // Ignore enrollment fetch error
+    }
+
+    const { data, error } = await supabase
       .from("wishlists")
-      .select("id", { count: "exact", head: true })
+      .select("id, course_id")
       .eq("user_id", userId);
 
-    if (error) return 0;
-    if (typeof count === "number" && count > 0) return count;
-    if (Array.isArray(data)) return data.length;
-    return 0;
+    if (error || !data) return 0;
+    return data.filter((row) => !enrolledIds.has(row?.course_id)).length;
   } catch {
     return 0;
   }
@@ -209,13 +259,33 @@ export async function getUserWishlistCourseIds(supabase, userId) {
   }
 
   try {
+    const enrolledIds = new Set();
+    try {
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("course_id")
+        .eq("user_id", userId);
+
+      if (enrollments && Array.isArray(enrollments)) {
+        for (const row of enrollments) {
+          if (row?.course_id) {
+            enrolledIds.add(row.course_id);
+          }
+        }
+      }
+    } catch {
+      // Ignore enrollment fetch error
+    }
+
     const { data, error } = await supabase
       .from("wishlists")
       .select("course_id")
       .eq("user_id", userId);
 
     if (error || !data) return [];
-    return data.map((row) => row.course_id).filter(Boolean);
+    return data
+      .map((row) => row.course_id)
+      .filter((id) => Boolean(id) && !enrolledIds.has(id));
   } catch {
     return [];
   }

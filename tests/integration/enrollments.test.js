@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { createMockSupabase, insertsFor } from "../helpers/mock-supabase.js";
+import {
+  createMockSupabase,
+  deletesFor,
+  insertsFor,
+} from "../helpers/mock-supabase.js";
 
 vi.mock("@/lib/auth", () => ({
   requireUser: vi.fn(),
@@ -306,6 +310,40 @@ describe("POST /api/enrollments", () => {
       user_id: USER.id,
       course_id: COURSE_ID,
     });
+
+    const wishlistDeletes = deletesFor(supabase, "wishlists");
+    expect(wishlistDeletes).toHaveLength(1);
+    expect(wishlistDeletes[0].filters).toEqual([
+      { column: "user_id", value: USER.id },
+      { column: "course_id", value: COURSE_ID },
+    ]);
+  });
+
+  it("automatically removes course from wishlists even if already enrolled", async () => {
+    const supabase = createMockSupabase({
+      courseId: COURSE_ID,
+      courseSelect: { id: COURSE_ID },
+      enrollmentsSelect: [{ id: "existing-enrollment", user_id: USER.id, course_id: COURSE_ID }],
+    });
+    requireUser.mockResolvedValue({
+      supabase,
+      user: USER,
+      profile: { id: USER.id },
+      error: null,
+    });
+
+    const response = await postEnrollment({ courseId: COURSE_ID });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.already).toBe(true);
+
+    const wishlistDeletes = deletesFor(supabase, "wishlists");
+    expect(wishlistDeletes).toHaveLength(1);
+    expect(wishlistDeletes[0].filters).toEqual([
+      { column: "user_id", value: USER.id },
+      { column: "course_id", value: COURSE_ID },
+    ]);
   });
 
   it("returns 400 when courseId is missing", async () => {
