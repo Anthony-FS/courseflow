@@ -110,6 +110,7 @@ export function MyCoursesList() {
             course={course}
             href={`/courses/${encodeURIComponent(course.code)}/learn`}
             progress={course.progress}
+            isEnrolled
           />
         </li>
       ))}

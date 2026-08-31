@@ -40,6 +40,15 @@ export function WishlistCard({
   const [saved, setSaved] = useState(initiallySaved);
   const [isPending, setIsPending] = useState(false);
 
+  const enrolled =
+    Boolean(isEnrolled) ||
+    Boolean(
+      course?.isEnrolled ||
+        course?.isSubscribed ||
+        course?.enrolled ||
+        course?.enrollmentId,
+    );
+
   useEffect(() => {
     setSaved(initiallySaved);
   }, [initiallySaved]);
@@ -81,7 +90,7 @@ export function WishlistCard({
     event.preventDefault();
     event.stopPropagation();
 
-    if (isPending || isEnrolled) return;
+    if (isPending || enrolled) return;
     setIsPending(true);
 
     try {
@@ -150,7 +159,7 @@ export function WishlistCard({
         />
 
         {/* Quick Remove Action Button on Wishlist Page */}
-        {!isEnrolled && onRemove ? (
+        {!enrolled && onRemove ? (
           <button
             type="button"
             onClick={handleRemoveClick}
@@ -165,7 +174,7 @@ export function WishlistCard({
               <BookmarkCheck className="size-5 fill-orange-500/20" aria-hidden />
             )}
           </button>
-        ) : !isEnrolled ? (
+        ) : !enrolled ? (
           /* Interactive Quick Bookmark Button on Catalog / Other Courses */
           <button
             type="button"
