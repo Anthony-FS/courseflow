@@ -43,12 +43,31 @@ export function UserMenu({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(initialWishlistCount);
+  const [wishlistCountLoaded, setWishlistCountLoaded] = useState(false);
   const menuRef = useRef(null);
   const router = useRouter();
 
   useEffect(() => {
-    setWishlistCount(initialWishlistCount);
-  }, [initialWishlistCount]);
+    if (!isOpen || wishlistCountLoaded) return undefined;
+
+    let cancelled = false;
+
+    fetch("/api/wishlist?count=1", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled && typeof data?.count === "number") {
+          setWishlistCount(data.count);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setWishlistCountLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, wishlistCountLoaded]);
 
   useEffect(() => {
     function handleWishlistChange(event) {

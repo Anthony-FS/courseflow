@@ -54,7 +54,9 @@ export async function GET(request) {
   const to = from + pageSize - 1;
 
   let promoIds = null;
-  if (query) {
+  let linkedPromoIds = null;
+  const isAllCoursesSearch = query.toLowerCase() === "all";
+  if (query && !isAllCoursesSearch) {
     const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
     const { data: linkedRows, error: linkedError } = await supabase
       .from("promo_code_courses")
@@ -64,11 +66,24 @@ export async function GET(request) {
     promoIds = (linkedRows ?? []).map((row) => row.promo_code_id).filter(Boolean);
   }
 
+  if (isAllCoursesSearch) {
+    const { data: linkedRows, error: linkedError } = await supabase
+      .from("promo_code_courses")
+      .select("promo_code_id");
+    if (linkedError) return jsonError(linkedError.message || "Failed to search promo codes", 500);
+    linkedPromoIds = [...new Set((linkedRows ?? []).map((row) => row.promo_code_id).filter(Boolean))];
+  }
+
   let queryBuilder = supabase
     .from("promo_codes")
     .select(PROMO_COLUMNS, { count: "exact" });
 
-  if (query) {
+  if (isAllCoursesSearch) {
+    queryBuilder = queryBuilder.is("course_id", null);
+    if (linkedPromoIds.length > 0) {
+      queryBuilder = queryBuilder.not("id", "in", `(${linkedPromoIds.join(",")})`);
+    }
+  } else if (query) {
     const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
     if (promoIds.length > 0) {
       queryBuilder = queryBuilder.or(`code.ilike.%${escaped}%,discount_type.ilike.%${escaped}%,id.in.(${promoIds.join(",")})`);
