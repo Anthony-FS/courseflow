@@ -288,6 +288,7 @@ export function catalogRequestUrl({
   pageSize,
   sortBy,
   sortDirection,
+  includeUserState = false,
 }) {
   const params = new URLSearchParams({
     q: String(query ?? "").trim(),
@@ -296,6 +297,8 @@ export function catalogRequestUrl({
     sortBy: parseCatalogSortBy(sortBy),
     sortDirection: parseCatalogSortDirection(sortDirection),
   });
+
+  if (includeUserState) params.set("includeUserState", "1");
 
   return `/api/courses?${params}`;
 }
