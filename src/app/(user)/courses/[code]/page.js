@@ -22,6 +22,7 @@ import {
   isCourseEnrolled,
 } from "@/lib/enrollments";
 import { createServiceClient } from "@/lib/supabase/server";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import {
   getUserWishlistCourseIds,
   isCourseWishlisted,
@@ -33,13 +34,13 @@ function catalogClient(sessionSupabase) {
 
 export async function generateMetadata({ params }) {
   const { code } = await params;
-  const { user, supabase } = await getSessionUser();
+  const metadataSupabase = createServiceClient() ?? (await createServerClient());
 
-  if (!user) {
-    return { title: "Course | CourseFlow" };
-  }
-
-  const course = await getCourseByCode(supabase, code, catalogClient(supabase));
+  const course = await getCourseByCode(
+    metadataSupabase,
+    code,
+    catalogClient(metadataSupabase),
+  );
   if (!course) {
     return { title: "Course not found | CourseFlow" };
   }
