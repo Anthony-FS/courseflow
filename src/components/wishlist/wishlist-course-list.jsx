@@ -64,6 +64,7 @@ export function WishlistCourseList({ initialCourses = [] }) {
                 course={course}
                 onRemove={handleRemove}
                 isRemoving={removingId === course.id}
+                isEnrolled={Boolean(course.isEnrolled || course.enrollmentId)}
                 showSubscribeButton
               />
             </li>

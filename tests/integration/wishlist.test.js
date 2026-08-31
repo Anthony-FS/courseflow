@@ -279,6 +279,56 @@ describe("getUserWishlist", () => {
     });
   });
 
+  it("filters out courses that user has already enrolled in and triggers cleanup", async () => {
+    const mockWishlistRows = [
+      {
+        id: "wishlist-1",
+        user_id: USER.id,
+        course_id: "enrolled-course-id",
+        created_at: "2026-08-01T00:00:00Z",
+        courses: {
+          id: "enrolled-course-id",
+          title: "Service Design Essentials",
+          course_code: "SD-101",
+          summary: "Learn essential service design.",
+          price: 3500,
+          lessons: [],
+        },
+      },
+      {
+        id: "wishlist-2",
+        user_id: USER.id,
+        course_id: "other-course-id",
+        created_at: "2026-08-01T00:00:00Z",
+        courses: {
+          id: "other-course-id",
+          title: "UX Design Mastery",
+          course_code: "UX-201",
+          summary: "Master UX.",
+          price: 4500,
+          lessons: [],
+        },
+      },
+    ];
+
+    const supabase = createMockSupabase({
+      wishlistsSelect: mockWishlistRows,
+      enrollmentsSelect: [{ id: "enrollment-1", user_id: USER.id, course_id: "enrolled-course-id" }],
+    });
+
+    const result = await getUserWishlist(supabase, USER.id);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("other-course-id");
+
+    const wishlistDeletes = deletesFor(supabase, "wishlists");
+    expect(wishlistDeletes).toHaveLength(1);
+    expect(wishlistDeletes[0].filters).toEqual([
+      { column: "user_id", value: USER.id },
+      { column: "course_id", value: "enrolled-course-id" },
+    ]);
+  });
+
   it("returns empty array if user has no wishlisted courses", async () => {
     const supabase = createMockSupabase({
       wishlistsSelect: [],
@@ -339,6 +389,7 @@ describe("getOtherInterestingCourses", () => {
         cover_image_url: "/courses/service-design.svg",
         total_learning_time: "8",
         price: 4500,
+        is_active: true,
         lessons: [{ count: 5 }],
       },
     ];
@@ -381,6 +432,28 @@ describe("getUserWishlistCount and getUserWishlistCourseIds", () => {
 
     const ids = await getUserWishlistCourseIds(supabase, USER.id);
     expect(ids).toEqual(["course-1", "course-2"]);
+  });
+
+  it("excludes enrolled courses from count and ids", async () => {
+    const { getUserWishlistCount, getUserWishlistCourseIds } = await import(
+      "@/lib/wishlist"
+    );
+
+    const mockWishlists = [
+      { id: "w-1", user_id: USER.id, course_id: "course-1" },
+      { id: "w-2", user_id: USER.id, course_id: "course-2" },
+    ];
+
+    const supabase = createMockSupabase({
+      wishlistsSelect: mockWishlists,
+      enrollmentsSelect: [{ id: "e-1", user_id: USER.id, course_id: "course-1" }],
+    });
+
+    const count = await getUserWishlistCount(supabase, USER.id);
+    expect(count).toBe(1);
+
+    const ids = await getUserWishlistCourseIds(supabase, USER.id);
+    expect(ids).toEqual(["course-2"]);
   });
 
   it("returns 0 and empty array when supabase or userId is missing", async () => {

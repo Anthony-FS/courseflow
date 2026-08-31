@@ -22,7 +22,7 @@ describe("catalog constants", () => {
     expect(CATALOG_DEBOUNCE_MS).toBe(300);
     expect(CATALOG_SEARCH_MAX_LENGTH).toBe(100);
     expect(CATALOG_COLUMNS).toBe(
-      "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, updated_at, lessons(count)",
+      "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, is_active, created_at, updated_at, lessons(count)",
     );
     expect(CATALOG_COLUMNS).not.toMatch(/description|video_trailer/);
   });
@@ -147,6 +147,10 @@ function createCatalogSupabase({ data = [], count = 0, error = null } = {}) {
   const chain = {
     select(columns, options) {
       calls.select = { columns, options };
+      return chain;
+    },
+    eq(column, value) {
+      calls.eq = { column, value };
       return chain;
     },
     or(filter) {

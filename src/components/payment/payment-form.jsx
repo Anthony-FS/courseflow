@@ -24,6 +24,7 @@ import { toSatang } from "@/lib/mock-checkout";
 import { createCardToken, createPromptPaySource, loadOmise } from "@/lib/omise-client";
 import { normalizePromoCode } from "@/lib/promo-codes";
 import { cn } from "@/lib/utils";
+import { dispatchWishlistChange, updateWishlistCache } from "@/lib/wishlist";
 
 const METHOD_LABEL = {
   card: "Credit card / Debit card",
@@ -288,8 +289,14 @@ export function PaymentForm({ course }) {
     resetQrWaitingState();
     setCheckoutError("");
     setCheckoutMessage("");
+    updateWishlistCache("remove", checkout.courseId);
+    dispatchWishlistChange({
+      action: "remove",
+      courseId: checkout.courseId,
+      enrolled: true,
+    });
     setShowPaymentSuccess(true);
-  }, [resetQrWaitingState]);
+  }, [checkout.courseId, resetQrWaitingState]);
 
   const handlePaymentSuccessClose = useCallback(() => {
     setShowPaymentSuccess(false);

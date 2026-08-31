@@ -166,6 +166,18 @@ export function OurCoursesCatalog({
         }
         return next;
       });
+
+      if (
+        detail.enrolled ||
+        detail.action === "enroll" ||
+        detail.action === "purchase"
+      ) {
+        setEnrolledSet((prev) => {
+          const next = new Set(prev);
+          next.add(detail.courseId);
+          return next;
+        });
+      }
     }
 
     window.addEventListener("courseflow:wishlist-change", handleWishlistChange);
