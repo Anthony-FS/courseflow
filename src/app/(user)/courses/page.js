@@ -2,6 +2,7 @@ import Footer from "@/components/footer";
 import { OurCoursesCatalog } from "@/components/courses/our-courses-catalog";
 import { getSessionUser } from "@/lib/auth";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getUserWishlistCourseIds } from "@/lib/wishlist";
 
 export const metadata = {
@@ -10,9 +11,10 @@ export const metadata = {
 
 export default async function OurCoursesPage() {
   const { user, supabase } = await getSessionUser();
+  const catalog = createServiceClient() ?? supabase;
   const [initialWishlistIds, enrolledCourseIds] = await Promise.all([
     user ? getUserWishlistCourseIds(supabase, user.id) : [],
-    user ? getUserEnrolledCourseIds(supabase, user.id) : [],
+    user ? getUserEnrolledCourseIds(catalog, user.id) : [],
   ]);
 
   return (

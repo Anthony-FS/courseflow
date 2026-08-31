@@ -17,7 +17,9 @@ import { getTotalPages } from "@/lib/pagination";
 import {
   getActiveWishlistSet,
   initWishlistCache,
+  setWishlistCacheIds,
 } from "@/lib/wishlist";
+import { createClient } from "@/lib/supabase/client";
 
 const CATALOG_SORT_OPTIONS = [
   {
@@ -92,7 +94,9 @@ export function OurCoursesCatalog({
   const [wishlistSet, setWishlistSet] = useState(() =>
     getActiveWishlistSet(initialWishlistIds),
   );
-  const [enrolledSet] = useState(() => new Set(enrolledCourseIds));
+  const [enrolledSet, setEnrolledSet] = useState(
+    () => new Set(enrolledCourseIds),
+  );
   const [input, setInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
@@ -107,6 +111,46 @@ export function OurCoursesCatalog({
   const pageSizeRef = useRef(null);
 
   useEffect(() => {
+    setEnrolledSet(new Set(enrolledCourseIds));
+  }, [enrolledCourseIds]);
+
+  useEffect(() => {
+    async function syncUserData() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const [{ data: wishlistData }, { data: enrollmentData }] =
+            await Promise.all([
+              supabase
+                .from("wishlists")
+                .select("course_id")
+                .eq("user_id", user.id),
+              supabase
+                .from("enrollments")
+                .select("course_id")
+                .eq("user_id", user.id),
+            ]);
+
+          if (wishlistData) {
+            const ids = wishlistData.map((r) => r.course_id).filter(Boolean);
+            setWishlistCacheIds(ids);
+            setWishlistSet(new Set(ids));
+          }
+          if (enrollmentData) {
+            const ids = enrollmentData.map((r) => r.course_id).filter(Boolean);
+            setEnrolledSet(new Set(ids));
+          }
+        }
+      } catch {
+        // Ignore background sync errors
+      }
+    }
+
+    syncUserData();
+  }, []);
     function handleWishlistChange(event) {
       const detail = event?.detail;
       if (!detail?.courseId) return;
