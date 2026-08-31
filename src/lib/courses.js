@@ -8,7 +8,7 @@ const TRAILER_BUCKET = "course-trailers";
 const ATTACHMENT_BUCKET = "course-attachments";
 
 const COURSE_DETAIL_COLUMNS =
-  "id, title, course_code, summary, description, price, cover_image_url, cover_file_url, video_trailer_url";
+  "id, title, course_code, summary, description, price, is_active, cover_image_url, cover_file_url, video_trailer_url";
 const COURSE_DETAIL_WITH_LESSONS = `${COURSE_DETAIL_COLUMNS}, lessons ( id, title, sort_order, sub_lessons ( id, title, sort_order ) )`;
 
 function toPublicStorageUrl(objectPath, supabaseUrl) {
@@ -199,7 +199,7 @@ export const CATALOG_DEBOUNCE_MS = 300;
 export const CATALOG_SEARCH_MAX_LENGTH = 100;
 export const CATALOG_MOBILE_MAX_PX = 760;
 export const CATALOG_COLUMNS =
-  "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, created_at, updated_at, lessons(count)";
+  "id, course_code, title, summary, cover_image_url, cover_file_url, total_learning_time, price, is_active, created_at, updated_at, lessons(count)";
 
 export function catalogPageSizeFromWidth(width) {
   return Number(width) <= CATALOG_MOBILE_MAX_PX ? 6 : 12;
@@ -336,7 +336,8 @@ export async function getCatalogCourses(
 
   let request = supabase
     .from("courses")
-    .select(CATALOG_COLUMNS, { count: "exact" });
+    .select(CATALOG_COLUMNS, { count: "exact" })
+    .eq("is_active", true);
 
   if (uniqueExcludeIds.length > 0) {
     request = request.not("id", "in", `(${uniqueExcludeIds.join(",")})`);
@@ -418,6 +419,7 @@ export async function getOtherInterestingCourses(
   let request = supabase
     .from("courses")
     .select(CATALOG_COLUMNS)
+    .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -474,6 +476,7 @@ export function mapCourseDetail(row) {
     summary: row.summary ?? "",
     description: row.description ?? "",
     price: row.price ?? 0,
+    isActive: row.is_active !== false,
     coverUrl: resolveCoverUrl(row.cover_image_url || row.cover_file_url),
     trailerUrl: resolveTrailerUrl(row.video_trailer_url),
     lessons,

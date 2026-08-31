@@ -21,6 +21,7 @@ export function ConfirmationDialog({
   cancelText,
   isConfirming = false,
   confirmFirst = false,
+  confirmVariant,
   confirmingText = "Deleting...",
 }) {
   function handleOpenChange(nextOpen) {
@@ -33,7 +34,9 @@ export function ConfirmationDialog({
   const confirmButton = (
     <Button
       type="button"
-      variant={confirmFirst ? "secondary" : "default"}
+      variant={
+        confirmVariant ?? (confirmFirst ? "secondary" : "default")
+      }
       disabled={isConfirming}
       className="w-full sm:w-auto"
       onClick={onConfirm}

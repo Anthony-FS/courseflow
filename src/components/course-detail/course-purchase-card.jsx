@@ -16,6 +16,7 @@ function PurchaseActions({
   courseTitle,
   initiallySaved,
   isSubscribed,
+  isPurchasable = true,
 }) {
   const buttonClassName = compact
     ? "min-h-12 rounded-full px-3 py-3 text-body3 whitespace-normal"
@@ -29,6 +30,20 @@ function PurchaseActions({
           className={buttonClassName}
         />
       </div>
+    );
+  }
+
+  if (!isPurchasable) {
+    return (
+      <p
+        className={cn(
+          "rounded-lg bg-gray-100 px-4 py-3 text-body3 text-gray-700",
+          compact && "text-center",
+        )}
+        role="status"
+      >
+        This course is not available for purchase right now.
+      </p>
     );
   }
 
@@ -54,6 +69,7 @@ function CoursePurchaseSidebar({
   courseId,
   initiallySaved,
   isSubscribed,
+  isPurchasable = true,
   price,
   summary,
   title,
@@ -78,6 +94,7 @@ function CoursePurchaseSidebar({
           courseTitle={title}
           initiallySaved={initiallySaved}
           isSubscribed={isSubscribed}
+          isPurchasable={isPurchasable}
         />
       </div>
     </aside>
@@ -89,6 +106,7 @@ function CoursePurchaseMobileBar({
   courseId,
   initiallySaved,
   isSubscribed,
+  isPurchasable = true,
   price,
   summary,
   title,
@@ -155,6 +173,7 @@ function CoursePurchaseMobileBar({
           courseTitle={title}
           initiallySaved={initiallySaved}
           isSubscribed={isSubscribed}
+          isPurchasable={isPurchasable}
         />
       </div>
     </div>

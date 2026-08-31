@@ -387,6 +387,51 @@ export async function PUT(request, { params }) {
   return jsonOk({ id: courseId, success: true });
 }
 
+export async function PATCH(request, { params }) {
+  const { supabase, error } = await requireAdmin();
+  if (error) return error;
+
+  const { id: courseId } = await params;
+  if (!courseId) {
+    return jsonError("Course id is required", 400);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError("Invalid JSON body", 400);
+  }
+
+  if (typeof body.isActive !== "boolean") {
+    return jsonError("isActive must be a boolean.", 400);
+  }
+
+  const { data: course, error: updateError } = await supabase
+    .from("courses")
+    .update({
+      is_active: body.isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", courseId)
+    .select("id, is_active")
+    .maybeSingle();
+
+  if (updateError) {
+    return jsonError(updateError.message || "Failed to update course status", 500);
+  }
+
+  if (!course?.id) {
+    return jsonError("Course not found", 404);
+  }
+
+  return jsonOk({
+    id: course.id,
+    is_active: course.is_active !== false,
+    success: true,
+  });
+}
+
 
 async function deleteByCourseId(supabase, table, courseId) {
   const { error } = await supabase.from(table).delete().eq("course_id", courseId);

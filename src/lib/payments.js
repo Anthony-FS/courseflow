@@ -5,7 +5,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 export async function loadPayableCourse(supabase, courseId) {
   const { data: course, error } = await supabase
     .from("courses")
-    .select("id, title, price")
+    .select("id, title, price, is_active")
     .eq("id", courseId)
     .maybeSingle();
 
@@ -15,6 +15,10 @@ export async function loadPayableCourse(supabase, courseId) {
 
   if (!course?.id) {
     return null;
+  }
+
+  if (course.is_active === false) {
+    return { unavailable: true };
   }
 
   const price = Number(course.price);

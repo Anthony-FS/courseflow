@@ -29,12 +29,18 @@ export default async function PaymentPage({ searchParams }) {
 
   const { data: course, error } = await supabase
     .from("courses")
-    .select("id, title, price, course_code")
+    .select("id, title, price, course_code, is_active")
     .eq("id", courseId)
     .maybeSingle();
 
   if (error || !course?.id) {
     notFound();
+  }
+
+  if (course.is_active === false) {
+    redirect(
+      `/courses/${encodeURIComponent(course.course_code || course.id)}`,
+    );
   }
 
   const coursePath = `/courses/${encodeURIComponent(course.course_code || course.id)}`;

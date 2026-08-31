@@ -5,11 +5,12 @@ import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 
 import { PromoCodeTable } from "@/components/admin/promo-code-table";
+import { CourseStatusFilter } from "@/components/admin/course-status-filter";
 import { AdminPagination } from "@/components/admin/pagination";
 import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { getPromoCodes, searchPromoCodes } from "@/lib/promo-codes";
+import { filterPromoCodesByStatus, getPromoCodes, searchPromoCodes, updatePromoCodeStatus } from "@/lib/promo-codes";
 import { getTotalPages, paginateItems } from "@/lib/pagination";
 import { sortItems } from "@/lib/sorting";
 
@@ -51,11 +52,13 @@ export default function AdminPromoCodesPage() {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState("code");
   const [sortDirection, setSortDirection] = useState("asc");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
-  const [promoToDelete, setPromoToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [statusToggle, setStatusToggle] = useState(null);
+  const [isToggling, setIsToggling] = useState(false);
+  const [togglingPromoId, setTogglingPromoId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -79,9 +82,14 @@ export default function AdminPromoCodesPage() {
     };
   }, []);
 
+  const statusFilteredPromoCodes = useMemo(
+    () => filterPromoCodesByStatus(promoCodes, statusFilter),
+    [promoCodes, statusFilter],
+  );
+
   const filteredPromoCodes = useMemo(
-    () => searchPromoCodes(promoCodes, query),
-    [promoCodes, query],
+    () => searchPromoCodes(statusFilteredPromoCodes, query),
+    [statusFilteredPromoCodes, query],
   );
 
   const sortedPromoCodes = useMemo(() => {
@@ -106,6 +114,11 @@ export default function AdminPromoCodesPage() {
     [sortedPromoCodes, currentPage],
   );
 
+  useEffect(() => {
+    const maxPage = getTotalPages(sortedPromoCodes.length);
+    setCurrentPage((page) => Math.min(page, Math.max(1, maxPage)));
+  }, [sortedPromoCodes.length]);
+
   function handleSearchChange(event) {
     setQuery(event.target.value);
     setCurrentPage(1);
@@ -117,26 +130,43 @@ export default function AdminPromoCodesPage() {
     setCurrentPage(1);
   }
 
-  async function handleDelete() {
-    if (!promoToDelete || isDeleting) return;
-    setIsDeleting(true);
+  function handleStatusFilterChange(nextStatus) {
+    setStatusFilter(nextStatus);
+    setCurrentPage(1);
+  }
+
+  function handleToggleStatus(promo) {
+    const nextActive = promo.is_active === false;
+    setStatusToggle({ promo, nextActive });
+  }
+
+  async function handleConfirmStatusToggle() {
+    if (!statusToggle || isToggling) {
+      return;
+    }
+
+    const { promo, nextActive } = statusToggle;
+    setIsToggling(true);
+    setTogglingPromoId(promo.id);
+
     try {
-      const response = await fetch(`/api/admin/promo-codes/${promoToDelete.id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Failed to delete promo code.");
-
-      const remaining = promoCodes.filter((promo) => promo.id !== promoToDelete.id);
-
-      setPromoCodes(remaining);
-      setCurrentPage((page) =>
-        Math.min(page, getTotalPages(searchPromoCodes(remaining, query).length)),
+      await updatePromoCodeStatus(promo.id, nextActive);
+      setPromoCodes((current) =>
+        current.map((row) =>
+          row.id === promo.id ? { ...row, is_active: nextActive } : row,
+        ),
       );
-      setPromoToDelete(null);
+      setStatusToggle(null);
+      setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(error.message ?? "Failed to update promo code status.");
     } finally {
-      setIsDeleting(false);
+      setIsToggling(false);
+      setTogglingPromoId("");
     }
   }
+
+  const activating = statusToggle?.nextActive === true;
 
   return (
     <main className="flex min-h-full flex-col">
@@ -155,6 +185,11 @@ export default function AdminPromoCodesPage() {
             />
             <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-gray-600" />
           </label>
+          <CourseStatusFilter
+            value={statusFilter}
+            onChange={handleStatusFilterChange}
+            ariaLabel="Filter promo codes by status"
+          />
           <SortFilterBar
             options={PROMO_SORT_OPTIONS}
             sortBy={sortBy}
@@ -173,7 +208,12 @@ export default function AdminPromoCodesPage() {
       <section className="p-10">
         {errorMessage ? <p className="mb-4 text-body2 text-orange-500" role="alert">{errorMessage}</p> : null}
         <div className="overflow-hidden rounded-lg bg-white shadow-card">
-          <PromoCodeTable promoCodes={paginatedPromoCodes} isLoading={status === "loading"} onDelete={setPromoToDelete} />
+          <PromoCodeTable
+            promoCodes={paginatedPromoCodes}
+            isLoading={status === "loading"}
+            onToggleStatus={handleToggleStatus}
+            togglingPromoId={togglingPromoId}
+          />
         </div>
 
         {status === "ready" && sortedPromoCodes.length > 0 ? (
@@ -186,22 +226,25 @@ export default function AdminPromoCodesPage() {
         ) : null}
       </section>
       <ConfirmationDialog
-        open={Boolean(promoToDelete)}
-        isConfirming={isDeleting}
-        confirmFirst
+        open={Boolean(statusToggle)}
+        isConfirming={isToggling}
+        confirmFirst={!activating}
         onOpenChange={(open) => {
-          if (!open && !isDeleting) {
-            setPromoToDelete(null);
+          if (!open && !isToggling) {
+            setStatusToggle(null);
           }
         }}
-        onConfirm={handleDelete}
+        onConfirm={handleConfirmStatusToggle}
+        title="Confirmation"
         message={
-          promoToDelete?.code
-            ? `Are you sure you want to delete this code (${promoToDelete.code})?`
-            : "Are you sure you want to delete this code?"
+          activating
+            ? `Activate promo code "${statusToggle?.promo?.code}"? Customers will be able to use it again.`
+            : `Deactivate promo code "${statusToggle?.promo?.code}"? Customers will no longer be able to use it.`
         }
-        confirmText="Yes, I want to delete the code"
-        cancelText="No, keep it"
+        confirmText={activating ? "Yes, activate" : "Yes, deactivate"}
+        confirmVariant={activating ? "default" : "danger"}
+        cancelText="Cancel"
+        confirmingText="Updating..."
       />
     </main>
   );

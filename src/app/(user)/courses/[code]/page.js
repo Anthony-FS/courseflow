@@ -104,6 +104,7 @@ export default async function CourseDetailPage({ params }) {
           courseId={course.id}
           initiallySaved={inWishlist}
           isSubscribed={isSubscribed}
+          isPurchasable={course.isActive !== false}
           price={course.price}
           summary={course.summary}
           title={course.title}
@@ -140,6 +141,7 @@ export default async function CourseDetailPage({ params }) {
         courseId={course.id}
         initiallySaved={inWishlist}
         isSubscribed={isSubscribed}
+        isPurchasable={course.isActive !== false}
         price={course.price}
         summary={course.summary}
         title={course.title}

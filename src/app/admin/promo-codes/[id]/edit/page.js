@@ -7,7 +7,6 @@ import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getRequiredMinimumPurchase } from "@/lib/promo-code-validation";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { digitsOnly, getPromoCourseOptions, normalizePromoCode } from "@/lib/promo-codes";
 
 export default function EditPromoCodePage() {
@@ -18,8 +17,6 @@ export default function EditPromoCodePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [notices, setNotices] = useState({});
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
   const [courses, setCourses] = useState([]);
   const [isCourseMenuOpen, setIsCourseMenuOpen] = useState(false);
   const courseMenuRef = useRef(null);
@@ -162,19 +159,6 @@ export default function EditPromoCodePage() {
 
   const selectedCourses = courses.filter((course) => form.courseIds.includes(course.id));
 
-  async function handleDelete() {
-    setIsDeleting(true);
-    try {
-      const response = await fetch(`/api/admin/promo-codes/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Failed to delete promo code.");
-      router.push("/admin/promo-codes");
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(error.message);
-      setIsDeleting(false);
-    }
-  }
-
   return (
     <main className="flex min-h-full flex-col">
       <header className="flex items-center justify-between border-b border-gray-300 bg-white px-10 py-4">
@@ -247,21 +231,6 @@ export default function EditPromoCodePage() {
         </div>
         {errorMessage ? <p role="alert" className="mt-6 text-body2 text-orange-500">{errorMessage}</p> : null}
       </form>
-      <button type="button" onClick={() => setShowDelete(true)} className="self-end px-10 text-body2 font-medium text-blue-500 hover:text-blue-400">Delete Promo code</button>
-      <ConfirmationDialog
-        open={showDelete}
-        isConfirming={isDeleting}
-        confirmFirst
-        onOpenChange={setShowDelete}
-        onConfirm={handleDelete}
-        message={
-          promo?.code
-            ? `Are you sure you want to delete this code (${promo.code})?`
-            : "Are you sure you want to delete this code?"
-        }
-        confirmText="Yes, I want to delete the code"
-        cancelText="No, keep it"
-      />
     </main>
   );
 }
