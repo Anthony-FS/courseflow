@@ -55,6 +55,10 @@ export async function POST(request) {
     return jsonError("Course not found.", 404);
   }
 
+  if (course.unavailable) {
+    return jsonError("This course is not available for purchase.", 403);
+  }
+
   const priced = await resolvePromoTotal({
     code: promoCode,
     courseId: course.id,

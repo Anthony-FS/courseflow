@@ -21,7 +21,7 @@ import {
 } from "@/lib/course-validation";
 
 const ADMIN_COURSE_COLUMNS =
-  "id, title, course_code, cover_file_url, cover_file_type, cover_image_url, price, created_at, updated_at, lessons(count)";
+  "id, title, course_code, cover_file_url, cover_file_type, cover_image_url, price, is_active, created_at, updated_at, lessons(count)";
 
 const COURSE_SORT_COLUMNS = {
   courseCode: "course_code",
@@ -45,6 +45,7 @@ function mapAdminCourse(row) {
     cover_file_type: row.cover_file_type,
     price: row.price ?? 0,
     lesson_count: lessonCount,
+    is_active: row.is_active !== false,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
   };
@@ -68,6 +69,7 @@ export async function GET(request) {
   const query = String(searchParams.get("q") ?? "").trim();
   const sortBy = COURSE_SORT_COLUMNS[searchParams.get("sortBy")] ?? "course_code";
   const ascending = searchParams.get("sortDirection") !== "desc";
+  const statusFilter = searchParams.get("status") ?? "all";
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
@@ -78,6 +80,12 @@ export async function GET(request) {
   if (query) {
     const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
     requestQuery = requestQuery.or(`title.ilike.%${escaped}%,course_code.ilike.%${escaped}%`);
+  }
+
+  if (statusFilter === "active") {
+    requestQuery = requestQuery.eq("is_active", true);
+  } else if (statusFilter === "inactive") {
+    requestQuery = requestQuery.eq("is_active", false);
   }
 
   const { data, count, error: queryError } = await requestQuery
@@ -206,6 +214,7 @@ export async function POST(request) {
       total_learning_time: String(learningTimeNumber),
       cover_image_url: coverImageUrl,
       video_trailer_url: videoTrailerUrl,
+      is_active: true,
     })
     .select("id")
     .single();

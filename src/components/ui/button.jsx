@@ -19,6 +19,8 @@ const buttonVariants = cva(
           "rounded-[12px] border border-border bg-background px-8 py-[18px] text-body2 text-foreground hover:bg-muted",
         destructive:
           "rounded-[12px] border border-transparent bg-destructive/10 px-8 py-[18px] text-body2 text-destructive hover:bg-destructive/20",
+        danger:
+          "rounded-[12px] border border-transparent bg-red-500 px-8 py-[18px] text-body2 text-white shadow-button hover:bg-red-600 active:bg-red-700 disabled:bg-gray-400 disabled:text-gray-600 disabled:shadow-none",
         link: "text-blue-500 underline-offset-4 hover:underline",
       },
       size: {

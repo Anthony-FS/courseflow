@@ -4,7 +4,7 @@ export async function getPromoCodes() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, updated_at, promo_code_courses(course_id, courses(course_code))")
+    .select("id, code, discount_type, discount_value, min_purchase_amount, course_id, is_active, starts_at, updated_at, promo_code_courses(course_id, courses(course_code))")
     .order("code");
 
   if (error) {
@@ -54,6 +54,18 @@ export function searchPromoCodes(promoCodes, query) {
   });
 }
 
+export function filterPromoCodesByStatus(promoCodes, status = "all") {
+  if (status === "active") {
+    return promoCodes.filter((promo) => promo.is_active !== false);
+  }
+
+  if (status === "inactive") {
+    return promoCodes.filter((promo) => promo.is_active === false);
+  }
+
+  return promoCodes;
+}
+
 export const PROMO_CODE_PATTERN = /^[a-z0-9]+$/i;
 
 export function digitsOnly(value) {
@@ -71,4 +83,25 @@ export function clampPercentDiscount(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return String(value);
   return String(Math.min(Math.max(n, 0), 100));
+}
+
+export async function updatePromoCodeStatus(promoId, isActive) {
+  const response = await fetch(`/api/admin/promo-codes/${promoId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isActive }),
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to update promo code status.");
+  }
+
+  return data;
 }

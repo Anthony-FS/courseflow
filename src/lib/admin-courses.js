@@ -53,8 +53,16 @@ export async function getAdminCoursesPage({
   pageSize = 10,
   sortBy = "courseCode",
   sortDirection = "asc",
+  status = "all",
 } = {}) {
-  const params = new URLSearchParams({ q: query, page: String(page), pageSize: String(pageSize), sortBy, sortDirection });
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    pageSize: String(pageSize),
+    sortBy,
+    sortDirection,
+    status,
+  });
   const response = await fetch(`/api/admin/courses?${params}`, { cache: "no-store" });
   const data = await parseJson(response);
   if (!response.ok) throw createApiError(data, "Failed to load courses");
@@ -85,6 +93,21 @@ export async function updateAdminCourse(courseId, payload) {
 
   if (!response.ok) {
     throw createApiError(data, "Failed to update course");
+  }
+
+  return data;
+}
+
+export async function updateAdminCourseStatus(courseId, isActive) {
+  const response = await fetch(`/api/admin/courses/${courseId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isActive }),
+  });
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw createApiError(data, "Failed to update course status");
   }
 
   return data;
