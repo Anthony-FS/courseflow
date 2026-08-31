@@ -14,6 +14,7 @@ const FIELD_DEFINITIONS = [
   { key: "education", label: "Educational Background", type: "text", autoComplete: "off" },
   { key: "email", label: "Email", type: "email", autoComplete: "email" },
 ];
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 
 export function ProfileForm({ initialProfile, email }) {
   const [values, setValues] = useState({
@@ -46,6 +47,10 @@ export function ProfileForm({ initialProfile, email }) {
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
       setMessage("Please choose a JPG or PNG image.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_SIZE) {
+      setMessage("Photo must be 5 MB or smaller.");
       return;
     }
     setAvatarUrl(URL.createObjectURL(file));
