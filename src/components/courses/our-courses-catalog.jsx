@@ -19,7 +19,6 @@ import {
   initWishlistCache,
   setWishlistCacheIds,
 } from "@/lib/wishlist";
-import { createClient } from "@/lib/supabase/client";
 
 const CATALOG_SORT_OPTIONS = [
   {
@@ -66,10 +65,18 @@ async function loadCatalog({
   pageSize,
   sortBy,
   sortDirection,
+  includeUserState,
   signal,
 }) {
   const response = await fetch(
-    catalogRequestUrl({ query, page, pageSize, sortBy, sortDirection }),
+    catalogRequestUrl({
+      query,
+      page,
+      pageSize,
+      sortBy,
+      sortDirection,
+      includeUserState,
+    }),
     { signal },
   );
   const body = await response.json().catch(() => ({}));
@@ -109,48 +116,7 @@ export function OurCoursesCatalog({
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const pageSizeRef = useRef(null);
-
-  useEffect(() => {
-    setEnrolledSet(new Set(enrolledCourseIds));
-  }, [enrolledCourseIds]);
-
-  useEffect(() => {
-    async function syncUserData() {
-      try {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          const [{ data: wishlistData }, { data: enrollmentData }] =
-            await Promise.all([
-              supabase
-                .from("wishlists")
-                .select("course_id")
-                .eq("user_id", user.id),
-              supabase
-                .from("enrollments")
-                .select("course_id")
-                .eq("user_id", user.id),
-            ]);
-
-          if (wishlistData) {
-            const ids = wishlistData.map((r) => r.course_id).filter(Boolean);
-            setWishlistCacheIds(ids);
-            setWishlistSet(new Set(ids));
-          }
-          if (enrollmentData) {
-            const ids = enrollmentData.map((r) => r.course_id).filter(Boolean);
-            setEnrolledSet(new Set(ids));
-          }
-        }
-      } catch {
-        // Ignore background sync errors
-      }
-    }
-
-    syncUserData();
-  }, []);
+  const userStateLoadedRef = useRef(false);
 
   useEffect(() => {
     function handleWishlistChange(event) {
@@ -229,9 +195,20 @@ export function OurCoursesCatalog({
       pageSize,
       sortBy,
       sortDirection,
+      includeUserState: !userStateLoadedRef.current,
       signal: controller.signal,
     })
       .then((result) => {
+        if (Array.isArray(result.wishlistIds)) {
+          setWishlistCacheIds(result.wishlistIds);
+          setWishlistSet(new Set(result.wishlistIds));
+        }
+        if (Array.isArray(result.enrolledCourseIds)) {
+          setEnrolledSet(new Set(result.enrolledCourseIds));
+        }
+        if (Array.isArray(result.wishlistIds)) {
+          userStateLoadedRef.current = true;
+        }
         setCourses(result.courses ?? []);
         setTotal(result.total ?? 0);
         setErrorMessage("");
