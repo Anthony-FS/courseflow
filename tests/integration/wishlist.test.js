@@ -390,6 +390,7 @@ describe("getOtherInterestingCourses", () => {
         total_learning_time: "8",
         price: 4500,
         is_active: true,
+        tag_id: "tag-development",
         lessons: [{ count: 5 }],
       },
     ];
@@ -409,6 +410,71 @@ describe("getOtherInterestingCourses", () => {
       title: "UX Design Mastery",
       price: 4500,
     });
+  });
+
+  it("prefers same-tag courses then fills remaining slots", async () => {
+    const { getOtherInterestingCourses } = await import("@/lib/courses");
+    const mockCourses = [
+      {
+        id: "mkt-1",
+        course_code: "MKT101",
+        title: "Digital Marketing Fundamentals",
+        summary: "Marketing basics",
+        cover_image_url: "/courses/service-design.svg",
+        total_learning_time: "10",
+        price: 4590,
+        is_active: true,
+        tag_id: "tag-marketing",
+        created_at: "2026-01-03T00:00:00Z",
+        lessons: [{ count: 3 }],
+      },
+      {
+        id: "bus-1",
+        course_code: "BUS101",
+        title: "Business Strategy Essentials",
+        summary: "Business basics",
+        cover_image_url: "/courses/software-developer.svg",
+        total_learning_time: "14",
+        price: 5990,
+        is_active: true,
+        tag_id: "tag-business",
+        created_at: "2026-01-02T00:00:00Z",
+        lessons: [{ count: 3 }],
+      },
+      {
+        id: "dev-1",
+        course_code: "DEV101",
+        title: "Service Design Essentials",
+        summary: "Development basics",
+        cover_image_url: "/courses/ux-ui-beginner.svg",
+        total_learning_time: "12",
+        price: 3559,
+        is_active: true,
+        tag_id: "tag-development",
+        created_at: "2026-01-01T00:00:00Z",
+        lessons: [{ count: 4 }],
+      },
+    ];
+
+    const supabase = createMockSupabase({
+      courseSelect: mockCourses,
+    });
+
+    const results = await getOtherInterestingCourses(supabase, {
+      excludeCourseId: "mkt-current",
+      tagId: "tag-marketing",
+      limit: 3,
+    });
+
+    expect(results).toHaveLength(3);
+    expect(results[0]).toMatchObject({
+      id: "mkt-1",
+      courseCode: "MKT101",
+    });
+    expect(results.slice(1).map((course) => course.id).sort()).toEqual([
+      "bus-1",
+      "dev-1",
+    ]);
   });
 });
 
