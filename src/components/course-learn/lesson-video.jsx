@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
 
+import { markLessonVideoWatched } from "@/lib/course-learn-video";
 import { cn } from "@/lib/utils";
 
 function DirectFileVideoPlayer({
@@ -12,6 +13,8 @@ function DirectFileVideoPlayer({
   videoUrl,
   className,
   videoClassName = "object-cover",
+  courseId,
+  subLessonId,
 }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -30,6 +33,7 @@ function DirectFileVideoPlayer({
     try {
       await video.play();
       setIsPlaying(true);
+      markLessonVideoWatched(courseId, subLessonId);
     } catch {
       setIsPlaying(false);
     }
@@ -53,6 +57,10 @@ function DirectFileVideoPlayer({
           controls={isPlaying}
           onPause={() => setIsPlaying(false)}
           onEnded={() => setIsPlaying(false)}
+          onPlay={() => {
+            setIsPlaying(true);
+            markLessonVideoWatched(courseId, subLessonId);
+          }}
           playsInline
           preload="metadata"
         />
@@ -92,13 +100,15 @@ function DirectFileVideoPlayer({
  * Lesson video shell. Plays a real URL when available; otherwise shows
  * the course cover as a thumbnail (mock until learner materials API exists).
  */
-function LessonVideo({ title, coverUrl, videoUrl }) {
+function LessonVideo({ title, coverUrl, videoUrl, courseId, subLessonId }) {
   return (
     <DirectFileVideoPlayer
       title={title}
       coverUrl={coverUrl}
       videoUrl={videoUrl}
-      className="rounded-lg bg-gray-200"
+      courseId={courseId}
+      subLessonId={subLessonId}
+      className="bg-gray-200"
     />
   );
 }

@@ -71,6 +71,7 @@ export default async function CourseDetailPage({ params }) {
   const otherCourses = await getOtherInterestingCourses(catalog, {
     excludeCourseId: course.id,
     enrolledCourseIds,
+    tagId: course.tagId,
     limit: 3,
   });
 

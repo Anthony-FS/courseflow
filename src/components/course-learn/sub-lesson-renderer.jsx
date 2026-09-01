@@ -1,8 +1,10 @@
 "use client";
 
-import { Info, AlertTriangle, Lightbulb, ExternalLink, File } from "lucide-react";
+import { useState } from "react";
+import { Info, AlertTriangle, Lightbulb, ExternalLink, File, Play } from "lucide-react";
 
 import { DirectFileVideoPlayer } from "@/components/course-learn/lesson-video";
+import { markLessonVideoWatched } from "@/lib/course-learn-video";
 import {
   BLOCK_TYPES,
   getAttachmentSrc,
@@ -164,30 +166,32 @@ function DiagramImageCard({ url, caption, alt }) {
 /**
  * Renders a Video Player Block (supports YouTube, Vimeo, and direct video files)
  */
-function InlineVideoPlayer({ url, caption }) {
+function InlineVideoPlayer({ url, caption, courseId, subLessonId }) {
   if (!url) return null;
 
   const embed = getVideoEmbedInfo(url);
   if (!embed) return null;
 
   const visibleCaption = sanitizeVideoCaption(caption);
+  const title = visibleCaption || "Lesson Video";
 
   return (
     <div className="my-6 mx-auto w-full max-w-3xl">
-      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 shadow-card">
+      <div className="relative aspect-video w-full overflow-hidden border border-gray-200 bg-gray-900 shadow-card">
         {embed.type === "youtube" || embed.type === "vimeo" ? (
-          <iframe
-            src={embed.embedUrl}
-            title={visibleCaption || "Lesson Video"}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            className="h-full w-full border-0"
+          <EmbedVideoPlayer
+            embed={embed}
+            title={title}
+            courseId={courseId}
+            subLessonId={subLessonId}
           />
         ) : (
           <DirectFileVideoPlayer
-            title={visibleCaption || "Lesson Video"}
+            title={title}
             videoUrl={embed.src}
-            className="rounded-2xl border border-gray-200 bg-gray-900 shadow-card"
+            courseId={courseId}
+            subLessonId={subLessonId}
+            className="border border-gray-200 bg-gray-900 shadow-card"
             videoClassName="object-contain"
           />
         )}
@@ -198,6 +202,46 @@ function InlineVideoPlayer({ url, caption }) {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * YouTube/Vimeo need a click-to-start overlay so we can record that the
+ * learner engaged with the video before granting a full green check.
+ */
+function EmbedVideoPlayer({ embed, title, courseId, subLessonId }) {
+  const [started, setStarted] = useState(false);
+
+  if (!started) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          markLessonVideoWatched(courseId, subLessonId);
+          setStarted(true);
+        }}
+        aria-label={`Play ${title}`}
+        className="absolute inset-0 z-10 grid cursor-pointer touch-manipulation place-items-center bg-black/40"
+      >
+        <span className="pointer-events-none grid size-16 place-items-center rounded-full bg-gray-900/45 text-white shadow-card sm:size-20">
+          <Play className="size-7 fill-white sm:size-8" aria-hidden />
+        </span>
+      </button>
+    );
+  }
+
+  const autoplaySrc = embed.embedUrl.includes("?")
+    ? `${embed.embedUrl}&autoplay=1`
+    : `${embed.embedUrl}?autoplay=1`;
+
+  return (
+    <iframe
+      src={autoplaySrc}
+      title={title}
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowFullScreen
+      className="h-full w-full border-0"
+    />
   );
 }
 
@@ -292,7 +336,12 @@ function CalloutBox({ title = "เนื้อหาเสริม", content, v
 /**
  * Main SubLessonRenderer component
  */
-export function SubLessonRenderer({ description, className }) {
+export function SubLessonRenderer({
+  description,
+  className,
+  courseId,
+  subLessonId,
+}) {
   const blocks = parseSubLessonContent(description);
 
   if (!blocks || blocks.length === 0) {
@@ -319,6 +368,8 @@ export function SubLessonRenderer({ description, className }) {
                 key={block.id}
                 url={block.url}
                 caption={block.caption}
+                courseId={courseId}
+                subLessonId={subLessonId}
               />
             );
 

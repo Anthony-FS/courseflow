@@ -24,6 +24,7 @@ erDiagram
   courses ||--o{ assignments : has
   courses ||--o{ reviews : receives
   courses ||--o{ promo_codes : discounts
+  course_tags ||--o{ courses : labels
 
   lessons ||--o{ sub_lessons : contains
 
@@ -54,6 +55,7 @@ erDiagram
   courses {
     uuid id PK
     uuid created_by FK
+    uuid tag_id FK
     string title
     text summary
     text description
@@ -63,6 +65,13 @@ erDiagram
     numeric price
     timestamptz created_at
     timestamptz updated_at
+  }
+
+  course_tags {
+    uuid id PK
+    string slug UK
+    string name
+    timestamptz created_at
   }
 
   lessons {
@@ -176,6 +185,8 @@ erDiagram
 | Add Course form field | Table.column |
 | --------------------- | ------------ |
 | Course name | `courses.title` |
+| Course code | `courses.course_code` |
+| Tag | `courses.tag_id` → `course_tags` (`development` \| `marketing` \| `business`) |
 | Course summary | `courses.summary` |
 | Course detail | `courses.description` |
 | Price | `courses.price` |

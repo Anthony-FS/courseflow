@@ -1,6 +1,25 @@
 /**
  * Minimal Supabase mock that records inserts/updates for integration assertions.
  */
+
+const DEFAULT_COURSE_TAGS = [
+  {
+    id: "tag-development",
+    slug: "development",
+    name: "Development",
+  },
+  {
+    id: "tag-marketing",
+    slug: "marketing",
+    name: "Marketing",
+  },
+  {
+    id: "tag-business",
+    slug: "business",
+    name: "Business",
+  },
+];
+
 export function createMockSupabase({
   courseId = "course-test-id",
   lessonsSelect = null,
@@ -13,6 +32,7 @@ export function createMockSupabase({
   wishlistsSelect = null,
   progressSelect = null,
   subLessonsSelect = null,
+  courseTagsSelect = DEFAULT_COURSE_TAGS,
   insertErrors = {},
   updateErrors = {},
 } = {}) {
@@ -24,6 +44,13 @@ export function createMockSupabase({
 
   function selectRows(table) {
     let rows = [];
+    if (table === "course_tags") {
+      return Array.isArray(courseTagsSelect)
+        ? courseTagsSelect
+        : courseTagsSelect
+          ? [courseTagsSelect]
+          : [];
+    }
     if (table === "wishlists" && wishlistsSelect) {
       rows = Array.isArray(wishlistsSelect) ? wishlistsSelect : [wishlistsSelect];
     } else if (table === "courses" && courseSelect) {

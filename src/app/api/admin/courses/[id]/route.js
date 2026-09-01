@@ -8,11 +8,14 @@ import {
 } from "@/lib/course-media-storage";
 import {
   COURSE_CODE_TAKEN_MESSAGE,
+  DEFAULT_COURSE_TAG,
   findCourseWithCode,
   isUniqueViolation,
+  normalizeCourseTag,
   parseCoursePrice,
   parseLearningTime,
   mapDiscountTypeForDb,
+  resolveCourseTagId,
   trimCourseCode,
   validateCourseFields,
   validatePromoFields,
@@ -34,10 +37,16 @@ function mapDiscountTypeForUi(value) {
 }
 
 function mapCourse(row) {
+  const tagSlug =
+    row?.course_tags?.slug ??
+    row?.tag ??
+    DEFAULT_COURSE_TAG;
+
   return {
     id: row.id,
     title: row.title ?? "",
     courseCode: row.course_code ?? "",
+    tag: tagSlug,
     summary: row.summary ?? "",
     description: row.description ?? "",
     price: row.price ?? 0,
@@ -73,6 +82,7 @@ function mapAttachment(row) {
 function parseCourseUpdate(body) {
   const title = String(body.title ?? "").trim();
   const courseCode = trimCourseCode(body.courseCode);
+  const tag = normalizeCourseTag(body.tag ?? DEFAULT_COURSE_TAG);
   const summary = String(body.summary ?? "").trim();
   const description = String(body.description ?? "").trim();
   const coverImageUrl = String(body.coverImageUrl ?? "").trim();
@@ -83,6 +93,7 @@ function parseCourseUpdate(body) {
   const fieldErrors = validateCourseFields({
     courseName: title,
     courseCode,
+    tag,
     price: body.price,
     learningTime: body.totalLearningTime,
     courseSummary: summary,
@@ -102,6 +113,7 @@ function parseCourseUpdate(body) {
         required: [
           "title",
           "courseCode",
+          "tag",
           "summary",
           "description",
           "price",
@@ -144,6 +156,7 @@ function parseCourseUpdate(body) {
   return {
     title,
     courseCode,
+    tag,
     summary,
     description,
     price,
@@ -204,7 +217,7 @@ export async function GET(_request, { params }) {
   const { data: course, error: courseError } = await supabase
     .from("courses")
     .select(
-      "id, title, course_code, summary, description, price, total_learning_time, cover_image_url, video_trailer_url",
+      "id, title, course_code, summary, description, price, total_learning_time, cover_image_url, video_trailer_url, tag_id, course_tags(slug)",
     )
     .eq("id", courseId)
     .maybeSingle();
@@ -276,11 +289,26 @@ export async function PUT(request, { params }) {
     );
   }
 
+  let tagId;
+  try {
+    tagId = await resolveCourseTagId(supabase, parsed.tag);
+  } catch (tagError) {
+    return jsonError(tagError?.message || "Failed to resolve course tag", 500);
+  }
+
+  if (!tagId) {
+    return jsonError("Missing or invalid required course fields", 400, {
+      fields: { tag: "Please select a valid course tag" },
+      required: ["tag"],
+    });
+  }
+
   const { error: updateError } = await supabase
     .from("courses")
     .update({
       title: parsed.title,
       course_code: parsed.courseCode,
+      tag_id: tagId,
       summary: parsed.summary,
       description: parsed.description,
       price: parsed.price,

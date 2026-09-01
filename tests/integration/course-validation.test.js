@@ -14,6 +14,7 @@ describe("course field validation", () => {
   const valid = {
     courseName: "Service Design",
     courseCode: "SD101",
+    tag: "development",
     price: "100",
     learningTime: "12",
     courseSummary: "A short summary",
@@ -38,6 +39,15 @@ describe("course field validation", () => {
   it("rejects an empty course code", () => {
     expect(validateCourseFields({ ...valid, courseCode: "" }).courseCode).toBe(
       "Please fill out this field",
+    );
+  });
+
+  it("rejects an invalid course tag", () => {
+    expect(validateCourseFields({ ...valid, tag: "" }).tag).toBe(
+      "Please fill out this field",
+    );
+    expect(validateCourseFields({ ...valid, tag: "design" }).tag).toMatch(
+      /valid course tag/i,
     );
   });
 

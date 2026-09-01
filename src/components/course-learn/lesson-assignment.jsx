@@ -13,8 +13,17 @@ function LessonAssignment({
   className,
   onSubmitted,
 }) {
-  if (!assignment?.id) {
-    return null;
+  const [answer, setAnswer] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    try {
+      await markAssignmentSubmitted(courseId, subLessonId);
+      setNotice("Assignment submitted.");
+    } catch (error) {
+      setNotice(error.message || "Failed to submit assignment.");
+    }
   }
 
   return (

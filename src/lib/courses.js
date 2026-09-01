@@ -8,7 +8,7 @@ const TRAILER_BUCKET = "course-trailers";
 const ATTACHMENT_BUCKET = "course-attachments";
 
 const COURSE_DETAIL_COLUMNS =
-  "id, title, course_code, summary, description, price, is_active, cover_image_url, cover_file_url, video_trailer_url";
+  "id, title, course_code, summary, description, price, is_active, cover_image_url, cover_file_url, video_trailer_url, tag_id";
 const COURSE_DETAIL_WITH_LESSONS = `${COURSE_DETAIL_COLUMNS}, lessons ( id, title, sort_order, sub_lessons ( id, title, sort_order ) )`;
 
 function toPublicStorageUrl(objectPath, supabaseUrl) {
@@ -392,7 +392,7 @@ export async function getCatalogCourses(
 
 export async function getOtherInterestingCourses(
   supabase,
-  { excludeCourseId, userId, enrolledCourseIds, limit = 3 } = {},
+  { excludeCourseId, userId, enrolledCourseIds, tagId, limit = 3 } = {},
 ) {
   if (!supabase) {
     return [];
@@ -412,41 +412,67 @@ export async function getOtherInterestingCourses(
   } else {
     const enrolledUserId = String(userId ?? "").trim();
     if (enrolledUserId) {
-    const { data: enrollments } = await supabase
-      .from("enrollments")
-      .select("course_id")
-      .eq("user_id", enrolledUserId);
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("course_id")
+        .eq("user_id", enrolledUserId);
 
-    for (const row of enrollments ?? []) {
-      const courseId = String(row?.course_id ?? "").trim();
-      if (courseId) {
-        excludeIds.add(courseId);
+      for (const row of enrollments ?? []) {
+        const courseId = String(row?.course_id ?? "").trim();
+        if (courseId) {
+          excludeIds.add(courseId);
+        }
       }
     }
+  }
+
+  const currentTagId = String(tagId ?? "").trim();
+
+  async function fetchCandidates({ matchTag, take }) {
+    if (take <= 0) return [];
+
+    let request = supabase
+      .from("courses")
+      .select(CATALOG_COLUMNS)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(take);
+
+    if (matchTag && currentTagId) {
+      request = request.eq("tag_id", currentTagId);
     }
+
+    const ids = [...excludeIds];
+    if (ids.length === 1) {
+      request = request.neq("id", ids[0]);
+    } else if (ids.length > 1) {
+      request = request.not("id", "in", `(${ids.join(",")})`);
+    }
+
+    const { data, error } = await request;
+    if (error) {
+      return [];
+    }
+
+    return data ?? [];
   }
 
-  let request = supabase
-    .from("courses")
-    .select(CATALOG_COLUMNS)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const sameTagRows = currentTagId
+    ? await fetchCandidates({ matchTag: true, take: limit })
+    : [];
 
-  const ids = [...excludeIds];
-  if (ids.length === 1) {
-    request = request.neq("id", ids[0]);
-  } else if (ids.length > 1) {
-    request = request.not("id", "in", `(${ids.join(",")})`);
+  for (const row of sameTagRows) {
+    const id = String(row?.id ?? "").trim();
+    if (id) excludeIds.add(id);
   }
 
-  const { data, error } = await request;
+  const remaining = Math.max(0, limit - sameTagRows.length);
+  const fillRows =
+    remaining > 0
+      ? await fetchCandidates({ matchTag: false, take: remaining })
+      : [];
 
-  if (error) {
-    return [];
-  }
-
-  return (data ?? []).map(mapCatalogCourse);
+  return [...sameTagRows, ...fillRows].map(mapCatalogCourse);
 }
 
 function mapCourse(row) {
@@ -483,6 +509,7 @@ export function mapCourseDetail(row) {
     id: row.id,
     title: row.title ?? "",
     courseCode: row.course_code ?? "",
+    tagId: row.tag_id ?? null,
     summary: row.summary ?? "",
     description: row.description ?? "",
     price: row.price ?? 0,

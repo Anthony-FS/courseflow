@@ -34,12 +34,15 @@ const COURSE_ROW = {
   total_learning_time: "12",
   cover_image_url: "course-covers/admin/cover.jpg",
   video_trailer_url: "course-trailers/admin/trailer.mp4",
+  tag_id: "tag-development",
+  course_tags: { slug: "development" },
 };
 
 function validUpdateBody(overrides = {}) {
   return {
     title: "Service Design Essentials",
     courseCode: "SD101",
+    tag: "development",
     summary: "Learn service design fundamentals",
     description: "Detailed course content",
     price: 3559,
@@ -117,6 +120,7 @@ describe("GET /api/admin/courses/[id]", () => {
       id: COURSE_ID,
       title: "Service Design Essentials",
       courseCode: "SD101",
+      tag: "development",
       summary: "Learn service design fundamentals",
       totalLearningTime: "12",
       coverImageUrl: "course-covers/admin/cover.jpg",
@@ -173,6 +177,7 @@ describe("PUT /api/admin/courses/[id]", () => {
     expect(courseUpdate.payload).toMatchObject({
       title: "Updated Course",
       course_code: "SD101",
+      tag_id: "tag-development",
       price: 1999,
       cover_image_url: "course-covers/admin/cover.jpg",
       video_trailer_url: "course-trailers/admin/trailer.mp4",

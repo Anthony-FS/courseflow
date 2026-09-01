@@ -12,11 +12,14 @@ import {
 import { resolveCoverUrl } from "@/lib/courses";
 import {
   COURSE_CODE_TAKEN_MESSAGE,
+  DEFAULT_COURSE_TAG,
   findCourseWithCode,
   isUniqueViolation,
+  normalizeCourseTag,
   parseCoursePrice,
   parseLearningTime,
   mapDiscountTypeForDb,
+  resolveCourseTagId,
   trimCourseCode,
   validateCourseFields,
   validatePromoFields,
@@ -121,6 +124,7 @@ export async function POST(request) {
 
   const title = String(body.title ?? "").trim();
   const courseCode = trimCourseCode(body.courseCode);
+  const tag = normalizeCourseTag(body.tag ?? DEFAULT_COURSE_TAG);
   const summary = String(body.summary ?? "").trim();
   const description = String(body.description ?? "").trim();
   const coverImageUrl = String(body.coverImageUrl ?? "").trim();
@@ -131,6 +135,7 @@ export async function POST(request) {
   const fieldErrors = validateCourseFields({
     courseName: title,
     courseCode,
+    tag,
     price: body.price,
     learningTime: body.totalLearningTime,
     courseSummary: summary,
@@ -149,6 +154,7 @@ export async function POST(request) {
       required: [
         "title",
         "courseCode",
+        "tag",
         "summary",
         "description",
         "price",
@@ -171,6 +177,20 @@ export async function POST(request) {
       lookupError?.message || "Failed to validate course code",
       500,
     );
+  }
+
+  let tagId;
+  try {
+    tagId = await resolveCourseTagId(supabase, tag);
+  } catch (tagError) {
+    return jsonError(tagError?.message || "Failed to resolve course tag", 500);
+  }
+
+  if (!tagId) {
+    return jsonError("Missing or invalid required course fields", 400, {
+      fields: { tag: "Please select a valid course tag" },
+      required: ["tag"],
+    });
   }
 
   const lessons = Array.isArray(body.lessons) ? body.lessons : [];
@@ -210,6 +230,7 @@ export async function POST(request) {
       created_by: user.id,
       title,
       course_code: courseCode,
+      tag_id: tagId,
       summary,
       description,
       price,
