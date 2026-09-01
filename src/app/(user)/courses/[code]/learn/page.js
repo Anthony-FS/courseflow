@@ -125,6 +125,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
   const requiresVideo =
     Boolean(subLessonContent?.videoUrl) ||
     hasVideoContentBlock(subLessonContent?.description);
+  const subLessonIds = flatSubLessons.map((subLesson) => subLesson.id);
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
@@ -169,6 +170,8 @@ export default async function CourseLearnPage({ params, searchParams }) {
           previous={prev}
           next={next}
           requiresVideo={requiresVideo}
+          subLessonIds={subLessonIds}
+          initialCompletedIds={progress.completedIds}
         />
       </div>
     </main>

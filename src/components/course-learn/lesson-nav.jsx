@@ -1,12 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { markSubLessonCompleted } from "@/lib/course-learn-progress";
+import {
+  markSubLessonCompleted,
+  SUB_LESSON_PROGRESS_EVENT,
+} from "@/lib/course-learn-progress";
 import { learnSubLessonHref } from "@/lib/course-learn";
 import { hasWatchedLessonVideo } from "@/lib/course-learn-video";
 import { cn } from "@/lib/utils";
+
+function uniqueIds(ids) {
+  return [...new Set((ids ?? []).filter(Boolean))];
+}
 
 function LessonNav({
   courseId,
@@ -15,8 +24,58 @@ function LessonNav({
   previous,
   next,
   requiresVideo = false,
+  subLessonIds = [],
+  initialCompletedIds = [],
   className,
 }) {
+  const [completedIds, setCompletedIds] = useState(() =>
+    uniqueIds(initialCompletedIds),
+  );
+
+  useEffect(() => {
+    setCompletedIds(uniqueIds(initialCompletedIds));
+  }, [initialCompletedIds.join("|")]);
+
+  useEffect(() => {
+    function handleProgressEvent(event) {
+      if (event?.detail?.courseId && event.detail.courseId !== courseId) {
+        return;
+      }
+      if (event?.detail?.action !== "complete") {
+        return;
+      }
+      const subLessonId = event?.detail?.subLessonId;
+      if (!subLessonId) {
+        return;
+      }
+      setCompletedIds((current) =>
+        current.includes(subLessonId) ? current : [...current, subLessonId],
+      );
+    }
+
+    window.addEventListener(SUB_LESSON_PROGRESS_EVENT, handleProgressEvent);
+    return () => {
+      window.removeEventListener(SUB_LESSON_PROGRESS_EVENT, handleProgressEvent);
+    };
+  }, [courseId]);
+
+  const isLastLesson = !next;
+  const otherLessonsComplete = (subLessonIds ?? [])
+    .filter((id) => id && id !== currentSubLessonId)
+    .every((id) => completedIds.includes(id));
+  const canFinishCourse = isLastLesson && otherLessonsComplete;
+
+  function completeCurrentLessonIfAllowed() {
+    if (
+      requiresVideo &&
+      !hasWatchedLessonVideo(courseId, currentSubLessonId)
+    ) {
+      return false;
+    }
+    void markSubLessonCompleted(courseId, currentSubLessonId);
+    return true;
+  }
+
   return (
     <nav
       aria-label="Lesson navigation"
@@ -41,23 +100,38 @@ function LessonNav({
           <Button asChild size="sm" className="min-h-12 px-6">
             <Link
               href={learnSubLessonHref(courseCode, next.id)}
-              onClick={() => {
-                if (
-                  requiresVideo &&
-                  !hasWatchedLessonVideo(courseId, currentSubLessonId)
-                ) {
-                  return;
+              onClick={(event) => {
+                if (!completeCurrentLessonIfAllowed()) {
+                  event.preventDefault();
                 }
-                void markSubLessonCompleted(courseId, currentSubLessonId);
               }}
             >
               Next Lesson
             </Link>
           </Button>
-        ) : (
-          <Button size="sm" className="min-h-12 px-6" disabled>
-            Next Lesson
+        ) : canFinishCourse ? (
+          <Button asChild size="sm" className="min-h-12 px-6">
+            <Link
+              href="/my-courses"
+              onClick={(event) => {
+                if (!completeCurrentLessonIfAllowed()) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              Finish Course
+            </Link>
           </Button>
+        ) : (
+          <button
+            type="button"
+            className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-[12px] bg-gray-400 px-6 text-body3 font-medium text-gray-600"
+            onClick={() => {
+              toast.error("Please complete all previous lessons before finishing the course.");
+            }}
+          >
+            Finish Course
+          </button>
         )}
       </div>
     </nav>
