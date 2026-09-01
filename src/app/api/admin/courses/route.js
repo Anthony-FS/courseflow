@@ -1,3 +1,5 @@
+import { revalidateTag } from "next/cache";
+
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk, jsonTooManyRequests } from "@/lib/api";
 import {
@@ -344,5 +346,6 @@ export async function POST(request) {
     }
   }
 
+  revalidateTag("courses", { expire: 0 });
   return jsonOk({ id: courseId }, { status: 201 });
 }

@@ -1,3 +1,5 @@
+import { revalidateTag } from "next/cache";
+
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import {
@@ -384,6 +386,7 @@ export async function PUT(request, { params }) {
     nextAttachmentUrl: parsed.attachment?.fileUrl,
   });
 
+  revalidateTag("courses", { expire: 0 });
   return jsonOk({ id: courseId, success: true });
 }
 
@@ -425,6 +428,7 @@ export async function PATCH(request, { params }) {
     return jsonError("Course not found", 404);
   }
 
+  revalidateTag("courses", { expire: 0 });
   return jsonOk({
     id: course.id,
     is_active: course.is_active !== false,
@@ -490,5 +494,6 @@ export async function DELETE(_request, { params }) {
     return jsonError(courseError.message || "Failed to delete course", 500);
   }
 
+  revalidateTag("courses", { expire: 0 });
   return jsonOk({ ok: true });
 }

@@ -6,6 +6,7 @@ import {
   parseCatalogPageSize,
 } from "@/lib/courses";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
+import { getCachedPublicCatalogCourses } from "@/lib/public-course-catalog";
 import {
   CATALOG_RATE_LIMIT,
   CATALOG_RATE_WINDOW_MS,
@@ -14,6 +15,9 @@ import {
   getClientIp,
 } from "@/lib/rate-limit";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+
+const PRIVATE_CATALOG_CACHE_CONTROL =
+  "private, no-store, max-age=0, must-revalidate";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -40,7 +44,8 @@ export async function GET(request) {
     return jsonTooManyRequests(limited.retryAfterSec);
   }
 
-  let supabase = createServiceClient();
+  const serviceSupabase = createServiceClient();
+  let supabase = serviceSupabase;
   if (!supabase) {
     if (process.env.NODE_ENV !== "development") {
       return jsonError("Course catalog is unavailable", 500);
@@ -76,19 +81,37 @@ export async function GET(request) {
   }
 
   try {
-    const result = await getCatalogCourses(supabase, {
-      query,
-      page,
-      pageSize,
-      excludeCourseIds,
-      sortBy,
-      sortDirection,
-    });
-    return jsonOk({
-      ...result,
-      enrolledCourseIds: excludeCourseIds,
-      ...(includeUserState ? { wishlistIds: wishlistCourseIds } : {}),
-    });
+    const result =
+      !user && serviceSupabase
+        ? await getCachedPublicCatalogCourses(
+            query,
+            page,
+            pageSize,
+            sortBy,
+            sortDirection,
+          )
+        : await getCatalogCourses(supabase, {
+            query,
+            page,
+            pageSize,
+            excludeCourseIds,
+            sortBy,
+            sortDirection,
+          });
+    return jsonOk(
+      {
+        ...result,
+        enrolledCourseIds: excludeCourseIds,
+        ...(includeUserState ? { wishlistIds: wishlistCourseIds } : {}),
+      },
+      {
+        headers: {
+          // Keep the HTTP response uncached so tag invalidation is visible immediately.
+          // The public database result is still cached server-side.
+          "Cache-Control": PRIVATE_CATALOG_CACHE_CONTROL,
+        },
+      },
+    );
   } catch (error) {
     return jsonError(error.message || "Failed to load courses", 500);
   }
