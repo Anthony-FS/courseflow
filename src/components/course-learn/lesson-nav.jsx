@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { markSubLessonCompleted } from "@/lib/course-learn-progress";
 import { learnSubLessonHref } from "@/lib/course-learn";
+import { hasWatchedLessonVideo } from "@/lib/course-learn-video";
 import { cn } from "@/lib/utils";
 
 function LessonNav({
@@ -13,6 +14,7 @@ function LessonNav({
   currentSubLessonId,
   previous,
   next,
+  requiresVideo = false,
   className,
 }) {
   return (
@@ -40,6 +42,12 @@ function LessonNav({
             <Link
               href={learnSubLessonHref(courseCode, next.id)}
               onClick={() => {
+                if (
+                  requiresVideo &&
+                  !hasWatchedLessonVideo(courseId, currentSubLessonId)
+                ) {
+                  return;
+                }
                 void markSubLessonCompleted(courseId, currentSubLessonId);
               }}
             >

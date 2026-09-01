@@ -48,13 +48,13 @@ export function resolveActiveSubLesson(flatSubLessons, subLessonId) {
  * Badge status:
  * - completed (full green): only after Next Lesson (`completedIds`)
  * - pending-assignment (yellow half): visited lesson with unfinished assignment
- * - in-progress (green half): visited or currently active, but not completed
- * - not-started (empty green): never visited
+ * - in-progress (green half): visited (scrolled to end of content), not completed
+ * - not-started (empty green): never visited — opening a lesson alone does not count
  * Visiting alone must never produce a full green badge.
  */
 export function withMockLessonStatuses(
   lessons,
-  activeSubLessonId,
+  _activeSubLessonId,
   completedIds = [],
   {
     visitedIds = [],
@@ -73,7 +73,7 @@ export function withMockLessonStatuses(
       const id = subLesson.id;
       const assignmentOpen =
         hasAssignment.has(id) && !assignmentSubmitted.has(id);
-      const wasVisited = visited.has(id) || id === activeSubLessonId;
+      const wasVisited = visited.has(id);
       let status = "not-started";
 
       if (completed.has(id) && !assignmentOpen) {

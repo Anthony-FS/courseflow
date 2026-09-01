@@ -1,4 +1,5 @@
 import { LessonAssignmentList } from "@/components/course-learn/lesson-assignment-list";
+import { LessonReadSentinel } from "@/components/course-learn/lesson-read-sentinel";
 import { LessonVideo } from "@/components/course-learn/lesson-video";
 import { SubLessonRenderer } from "@/components/course-learn/sub-lesson-renderer";
 import { LEARN_LESSON_CONTENT_ID } from "@/lib/course-learn-scroll";
@@ -32,13 +33,19 @@ function LessonContent({
               title={title}
               coverUrl={coverUrl}
               videoUrl={videoUrl}
+              courseId={courseId}
+              subLessonId={subLessonId}
             />
           </div>
         ) : null}
 
         {description ? (
           <div className="mt-6 text-gray-700">
-            <SubLessonRenderer description={description} />
+            <SubLessonRenderer
+              description={description}
+              courseId={courseId}
+              subLessonId={subLessonId}
+            />
           </div>
         ) : null}
 
@@ -50,6 +57,8 @@ function LessonContent({
             subLessonId={subLessonId}
           />
         ) : null}
+
+        <LessonReadSentinel courseId={courseId} subLessonId={subLessonId} />
       </div>
     </article>
   );

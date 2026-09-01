@@ -55,7 +55,7 @@ describe("course-learn helpers", () => {
 
   it("shows a pending assignment badge only after the lesson was visited", () => {
     const skipped = withMockLessonStatuses(lessons, "s3", ["s1"], {
-      visitedIds: ["s1"],
+      visitedIds: ["s1", "s3"],
     });
 
     expect(skipped[0].subLessons[0].status).toBe("completed");
@@ -70,7 +70,7 @@ describe("course-learn helpers", () => {
 
     const firstOnly = withMockLessonStatuses(lessons, "s2");
     expect(firstOnly[0].subLessons[0].status).toBe("not-started");
-    expect(firstOnly[0].subLessons[1].status).toBe("in-progress");
+    expect(firstOnly[0].subLessons[1].status).toBe("not-started");
     expect(mockProgressPercent(firstOnly)).toBe(0);
 
     const visitWithoutNext = withMockLessonStatuses(lessons, "s2", [], {

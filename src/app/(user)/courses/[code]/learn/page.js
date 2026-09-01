@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { CourseCurriculumSidebar } from "@/components/course-learn/course-curriculum-sidebar";
 import { LessonContent } from "@/components/course-learn/lesson-content";
 import { LessonNav } from "@/components/course-learn/lesson-nav";
+import { LockLearnPageScroll } from "@/components/course-learn/lock-learn-page-scroll";
 import { ScrollToLessonContentOnNavigate } from "@/components/course-learn/scroll-to-lesson-content";
 import { getSessionUser } from "@/lib/auth";
 import {
@@ -16,6 +17,7 @@ import {
 import { getCourseProgress } from "@/lib/course-learn-progress";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
+import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
 import {
   createClient as createServerClient,
   createServiceClient,
@@ -120,9 +122,14 @@ export default async function CourseLearnPage({ params, searchParams }) {
     };
   });
 
+  const requiresVideo =
+    Boolean(subLessonContent?.videoUrl) ||
+    hasVideoContentBlock(subLessonContent?.description);
+
   return (
-    <main className="flex min-h-[calc(100vh-5.5rem)] flex-1 flex-col bg-white">
-      <div className="flex w-full flex-1 flex-col lg:flex-row">
+    <main className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+      <LockLearnPageScroll />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none lg:flex-row lg:overflow-hidden">
         <CourseCurriculumSidebar
           key={active.lessonId}
           courseId={course.id}
@@ -137,7 +144,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
           initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
         />
 
-        <div className="flex min-w-0 flex-1 justify-center">
+        <div className="flex min-h-0 min-w-0 flex-1 justify-center lg:overflow-y-auto lg:overscroll-y-none">
           <div className="w-full max-w-3xl flex-1 xl:max-w-4xl">
             <LessonContent
               title={subLessonContent?.title ?? active.title}
@@ -154,13 +161,14 @@ export default async function CourseLearnPage({ params, searchParams }) {
         <ScrollToLessonContentOnNavigate subLessonId={active.id} />
       </div>
 
-      <div className="sticky bottom-0 z-10 w-full shrink-0 bg-white">
+      <div className="w-full shrink-0 bg-white">
         <LessonNav
           courseId={course.id}
           courseCode={courseCode}
           currentSubLessonId={active.id}
           previous={prev}
           next={next}
+          requiresVideo={requiresVideo}
         />
       </div>
     </main>

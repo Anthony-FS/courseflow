@@ -54,6 +54,14 @@ export function notifyAssignmentSubmitted(courseId, subLessonId) {
   });
 }
 
+/** Optimistic sidebar update when the learner reaches end of lesson content. */
+export function notifySubLessonVisited(courseId, subLessonId) {
+  notifyProgress(courseId, {
+    action: "visit",
+    subLessonId,
+  });
+}
+
 /**
  * Sub-lesson IDs that already have a real submission row.
  * Sidebar uses this so Submitted assignments don't stay yellow when

@@ -15,10 +15,7 @@ import {
   markScrollToLessonContentIntent,
   scrollToLessonContent,
 } from "@/lib/course-learn-scroll";
-import {
-  markSubLessonVisited,
-  SUB_LESSON_PROGRESS_EVENT,
-} from "@/lib/course-learn-progress";
+import { SUB_LESSON_PROGRESS_EVENT } from "@/lib/course-learn-progress";
 import { cn } from "@/lib/utils";
 
 function formatModuleNumber(index) {
@@ -58,10 +55,7 @@ function CourseCurriculumSidebar({
     uniqueIds(initialCompletedIds),
   );
   const [visitedIds, setVisitedIds] = useState(() =>
-    uniqueIds([
-      ...initialVisitedIds,
-      ...(activeSubLessonId ? [activeSubLessonId] : []),
-    ]),
+    uniqueIds(initialVisitedIds),
   );
   const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState(() =>
     uniqueIds(initialSubmittedAssignmentIds),
@@ -69,50 +63,14 @@ function CourseCurriculumSidebar({
 
   useEffect(() => {
     setCompletedIds(uniqueIds(initialCompletedIds));
-    setVisitedIds(
-      uniqueIds([
-        ...initialVisitedIds,
-        ...(activeSubLessonId ? [activeSubLessonId] : []),
-      ]),
-    );
+    setVisitedIds(uniqueIds(initialVisitedIds));
     setSubmittedAssignmentIds(uniqueIds(initialSubmittedAssignmentIds));
   }, [
-    activeSubLessonId,
     // Serialize so server-fetched arrays don't thrash on identity.
     initialCompletedIds.join("|"),
     initialSubmittedAssignmentIds.join("|"),
     initialVisitedIds.join("|"),
   ]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function syncVisit() {
-      if (!courseId || !activeSubLessonId) {
-        return;
-      }
-
-      setVisitedIds((current) =>
-        current.includes(activeSubLessonId)
-          ? current
-          : [...current, activeSubLessonId],
-      );
-
-      try {
-        await markSubLessonVisited(courseId, activeSubLessonId);
-      } catch {
-        if (!cancelled) {
-          // Keep optimistic visited state for the current session.
-        }
-      }
-    }
-
-    syncVisit();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [courseId, activeSubLessonId]);
 
   useEffect(() => {
     function handleProgressEvent(event) {
@@ -162,7 +120,7 @@ function CourseCurriculumSidebar({
   const progressPercent = mockProgressPercent(lessonsWithStatus);
 
   return (
-    <aside className="flex w-full min-w-0 shrink-0 flex-col overflow-x-hidden bg-white px-6 py-8 lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-11rem)] lg:w-[22.5rem] lg:overflow-y-auto lg:border-r lg:border-gray-300 lg:px-8">
+    <aside className="flex w-full min-w-0 shrink-0 flex-col overflow-x-hidden bg-white px-6 py-8 lg:h-full lg:w-[22.5rem] lg:overflow-y-auto lg:overscroll-y-none lg:border-r lg:border-gray-300 lg:px-8">
       <p className="shrink-0 text-body3 font-medium text-orange-500">Course</p>
       <h2 className="mt-2 shrink-0 break-words text-headline3 font-medium tracking-[-0.02em] text-black">
         {courseTitle}
