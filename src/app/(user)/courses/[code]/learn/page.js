@@ -16,18 +16,15 @@ import {
 import { getCourseProgress } from "@/lib/course-learn-progress";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
-import { createServiceClient } from "@/lib/supabase/server";
+import {
+  createClient as createServerClient,
+  createServiceClient,
+} from "@/lib/supabase/server";
 
 export async function generateMetadata({ params }) {
   const { code } = await params;
-  const { user, supabase } = await getSessionUser();
-
-  if (!user) {
-    return { title: "Learn | CourseFlow" };
-  }
-
-  const catalog = createServiceClient() ?? supabase;
-  const course = await getCourseByCode(supabase, code, catalog);
+  const metadataSupabase = createServiceClient() ?? (await createServerClient());
+  const course = await getCourseByCode(metadataSupabase, code, metadataSupabase);
   if (!course) {
     return { title: "Course not found | CourseFlow" };
   }

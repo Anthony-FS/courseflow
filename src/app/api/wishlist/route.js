@@ -5,6 +5,22 @@ function isUniqueViolation(error) {
   return error?.code === "23505";
 }
 
+export async function GET(request) {
+  const { supabase, user, error } = await requireUser();
+  if (error) return error;
+
+  const countOnly = new URL(request.url).searchParams.get("count") === "1";
+  if (!countOnly) return jsonError("Unsupported wishlist request", 400);
+
+  const { count, error: countError } = await supabase
+    .from("wishlists")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if (countError) return jsonError(countError.message || "Failed to load wishlist count", 500);
+  return jsonOk({ count: count ?? 0 });
+}
+
 export async function POST(request) {
   const { supabase, user, error } = await requireUser();
   if (error) return error;
