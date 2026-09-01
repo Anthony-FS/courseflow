@@ -1,9 +1,4 @@
-import {
-  getAssignmentsForCourse,
-  mockProgressPercent,
-  withMockLessonStatuses,
-} from "@/lib/course-learn";
-import { getCourseProgress } from "@/lib/course-learn-progress";
+import { mockProgressPercent, withMockLessonStatuses } from "@/lib/course-learn";
 import { resolveCoverUrl } from "@/lib/courses";
 import { dispatchWishlistChange, updateWishlistCache } from "@/lib/wishlist";
 
@@ -169,26 +164,152 @@ function courseLessonsForProgress(course) {
   }));
 }
 
-async function getEnrollmentProgress(supabase, userId, course) {
-  const assignmentsPromise = getAssignmentsForCourse(supabase, course.id);
-  const [progress, assignments] = await Promise.all([
-    getCourseProgress(supabase, userId, course.id, { assignmentsPromise }),
-    assignmentsPromise,
-  ]);
-  const lessonsWithStatus = withMockLessonStatuses(
-    courseLessonsForProgress(course),
-    null,
-    progress.completedIds,
-    {
-      visitedIds: progress.visitedIds,
-      assignmentSubLessonIds: assignments.map(
-        (assignment) => assignment.subLessonId,
-      ),
-      submittedAssignmentSubLessonIds: progress.submittedAssignmentIds,
-    },
-  );
+function mapBatchProgressRows(rows) {
+  const progressByCourse = new Map();
 
-  return Math.min(100, Math.max(0, mockProgressPercent(lessonsWithStatus)));
+  for (const row of rows ?? []) {
+    const courseId = row?.course_id;
+    const subLessonId = row?.sub_lesson_id;
+    if (!courseId || !subLessonId) continue;
+
+    const progress = progressByCourse.get(courseId) ?? {
+      visitedIds: [],
+      completedIds: [],
+      submittedAssignmentIds: [],
+    };
+
+    if (row.visited_at || row.completed_at || row.assignment_submitted_at) {
+      progress.visitedIds.push(subLessonId);
+    }
+    if (row.completed_at) {
+      progress.completedIds.push(subLessonId);
+    }
+    if (row.assignment_submitted_at) {
+      progress.submittedAssignmentIds.push(subLessonId);
+    }
+
+    progressByCourse.set(courseId, progress);
+  }
+
+  return progressByCourse;
+}
+
+function mapBatchAssignments(rows) {
+  const assignmentsByCourse = new Map();
+  const assignmentIds = [];
+
+  for (const row of rows ?? []) {
+    const courseId = row?.course_id;
+    const subLessonId = row?.sub_lesson_id;
+    if (!courseId || !row?.id || !subLessonId) continue;
+
+    const assignments = assignmentsByCourse.get(courseId) ?? [];
+    assignments.push({ id: row.id, subLessonId });
+    assignmentsByCourse.set(courseId, assignments);
+    assignmentIds.push(row.id);
+  }
+
+  return { assignmentsByCourse, assignmentIds };
+}
+
+function mapSubmittedAssignmentSubLessons(assignments, submittedIds) {
+  const assignmentIdsBySubLesson = new Map();
+  for (const assignment of assignments ?? []) {
+    const list = assignmentIdsBySubLesson.get(assignment.subLessonId) ?? [];
+    list.push(assignment.id);
+    assignmentIdsBySubLesson.set(assignment.subLessonId, list);
+  }
+
+  const submittedSubLessonIds = [];
+  for (const [subLessonId, assignmentIds] of assignmentIdsBySubLesson) {
+    if (assignmentIds.every((id) => submittedIds.has(id))) {
+      submittedSubLessonIds.push(subLessonId);
+    }
+  }
+
+  return submittedSubLessonIds;
+}
+
+async function getBatchEnrollmentProgress(supabase, userId, enrolledCourses) {
+  const courseIds = enrolledCourses
+    .map((enrollment) =>
+      Array.isArray(enrollment.courses)
+        ? enrollment.courses[0]?.id
+        : enrollment.courses?.id,
+    )
+    .filter(Boolean);
+
+  if (courseIds.length === 0) {
+    return new Map();
+  }
+
+  const [{ data: progressRows, error: progressError }, { data: assignmentRows, error: assignmentError }] =
+    await Promise.all([
+      supabase
+        .from("sub_lesson_progress")
+        .select(
+          "course_id, sub_lesson_id, visited_at, completed_at, assignment_submitted_at",
+        )
+        .eq("user_id", userId)
+        .in("course_id", courseIds),
+      supabase
+        .from("assignments")
+        .select("id, course_id, sub_lesson_id")
+        .in("course_id", courseIds),
+    ]);
+
+  const progressByCourse = progressError
+    ? new Map()
+    : mapBatchProgressRows(progressRows);
+  const { assignmentsByCourse, assignmentIds } = assignmentError
+    ? { assignmentsByCourse: new Map(), assignmentIds: [] }
+    : mapBatchAssignments(assignmentRows);
+
+  let submittedAssignmentIds = new Set();
+  if (assignmentIds.length > 0) {
+    const { data: submissionRows, error: submissionError } = await supabase
+      .from("submissions")
+      .select("assignment_id, status, submitted_at")
+      .eq("user_id", userId)
+      .in("assignment_id", assignmentIds);
+
+    if (!submissionError) {
+      submittedAssignmentIds = new Set(
+        (submissionRows ?? [])
+          .filter((row) => row?.submitted_at || row?.status === "submitted")
+          .map((row) => row?.assignment_id)
+          .filter(Boolean),
+      );
+    }
+  }
+
+  const progressByCourseWithSubmissions = new Map();
+  for (const courseId of courseIds) {
+    const progress = progressByCourse.get(courseId) ?? {
+      visitedIds: [],
+      completedIds: [],
+      submittedAssignmentIds: [],
+    };
+    const submittedFromSubmissions = mapSubmittedAssignmentSubLessons(
+      assignmentsByCourse.get(courseId),
+      submittedAssignmentIds,
+    );
+    const submittedIds = [
+      ...new Set([
+        ...progress.submittedAssignmentIds,
+        ...submittedFromSubmissions,
+      ]),
+    ];
+
+    progressByCourseWithSubmissions.set(courseId, {
+      ...progress,
+      assignments: assignmentsByCourse.get(courseId) ?? [],
+      visitedIds: [...new Set([...progress.visitedIds, ...submittedIds])],
+      submittedAssignmentIds: submittedIds,
+    });
+  }
+
+  return progressByCourseWithSubmissions;
 }
 
 export async function getUserEnrolledCourses(supabase, userId) {
@@ -225,20 +346,43 @@ export async function getUserEnrolledCourses(supabase, userId) {
     throw new Error(error.message || "Failed to load enrolled courses.");
   }
 
-  const courses = await Promise.all(
-    (data ?? []).map(async (enrollment) => {
+  const progressByCourse = await getBatchEnrollmentProgress(
+    supabase,
+    userId,
+    data ?? [],
+  );
+
+  const courses = (data ?? []).map((enrollment) => {
       const mapped = mapEnrolledCourse(enrollment);
       const course = Array.isArray(enrollment.courses)
         ? enrollment.courses[0]
         : enrollment.courses;
       if (!mapped || !course) return null;
 
+      const progress = progressByCourse.get(course.id) ?? {
+        visitedIds: [],
+        completedIds: [],
+        submittedAssignmentIds: [],
+      };
+      const assignments = progress.assignments ?? [];
+      const lessonsWithStatus = withMockLessonStatuses(
+        courseLessonsForProgress(course),
+        null,
+        progress.completedIds,
+        {
+          visitedIds: progress.visitedIds,
+          assignmentSubLessonIds: assignments.map(
+            (assignment) => assignment.subLessonId,
+          ),
+          submittedAssignmentSubLessonIds: progress.submittedAssignmentIds,
+        },
+      );
+
       return {
         ...mapped,
-        progress: await getEnrollmentProgress(supabase, userId, course),
+        progress: Math.min(100, Math.max(0, mockProgressPercent(lessonsWithStatus))),
       };
-    }),
-  );
+    });
 
   return courses.filter(Boolean);
 }
