@@ -7,9 +7,9 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 const reviews = [
-  { name: "Saiful Islam", image: "/review1.jpg", text: "Start with something simple and small, then expand over time. If people call it a ‘toy’, you’re definitely onto something. If you’re waiting for encouragement from others, you’re doing it wrong. By the time people think an idea is good, it’s probably too late.", position: "-348px -249px" },
-  { name: "Jane Cooper", image: "/review2.jpg", text: "CourseFlow makes learning feel clear and collaborative. Everything our students need is in one place, and the experience stays simple even as our classes grow.", position: "-1166px -249px" },
-  { name: "Brooklyn Simmons", image: "/review3.jpg", text: "The platform gives our team the structure to teach better while still leaving room for creativity. It is easy to use, fast to navigate, and genuinely enjoyable.", position: "-1166px -249px" },
+  { name: "Saiful Islam", image: "/review1.webp", text: "Start with something simple and small, then expand over time. If people call it a ‘toy’, you’re definitely onto something. If you’re waiting for encouragement from others, you’re doing it wrong. By the time people think an idea is good, it’s probably too late.", position: "-348px -249px" },
+  { name: "Jane Cooper", image: "/review2.webp", text: "CourseFlow makes learning feel clear and collaborative. Everything our students need is in one place, and the experience stays simple even as our classes grow.", position: "-1166px -249px" },
+  { name: "Brooklyn Simmons", image: "/review3.webp", text: "The platform gives our team the structure to teach better while still leaving room for creativity. It is easy to use, fast to navigate, and genuinely enjoyable.", position: "-1166px -249px" },
 ];
 
 function ReviewCard({ review, onPauseChange }) {
