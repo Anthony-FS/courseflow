@@ -122,7 +122,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
 
   return (
     <main className="flex min-h-[calc(100vh-5.5rem)] flex-1 flex-col bg-white">
-      <div className="mx-auto flex w-[calc(100%)] max-w-280 flex-1 flex-col lg:flex-row">
+      <div className="flex w-full flex-1 flex-col lg:flex-row">
         <CourseCurriculumSidebar
           key={active.lessonId}
           courseId={course.id}
@@ -137,27 +137,30 @@ export default async function CourseLearnPage({ params, searchParams }) {
           initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
         />
 
-        <LessonContent
-          title={subLessonContent?.title ?? active.title}
-          description={subLessonContent?.description}
-          coverUrl={course.coverUrl}
-          videoUrl={subLessonContent?.videoUrl ?? null}
-          assignmentEntries={assignmentEntries}
-          courseId={course.id}
-          subLessonId={active.id}
-        />
+        <div className="flex min-w-0 flex-1 justify-center">
+          <div className="w-full max-w-3xl flex-1 xl:max-w-4xl">
+            <LessonContent
+              title={subLessonContent?.title ?? active.title}
+              description={subLessonContent?.description}
+              coverUrl={course.coverUrl}
+              videoUrl={subLessonContent?.videoUrl ?? null}
+              assignmentEntries={assignmentEntries}
+              courseId={course.id}
+              subLessonId={active.id}
+            />
+          </div>
+        </div>
 
         <ScrollToLessonContentOnNavigate subLessonId={active.id} />
       </div>
 
-      <div className="mx-auto w-[calc(100%)]">
+      <div className="sticky bottom-0 z-10 w-full shrink-0 bg-white">
         <LessonNav
           courseId={course.id}
           courseCode={courseCode}
           currentSubLessonId={active.id}
           previous={prev}
           next={next}
-          className="px-2 "
         />
       </div>
     </main>

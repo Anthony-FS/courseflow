@@ -98,7 +98,7 @@ function LessonVideo({ title, coverUrl, videoUrl }) {
       title={title}
       coverUrl={coverUrl}
       videoUrl={videoUrl}
-      className="rounded-lg bg-gray-200"
+      className="bg-gray-200"
     />
   );
 }

@@ -162,18 +162,18 @@ function CourseCurriculumSidebar({
   const progressPercent = mockProgressPercent(lessonsWithStatus);
 
   return (
-    <aside className="flex w-full flex-col bg-white px-6 py-8 lg:w-[22.5rem] lg:shrink-0 lg:self-stretch lg:border-r lg:border-gray-300 lg:px-8">
-      <p className="text-body3 font-medium text-orange-500">Course</p>
-      <h2 className="mt-2 text-headline3 font-medium tracking-[-0.02em] text-black">
+    <aside className="flex w-full min-w-0 shrink-0 flex-col overflow-x-hidden bg-white px-6 py-8 lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-11rem)] lg:w-[22.5rem] lg:overflow-y-auto lg:border-r lg:border-gray-300 lg:px-8">
+      <p className="shrink-0 text-body3 font-medium text-orange-500">Course</p>
+      <h2 className="mt-2 shrink-0 break-words text-headline3 font-medium tracking-[-0.02em] text-black">
         {courseTitle}
       </h2>
       {courseSummary ? (
-        <p className="mt-3 line-clamp-3 text-body3 text-gray-700">
+        <p className="mt-3 line-clamp-3 shrink-0 text-body3 text-gray-700">
           {courseSummary}
         </p>
       ) : null}
 
-      <div className="mt-6">
+      <div className="mt-6 shrink-0">
         <p className="text-body3 font-medium text-black">
           {progressPercent}% Complete
         </p>
@@ -217,7 +217,7 @@ function CourseCurriculumSidebar({
                     <span className="text-body2 font-medium text-gray-700">
                       {formatModuleNumber(index)}
                     </span>
-                    <span className="flex-1 text-body2 font-medium text-black">
+                    <span className="min-w-0 flex-1 break-words text-body2 font-medium text-black">
                       {lesson.title}
                     </span>
                     <ChevronDown
@@ -251,7 +251,7 @@ function CourseCurriculumSidebar({
                                 markScrollToLessonContentIntent();
                               }}
                               className={cn(
-                                "flex items-start gap-3 rounded-lg px-3 py-2.5 text-body3 text-gray-700 transition-colors",
+                                "flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 text-body3 text-gray-700 transition-colors",
                                 isActive
                                   ? "bg-blue-100 font-medium text-black"
                                   : "hover:bg-gray-100",
@@ -260,9 +260,11 @@ function CourseCurriculumSidebar({
                             >
                               <LessonStatusIcon
                                 status={subLesson.status}
-                                className="mt-0.5"
+                                className="mt-0.5 shrink-0"
                               />
-                              <span>{subLesson.title}</span>
+                              <span className="min-w-0 break-words">
+                                {subLesson.title}
+                              </span>
                             </Link>
                           </li>
                         );

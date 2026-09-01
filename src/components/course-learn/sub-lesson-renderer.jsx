@@ -174,7 +174,7 @@ function InlineVideoPlayer({ url, caption }) {
 
   return (
     <div className="my-6 mx-auto w-full max-w-3xl">
-      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 shadow-card">
+      <div className="relative aspect-video w-full overflow-hidden border border-gray-200 bg-gray-900 shadow-card">
         {embed.type === "youtube" || embed.type === "vimeo" ? (
           <iframe
             src={embed.embedUrl}
@@ -187,7 +187,7 @@ function InlineVideoPlayer({ url, caption }) {
           <DirectFileVideoPlayer
             title={visibleCaption || "Lesson Video"}
             videoUrl={embed.src}
-            className="rounded-2xl border border-gray-200 bg-gray-900 shadow-card"
+            className="border border-gray-200 bg-gray-900 shadow-card"
             videoClassName="object-contain"
           />
         )}
