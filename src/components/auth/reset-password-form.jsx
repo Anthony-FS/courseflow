@@ -5,8 +5,17 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import {
+  clearRecoveryUrlParams,
+  completeClientRecoverySession,
+  hasRecoveryLinkParams,
+  readRecoveryLinkError,
+} from "@/lib/auth-recovery";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+
+const DEFAULT_RECOVERY_ERROR =
+  "This reset link is invalid or has expired. Please request a new one.";
 
 function validatePassword(password) {
   if (!password) {
@@ -49,21 +58,10 @@ function FieldError({ id, message }) {
   );
 }
 
-function readLinkError(searchParams) {
-  const error = searchParams.get("error");
-  if (!error) return "";
-
-  const description = (searchParams.get("error_description") || "")
-    .replace(/\+/g, " ")
-    .trim();
-
-  if (description) return description;
-  return "This reset link is invalid or has expired. Please request a new one.";
-}
-
 export function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const recoveryQuery = searchParams.toString();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -77,9 +75,9 @@ export function ResetPasswordForm() {
 
   useEffect(() => {
     let cancelled = false;
-    const linkError = readLinkError(searchParams);
+    const linkError = readRecoveryLinkError(searchParams);
 
-    if (linkError) {
+    if (linkError && !hasRecoveryLinkParams(searchParams)) {
       setSessionError(linkError);
       setSessionChecking(false);
       return undefined;
@@ -87,7 +85,9 @@ export function ResetPasswordForm() {
 
     const supabase = createClient();
 
-    async function checkRecoverySession() {
+    async function finishRecovery(errorMessage = "") {
+      if (cancelled) return;
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -98,28 +98,58 @@ export function ResetPasswordForm() {
         setSessionReady(true);
         setSessionError("");
         setSessionChecking(false);
+        clearRecoveryUrlParams();
         return;
       }
 
-      // Recovery cookies may still be settling after /auth/confirm redirect.
+      setSessionError(errorMessage || DEFAULT_RECOVERY_ERROR);
+      setSessionChecking(false);
+    }
+
+    async function establishRecoverySession() {
+      const recoveryResult = await completeClientRecoverySession(
+        supabase,
+        searchParams,
+      );
+
+      if (cancelled) return;
+
+      if (recoveryResult.ok) {
+        await finishRecovery();
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (cancelled) return;
+
+      if (session) {
+        await finishRecovery();
+        return;
+      }
+
+      // detectSessionInUrl may still be exchanging the code.
       window.setTimeout(async () => {
         if (cancelled) return;
-        const {
-          data: { session: delayedSession },
-        } = await supabase.auth.getSession();
+
+        const retryResult = await completeClientRecoverySession(
+          supabase,
+          searchParams,
+        );
 
         if (cancelled) return;
 
-        if (delayedSession) {
-          setSessionReady(true);
-          setSessionError("");
-        } else {
-          setSessionError(
-            "This reset link is invalid or has expired. Please request a new one.",
-          );
+        if (retryResult.ok) {
+          await finishRecovery();
+          return;
         }
-        setSessionChecking(false);
-      }, 500);
+
+        await finishRecovery(
+          retryResult.error || recoveryResult.error || linkError,
+        );
+      }, 800);
     }
 
     const {
@@ -130,16 +160,17 @@ export function ResetPasswordForm() {
         setSessionReady(true);
         setSessionError("");
         setSessionChecking(false);
+        clearRecoveryUrlParams();
       }
     });
 
-    checkRecoverySession();
+    establishRecoverySession();
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [searchParams]);
+  }, [recoveryQuery]);
 
   function handlePasswordChange(event) {
     const value = event.target.value;
@@ -175,9 +206,7 @@ export function ResetPasswordForm() {
     }
 
     if (!sessionReady) {
-      setFormError(
-        "This reset link is invalid or has expired. Please request a new one.",
-      );
+      setFormError(DEFAULT_RECOVERY_ERROR);
       return;
     }
 
@@ -225,8 +254,7 @@ export function ResetPasswordForm() {
           Reset password
         </h1>
         <p className="mt-6 text-body2 text-[#9B2FAC]" role="alert">
-          {sessionError ||
-            "This reset link is invalid or has expired. Please request a new one."}
+          {sessionError || DEFAULT_RECOVERY_ERROR}
         </p>
         <p className="mt-6 text-body2 text-gray-900">
           <Link

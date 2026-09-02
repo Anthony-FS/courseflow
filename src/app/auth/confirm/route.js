@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
+import {
+  RECOVERY_RESET_PATH,
+} from "@/lib/auth-recovery";
+
 function safeNextPath(next) {
   if (
     typeof next === "string" &&
@@ -9,11 +13,11 @@ function safeNextPath(next) {
   ) {
     return next;
   }
-  return "/reset-password";
+  return RECOVERY_RESET_PATH;
 }
 
 function redirectWithError(origin, description) {
-  const url = new URL("/reset-password", origin);
+  const url = new URL(RECOVERY_RESET_PATH, origin);
   url.searchParams.set("error", "access_denied");
   url.searchParams.set(
     "error_description",
@@ -22,9 +26,17 @@ function redirectWithError(origin, description) {
   return NextResponse.redirect(url);
 }
 
+function redirectToClientRecovery(origin, code, next) {
+  const url = new URL(next, origin);
+  url.searchParams.set("code", code);
+  return NextResponse.redirect(url);
+}
+
 /**
  * Handles Supabase email links (password recovery, etc.).
- * Supports PKCE `code` and `token_hash` + `type` (verifyOtp).
+ * token_hash links are verified on the server.
+ * PKCE `code` links are forwarded to the reset page for client-side exchange
+ * (the browser holds the PKCE verifier cookie from forgot-password).
  */
 export async function GET(request) {
   const { searchParams, origin } = new URL(request.url);
@@ -56,6 +68,11 @@ export async function GET(request) {
     );
   }
 
+  // PKCE recovery: exchange in the browser where the verifier cookie lives.
+  if (code && !(tokenHash && type)) {
+    return redirectToClientRecovery(origin, code, next);
+  }
+
   let successRedirect = NextResponse.redirect(new URL(next, origin));
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -71,31 +88,17 @@ export async function GET(request) {
     },
   });
 
-  if (tokenHash && type) {
-    const { error: otpError } = await supabase.auth.verifyOtp({
-      type,
-      token_hash: tokenHash,
-    });
+  const { error: otpError } = await supabase.auth.verifyOtp({
+    type,
+    token_hash: tokenHash,
+  });
 
-    if (!otpError) {
-      return successRedirect;
-    }
-
-    return redirectWithError(
-      origin,
-      otpError.message || "Email link is invalid or has expired",
-    );
-  }
-
-  const { error: exchangeError } =
-    await supabase.auth.exchangeCodeForSession(code);
-
-  if (!exchangeError) {
+  if (!otpError) {
     return successRedirect;
   }
 
   return redirectWithError(
     origin,
-    exchangeError.message || "Email link is invalid or has expired",
+    otpError.message || "Email link is invalid or has expired",
   );
 }

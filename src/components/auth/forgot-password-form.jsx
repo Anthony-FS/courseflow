@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { buildRecoveryRedirectUrl } from "@/lib/auth-recovery";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +80,7 @@ export function ForgotPasswordForm() {
 
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/confirm?next=/reset-password`;
+      const redirectTo = buildRecoveryRedirectUrl(window.location.origin);
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo,
       });
