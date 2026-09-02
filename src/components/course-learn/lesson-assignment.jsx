@@ -8,8 +8,6 @@ import { AssignmentSubmissionCard } from "@/components/assignment-submission-car
 function LessonAssignment({
   assignment,
   submission = null,
-  courseId,
-  subLessonId,
   className,
   onSubmitted,
 }) {
