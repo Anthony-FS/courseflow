@@ -94,10 +94,21 @@ function AuthField({
             "h-12 min-h-12 px-4 text-body2 text-gray-900 placeholder:text-gray-600",
             showCalendar &&
               "[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0",
+            showCalendar &&
+              !value &&
+              "text-transparent [&::-webkit-datetime-edit]:invisible",
           )}
           onChange={onChange}
           onBlur={onBlur}
         />
+        {showCalendar && !value && placeholder ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-body3 text-gray-600"
+          >
+            {placeholder}
+          </span>
+        ) : null}
         {invalid ? (
           <InputGroupAddon align="inline-end">
             <ErrorMark />

@@ -210,4 +210,33 @@ describe("PUT /api/assignments/[id]/submission", () => {
     expect(body.correctChoice).toBe("B");
     expect(body.answerText).toBeUndefined();
   });
+
+  it("returns a multi-letter correctChoice", async () => {
+    const supabase = createMockSupabase({
+      assignmentsSelect: {
+        id: ASSIGNMENT_ID,
+        course_id: COURSE_ID,
+        submission_type: "choice",
+        answer_text: null,
+        correct_choice: "A,C",
+        choice_a: "One",
+        choice_b: "Two",
+        choice_c: "Three",
+        choice_d: "Four",
+      },
+      enrollmentsSelect: {
+        id: "enr-1",
+        user_id: USER.id,
+        course_id: COURSE_ID,
+      },
+    });
+    mockUser(supabase);
+
+    const response = await putBody({ content: "A,C" });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.correctChoice).toBe("A,C");
+    expect(body.content).toBe("A,C");
+  });
 });

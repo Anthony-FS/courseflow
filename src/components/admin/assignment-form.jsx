@@ -15,7 +15,11 @@ import {
   getAdminCourseLessons,
   getAdminLessonDetail,
 } from "@/lib/admin-courses";
-import { validateAssignmentFields } from "@/lib/assignment-validation";
+import {
+  parseChoiceLetters,
+  toggleChoiceLetter,
+  validateAssignmentFields,
+} from "@/lib/assignment-validation";
 import { getCourses } from "@/lib/courses";
 import { cn } from "@/lib/utils";
 
@@ -373,6 +377,14 @@ export default function AssignmentForm({ assignmentId = null }) {
     clearErrors("allowedFileTypes");
   }
 
+  function toggleCorrectChoice(letter) {
+    setForm((current) => ({
+      ...current,
+      correctChoice: toggleChoiceLetter(current.correctChoice, letter),
+    }));
+    clearErrors("correctChoice");
+  }
+
   function validate() {
     const nextErrors = validateAssignmentFields(form);
     setErrors(nextErrors);
@@ -667,7 +679,7 @@ export default function AssignmentForm({ assignmentId = null }) {
                 })}
               </div>
               <fieldset className="mt-4">
-                <legend className="mb-3 text-body2">Correct answer</legend>
+                <legend className="mb-3 text-body2">Correct answers</legend>
                 <div className="flex flex-wrap gap-8">
                   {CHOICE_OPTIONS.map((letter) => (
                     <label
@@ -675,11 +687,13 @@ export default function AssignmentForm({ assignmentId = null }) {
                       className="flex cursor-pointer items-center gap-3 text-gray-800"
                     >
                       <input
-                        type="radio"
+                        type="checkbox"
                         name="assignment-correct-choice"
                         value={letter}
-                        checked={form.correctChoice === letter}
-                        onChange={() => setField("correctChoice", letter)}
+                        checked={parseChoiceLetters(form.correctChoice).includes(
+                          letter,
+                        )}
+                        onChange={() => toggleCorrectChoice(letter)}
                         className="size-5 accent-blue-500"
                       />
                       <span>{letter}</span>

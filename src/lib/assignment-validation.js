@@ -3,6 +3,51 @@ import { EMPTY_FIELD_MESSAGE } from "@/lib/course-validation";
 export const SUBMISSION_TYPES = ["text", "file", "url", "choice"];
 export const CHOICE_LETTERS = ["A", "B", "C", "D"];
 
+export function parseChoiceLetters(value) {
+  const tokens = String(value ?? "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+  return CHOICE_LETTERS.filter((letter) => tokens.includes(letter));
+}
+
+export function canonicalizeChoiceLetters(value) {
+  return parseChoiceLetters(value).join(",");
+}
+
+export function isValidChoiceAnswer(value) {
+  return canonicalizeChoiceLetters(value) !== "";
+}
+
+export function choiceAnswersMatch(student, key) {
+  const canonicalKey = canonicalizeChoiceLetters(key);
+  return (
+    canonicalKey !== "" &&
+    canonicalizeChoiceLetters(student) === canonicalKey
+  );
+}
+
+export function formatCorrectChoiceLabel(value) {
+  const letters = parseChoiceLetters(value);
+  if (letters.length === 0) return "";
+  if (letters.length === 1) return `Correct answer is ${letters[0]}`;
+  if (letters.length === 2) {
+    return `Correct answers are ${letters[0]} and ${letters[1]}`;
+  }
+  const head = letters.slice(0, -1).join(", ");
+  return `Correct answers are ${head}, and ${letters[letters.length - 1]}`;
+}
+
+export function toggleChoiceLetter(current, letter) {
+  if (!CHOICE_LETTERS.includes(letter)) {
+    return canonicalizeChoiceLetters(current);
+  }
+  const selected = new Set(parseChoiceLetters(current));
+  if (selected.has(letter)) selected.delete(letter);
+  else selected.add(letter);
+  return canonicalizeChoiceLetters([...selected].join(","));
+}
+
 export const EMPTY_ANSWER_COLUMNS = {
   answer_text: null,
   choice_a: null,
@@ -57,7 +102,7 @@ export function validateAssignmentFields({
     if (isBlank(choiceB)) errors.choiceB = EMPTY_FIELD_MESSAGE;
     if (isBlank(choiceC)) errors.choiceC = EMPTY_FIELD_MESSAGE;
     if (isBlank(choiceD)) errors.choiceD = EMPTY_FIELD_MESSAGE;
-    if (!CHOICE_LETTERS.includes(String(correctChoice ?? "").trim())) {
+    if (!isValidChoiceAnswer(correctChoice)) {
       errors.correctChoice = EMPTY_FIELD_MESSAGE;
     }
   }
@@ -87,14 +132,14 @@ export function assignmentAnswerColumns(submissionType, body) {
     const choiceB = String(body.choiceB ?? "").trim();
     const choiceC = String(body.choiceC ?? "").trim();
     const choiceD = String(body.choiceD ?? "").trim();
-    const correctChoice = String(body.correctChoice ?? "").trim();
+    const correctChoice = canonicalizeChoiceLetters(body.correctChoice);
 
     if (
       !choiceA ||
       !choiceB ||
       !choiceC ||
       !choiceD ||
-      !CHOICE_LETTERS.includes(correctChoice)
+      !correctChoice
     ) {
       return { columns: null, error: EMPTY_FIELD_MESSAGE };
     }

@@ -5,7 +5,13 @@ import { Check, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { CHOICE_LETTERS } from "@/lib/assignment-validation";
+import {
+  CHOICE_LETTERS,
+  choiceAnswersMatch,
+  formatCorrectChoiceLabel,
+  parseChoiceLetters,
+  toggleChoiceLetter,
+} from "@/lib/assignment-validation";
 import { EMPTY_FIELD_MESSAGE } from "@/lib/course-validation";
 import { formatCourseDate } from "@/lib/format";
 import {
@@ -125,9 +131,10 @@ function ChoiceOption({
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={selected}
       disabled={disabled}
       onClick={() => onSelect(letter)}
-      aria-pressed={selected}
       className={cn(
         "flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left text-body2 transition-colors",
         "focus-visible:outline-none focus-visible:shadow-focus",
@@ -146,7 +153,7 @@ function ChoiceOption({
     >
       <span
         className={cn(
-          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2",
+          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-sm border-2",
           revealed && isCorrect && "border-green bg-green text-white",
           revealed &&
             isWrongSelection &&
@@ -165,7 +172,7 @@ function ChoiceOption({
         ) : revealed && isWrongSelection ? (
           <X className="size-3.5" strokeWidth={3} />
         ) : selected && !revealed ? (
-          <span className="size-2.5 rounded-full bg-blue-500" />
+          <Check className="size-3.5 text-blue-500" strokeWidth={3} />
         ) : null}
       </span>
       <span className="min-w-0 flex-1">
@@ -236,9 +243,7 @@ export function AssignmentSubmissionCard({
 
   const choiceRevealed = type === "choice" && hasSubmitted && !isEditing;
   const isChoiceCorrect =
-    choiceRevealed &&
-    saved.correctChoice &&
-    saved.content === saved.correctChoice;
+    choiceRevealed && choiceAnswersMatch(saved.content, saved.correctChoice);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -376,18 +381,24 @@ export function AssignmentSubmissionCard({
 
           {type === "choice" ? (
             <fieldset className="space-y-3">
-              <legend className="sr-only">Choose an answer</legend>
+              <legend className="text-body3 text-gray-700">
+                Select all that apply.
+              </legend>
               {CHOICE_LETTERS.map((letter) => (
                 <ChoiceOption
                   key={letter}
                   letter={letter}
                   text={choiceText(assignment, letter)}
-                  selected={draft === letter}
+                  selected={parseChoiceLetters(draft).includes(letter)}
                   revealed={false}
                   isCorrect={false}
                   isWrongSelection={false}
                   disabled={isSubmitting}
-                  onSelect={setDraft}
+                  onSelect={(nextLetter) =>
+                    setDraft((current) =>
+                      toggleChoiceLetter(current, nextLetter),
+                    )
+                  }
                 />
               ))}
             </fieldset>
@@ -438,20 +449,25 @@ export function AssignmentSubmissionCard({
                 {isChoiceCorrect
                   ? "Correct"
                   : saved.correctChoice
-                    ? `Incorrect · Correct answer is ${saved.correctChoice}`
+                    ? `Incorrect · ${formatCorrectChoiceLabel(saved.correctChoice)}`
                     : "Submitted"}
               </p>
               <div className="space-y-3">
                 {CHOICE_LETTERS.map((letter) => {
-                  const isCorrect = saved.correctChoice === letter;
+                  const isCorrect = parseChoiceLetters(
+                    saved.correctChoice,
+                  ).includes(letter);
                   const isWrongSelection =
-                    saved.content === letter && saved.correctChoice !== letter;
+                    parseChoiceLetters(saved.content).includes(letter) &&
+                    !isCorrect;
                   return (
                     <ChoiceOption
                       key={letter}
                       letter={letter}
                       text={choiceText(assignment, letter)}
-                      selected={saved.content === letter}
+                      selected={parseChoiceLetters(saved.content).includes(
+                        letter,
+                      )}
                       revealed
                       isCorrect={isCorrect}
                       isWrongSelection={isWrongSelection}

@@ -1,5 +1,8 @@
 import { EMPTY_FIELD_MESSAGE } from "@/lib/course-validation";
-import { CHOICE_LETTERS } from "@/lib/assignment-validation";
+import {
+  canonicalizeChoiceLetters,
+  isValidChoiceAnswer,
+} from "@/lib/assignment-validation";
 
 export const INVALID_URL_MESSAGE = "Enter a valid URL.";
 export const INVALID_FILE_PATH_MESSAGE = "Invalid file path.";
@@ -92,10 +95,11 @@ export function validateStudentSubmissionContent(
   }
 
   if (submissionType === "choice") {
-    if (!CHOICE_LETTERS.includes(trimmed)) {
+    const content = canonicalizeChoiceLetters(trimmed);
+    if (!content) {
       return { ok: false, message: EMPTY_FIELD_MESSAGE };
     }
-    return { ok: true, content: trimmed };
+    return { ok: true, content };
   }
 
   if (submissionType === "file") {
@@ -160,10 +164,10 @@ export function answerKeyFields(submissionType, assignmentRow) {
   }
 
   if (submissionType === "choice") {
-    const correctChoice = String(assignmentRow?.correct_choice ?? "").trim();
-    return CHOICE_LETTERS.includes(correctChoice)
-      ? { correctChoice }
-      : {};
+    const correctChoice = canonicalizeChoiceLetters(
+      assignmentRow?.correct_choice,
+    );
+    return isValidChoiceAnswer(correctChoice) ? { correctChoice } : {};
   }
 
   return {};
