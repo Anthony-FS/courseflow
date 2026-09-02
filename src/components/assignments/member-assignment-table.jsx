@@ -2,9 +2,15 @@
 
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 
+import { MemberAssignmentPagination } from "@/components/assignments/member-assignment-pagination";
 import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  ITEMS_PER_PAGE,
+  getTotalPages,
+  paginateItems,
+} from "@/lib/pagination";
 
 function matchesSearch(assignment, query) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -21,12 +27,54 @@ function matchesSearch(assignment, query) {
     .includes(normalizedQuery);
 }
 
-export function MemberAssignmentTable({ assignments = [] }) {
-  const [query, setQuery] = useState("");
-  const filteredAssignments = useMemo(
-    () => assignments.filter((assignment) => matchesSearch(assignment, query)),
-    [assignments, query],
+export function memberAssignmentListReducer(state, action) {
+  if (action.type === "search") {
+    return { query: action.query, currentPage: 1 };
+  }
+  if (action.type === "page") {
+    return { ...state, currentPage: action.page };
+  }
+  if (action.type === "clamp") {
+    return { ...state, currentPage: Math.min(state.currentPage, action.totalPages) };
+  }
+  return state;
+}
+
+export function getMemberAssignmentPage(
+  assignments,
+  query,
+  currentPage,
+  pageSize = ITEMS_PER_PAGE,
+) {
+  const filteredAssignments = assignments.filter((assignment) =>
+    matchesSearch(assignment, query),
   );
+  const totalPages = getTotalPages(filteredAssignments.length, pageSize);
+  const validPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  return {
+    filteredAssignments,
+    assignments: paginateItems(filteredAssignments, validPage, pageSize),
+    currentPage: validPage,
+    totalPages,
+  };
+}
+
+export function MemberAssignmentTable({ assignments = [] }) {
+  const [state, dispatch] = useReducer(memberAssignmentListReducer, {
+    query: "",
+    currentPage: 1,
+  });
+  const page = useMemo(
+    () => getMemberAssignmentPage(assignments, state.query, state.currentPage),
+    [assignments, state.query, state.currentPage],
+  );
+
+  useEffect(() => {
+    if (state.currentPage !== page.currentPage) {
+      dispatch({ type: "clamp", totalPages: page.totalPages });
+    }
+  }, [page.currentPage, page.totalPages, state.currentPage]);
 
   return (
     <section aria-label="My assignment list">
@@ -35,8 +83,10 @@ export function MemberAssignmentTable({ assignments = [] }) {
           <span className="sr-only">Search assignments</span>
           <input
             type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={state.query}
+            onChange={(event) =>
+              dispatch({ type: "search", query: event.target.value })
+            }
             placeholder="Search assignments..."
             className="h-12 min-h-12 w-full rounded-lg border border-gray-400 bg-white px-4 pr-11 text-body2"
           />
@@ -64,14 +114,14 @@ export function MemberAssignmentTable({ assignments = [] }) {
             </thead>
 
             <tbody className="text-body2 text-gray-800">
-              {filteredAssignments.length === 0 ? (
+              {page.filteredAssignments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-gray-600">
                     No assignments match your search.
                   </td>
                 </tr>
               ) : (
-                filteredAssignments.map((assignment) => (
+                page.assignments.map((assignment) => (
                   <tr key={assignment.id} className="border-t border-gray-300">
                     <td className="px-6 py-4">{assignment.title}</td>
                     <td className="px-6 py-4">{assignment.courseTitle}</td>
@@ -96,6 +146,16 @@ export function MemberAssignmentTable({ assignments = [] }) {
           </table>
         </div>
       </div>
+
+      {page.filteredAssignments.length > ITEMS_PER_PAGE ? (
+        <MemberAssignmentPagination
+          currentPage={page.currentPage}
+          totalPages={page.totalPages}
+          onPageChange={(nextPage) =>
+            dispatch({ type: "page", page: nextPage })
+          }
+        />
+      ) : null}
     </section>
   );
 }
