@@ -13,19 +13,6 @@ function LessonAssignment({
   className,
   onSubmitted,
 }) {
-  const [answer, setAnswer] = useState("");
-  const [notice, setNotice] = useState("");
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    try {
-      await markAssignmentSubmitted(courseId, subLessonId);
-      setNotice("Assignment submitted.");
-    } catch (error) {
-      setNotice(error.message || "Failed to submit assignment.");
-    }
-  }
-
   return (
     <AssignmentSubmissionCard
       className={className}
