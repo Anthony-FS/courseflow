@@ -12,18 +12,20 @@ import {
   SUBMISSION_TYPES,
   assignmentAnswerColumns,
 } from "@/lib/assignment-validation";
+import { processAdminAssignments } from "@/lib/admin-assignment-list";
 
-const ADMIN_ASSIGNMENT_COLUMNS = `
+export const ADMIN_ASSIGNMENT_COLUMNS = `
   id,
   title,
   description,
-  start_at,
-  end_at,
+  created_at,
+  updated_at,
+  is_active,
   course:courses ( title ),
   subLesson:sub_lessons ( title, lesson:lessons ( title ) )
 `;
 
-function mapAdminAssignment(row) {
+export function mapAdminAssignment(row) {
   return {
     id: row.id,
     title: row.title,
@@ -31,7 +33,11 @@ function mapAdminAssignment(row) {
     courseTitle: row.course?.title ?? "-",
     lessonTitle: row.subLesson?.lesson?.title ?? "-",
     subLessonTitle: row.subLesson?.title ?? "-",
-    dateLabel: row.start_at ? formatCourseDate(row.start_at) : "-",
+    createdDateLabel: row.created_at ? formatCourseDate(row.created_at) : "-",
+    updatedDateLabel: row.updated_at ? formatCourseDate(row.updated_at) : "-",
+    is_active: row.is_active !== false,
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
   };
 }
 
@@ -51,25 +57,26 @@ export async function GET(request) {
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize")) || 10));
   const query = String(searchParams.get("q") ?? "").trim();
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const status = searchParams.get("status") ?? "all";
+  const sortBy = searchParams.get("sortBy") ?? "updatedAt";
+  const sortDirection = searchParams.get("sortDirection") === "asc" ? "asc" : "desc";
 
-  let requestQuery = supabase
+  const { data, error: queryError } = await supabase
     .from("assignments")
-    .select(ADMIN_ASSIGNMENT_COLUMNS, { count: "exact" });
-
-  if (query) {
-    const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
-    requestQuery = requestQuery.ilike("title", `%${escaped}%`);
-  }
-
-  const { data, count, error: queryError } = await requestQuery
-    .order("start_at", { ascending: false })
-    .range(from, to);
+    .select(ADMIN_ASSIGNMENT_COLUMNS);
 
   if (queryError) return jsonError(queryError.message || "Failed to load assignments", 500);
 
-  return jsonOk({ assignments: (data ?? []).map(mapAdminAssignment), total: count ?? 0, page, pageSize });
+  const processed = processAdminAssignments((data ?? []).map(mapAdminAssignment), {
+    query,
+    status,
+    sortBy,
+    sortDirection,
+    page,
+    pageSize,
+  });
+
+  return jsonOk({ ...processed, page, pageSize });
 }
 
 const FILE_TYPES = ["pdf", "doc", "image"];

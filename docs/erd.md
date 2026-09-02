@@ -133,6 +133,9 @@ erDiagram
     string correct_choice
     timestamptz start_at
     timestamptz end_at
+    timestamptz created_at
+    timestamptz updated_at
+    boolean is_active
   }
 
   submissions {
