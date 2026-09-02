@@ -53,6 +53,33 @@ function patchRequest(payload) {
   );
 }
 
+function createStatusUpdateMock({ data, error = null } = {}) {
+  const updates = [];
+  return {
+    updates,
+    from(table) {
+      return {
+        update(payload) {
+          const entry = { table, payload, id: null, columns: "" };
+          updates.push(entry);
+          const chain = {
+            eq(_column, value) {
+              entry.id = value;
+              return chain;
+            },
+            select(columns) {
+              entry.columns = columns;
+              return chain;
+            },
+            maybeSingle: async () => ({ data: error ? null : data, error }),
+          };
+          return chain;
+        },
+      };
+    },
+  };
+}
+
 describe("Admin Assignment Edit/Delete API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -179,6 +206,95 @@ describe("Admin Assignment Edit/Delete API", () => {
   });
 
   describe("PATCH /api/admin/assignments/[id]", () => {
+    it.each([
+      [true, false],
+      [false, true],
+    ])("updates assignment status from %s to %s", async (_current, nextActive) => {
+      const updatedAt = "2026-09-03T10:45:00Z";
+      const supabase = createStatusUpdateMock({
+        data: {
+          id: "assignment-1",
+          is_active: nextActive,
+          updated_at: updatedAt,
+        },
+      });
+      mockAdmin(supabase);
+
+      const response = await updateAssignment(
+        patchRequest({ isActive: nextActive }),
+        assignmentParams(),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        id: "assignment-1",
+        is_active: nextActive,
+        updated_at: updatedAt,
+        success: true,
+      });
+      expect(supabase.updates[0]).toMatchObject({
+        table: "assignments",
+        payload: { is_active: nextActive },
+        id: "assignment-1",
+      });
+    });
+
+    it("rejects a non-boolean assignment status", async () => {
+      const supabase = createStatusUpdateMock();
+      mockAdmin(supabase);
+
+      const response = await updateAssignment(
+        patchRequest({ isActive: "false" }),
+        assignmentParams(),
+      );
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("isActive must be a boolean.");
+      expect(supabase.updates).toHaveLength(0);
+    });
+
+    it("blocks assignment status updates when admin authorization fails", async () => {
+      requireAdmin.mockResolvedValue({
+        error: Response.json({ error: "Forbidden" }, { status: 403 }),
+      });
+
+      const response = await updateAssignment(
+        patchRequest({ isActive: false }),
+        assignmentParams(),
+      );
+
+      expect(response.status).toBe(403);
+    });
+
+    it("returns 404 when the assignment status target does not exist", async () => {
+      const supabase = createStatusUpdateMock({ data: null });
+      mockAdmin(supabase);
+
+      const response = await updateAssignment(
+        patchRequest({ isActive: false }),
+        assignmentParams("missing"),
+      );
+
+      expect(response.status).toBe(404);
+      expect((await response.json()).error).toBe("Assignment not found");
+    });
+
+    it("returns 500 when the assignment status update fails", async () => {
+      const supabase = createStatusUpdateMock({
+        error: { message: "database unavailable" },
+      });
+      mockAdmin(supabase);
+
+      const response = await updateAssignment(
+        patchRequest({ isActive: false }),
+        assignmentParams(),
+      );
+
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toBe("database unavailable");
+    });
+
     it("updates an assignment by id", async () => {
       const supabase = createMockSupabase();
       mockAdmin(supabase);

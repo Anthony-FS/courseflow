@@ -6,20 +6,34 @@ import { Plus, Search } from "lucide-react";
 
 import { AssignmentTable } from "@/components/admin/assignment-table";
 import { AdminPagination } from "@/components/admin/pagination";
+import { CourseStatusFilter } from "@/components/admin/course-status-filter";
+import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { deleteAdminAssignment, getAdminAssignmentsPage } from "@/lib/admin-assignments";
+import {
+  applyAdminAssignmentStatus,
+  getAdminAssignmentsPage,
+  updateAdminAssignmentStatus,
+} from "@/lib/admin-assignments";
+import {
+  ASSIGNMENT_SORT_OPTIONS,
+  isAssignmentFilteredOutByStatus,
+} from "@/lib/admin-assignment-list";
 import { ITEMS_PER_PAGE, getTotalPages } from "@/lib/pagination";
 
 export default function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("updatedAt");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
-  const [assignmentToDelete, setAssignmentToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [statusToggle, setStatusToggle] = useState(null);
+  const [isToggling, setIsToggling] = useState(false);
+  const [togglingAssignmentId, setTogglingAssignmentId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +46,9 @@ export default function AdminAssignmentsPage() {
           query,
           page: currentPage,
           pageSize: ITEMS_PER_PAGE,
+          sortBy,
+          sortDirection,
+          status: statusFilter,
         });
 
         if (!cancelled) {
@@ -54,7 +71,7 @@ export default function AdminAssignmentsPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, currentPage]);
+  }, [query, currentPage, sortBy, sortDirection, statusFilter]);
 
   const totalPages = getTotalPages(total, ITEMS_PER_PAGE);
 
@@ -63,45 +80,64 @@ export default function AdminAssignmentsPage() {
     setCurrentPage(1);
   }
 
-  function handleDeleteRequest(assignment) {
-    setAssignmentToDelete(assignment);
+  function handleStatusFilterChange(nextStatus) {
+    setStatusFilter(nextStatus);
+    setCurrentPage(1);
+  }
+
+  function handleSortChange({ sortBy: nextSortBy, sortDirection: nextDirection }) {
+    setSortBy(nextSortBy);
+    setSortDirection(nextDirection);
+    setCurrentPage(1);
+  }
+
+  function handleToggleStatus(assignment) {
+    setStatusToggle({
+      assignment,
+      nextActive: assignment.is_active === false,
+    });
     setErrorMessage("");
   }
 
-  function handleDeleteCancel() {
-    if (!isDeleting) {
-      setAssignmentToDelete(null);
-    }
-  }
+  async function handleConfirmStatusToggle() {
+    if (!statusToggle || isToggling) return;
 
-  async function handleDeleteConfirm() {
-    if (!assignmentToDelete || isDeleting) return;
-
-    setIsDeleting(true);
+    const { assignment, nextActive } = statusToggle;
+    setIsToggling(true);
+    setTogglingAssignmentId(assignment.id);
     setErrorMessage("");
 
     try {
-      await deleteAdminAssignment(assignmentToDelete.id);
-
-      setAssignments((current) =>
-        current.filter(
-          (assignment) => assignment.id !== assignmentToDelete.id,
-        ),
+      const result = await updateAdminAssignmentStatus(
+        assignment.id,
+        nextActive,
       );
-      const nextTotal = Math.max(0, total - 1);
-      setTotal(nextTotal);
-      setCurrentPage((page) => Math.min(page, getTotalPages(nextTotal, ITEMS_PER_PAGE)));
+      const filteredOut = isAssignmentFilteredOutByStatus(
+        statusFilter,
+        result.is_active,
+      );
 
-      setAssignmentToDelete(null);
-      setCurrentPage(1);
+      setAssignments((current) => {
+        const updated = applyAdminAssignmentStatus(current, result);
+        return filteredOut
+          ? updated.filter((row) => row.id !== assignment.id)
+          : updated;
+      });
+      if (filteredOut) {
+        setTotal((current) => Math.max(0, current - 1));
+      }
+      setStatusToggle(null);
     } catch (error) {
       setErrorMessage(
-        error.message ?? "Failed to delete assignment.",
+        error.message ?? "Failed to update assignment status.",
       );
     } finally {
-      setIsDeleting(false);
+      setIsToggling(false);
+      setTogglingAssignmentId("");
     }
   }
+
+  const activating = statusToggle?.nextActive === true;
 
   return (
     <main className="flex min-h-full flex-col">
@@ -123,6 +159,19 @@ export default function AdminAssignmentsPage() {
               className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-gray-600"
             />
           </label>
+
+          <CourseStatusFilter
+            value={statusFilter}
+            onChange={handleStatusFilterChange}
+            ariaLabel="Filter assignments by status"
+          />
+
+          <SortFilterBar
+            options={ASSIGNMENT_SORT_OPTIONS}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            onSortChange={handleSortChange}
+          />
 
           <Button asChild className="min-h-12 gap-2 px-6 py-3">
             <Link href="/admin/assignments/new">
@@ -147,7 +196,8 @@ export default function AdminAssignmentsPage() {
           <AssignmentTable
             assignments={assignments}
             isLoading={status === "loading"}
-            onDelete={handleDeleteRequest}
+            onToggleStatus={handleToggleStatus}
+            togglingAssignmentId={togglingAssignmentId}
           />
         </div>
 
@@ -162,22 +212,23 @@ export default function AdminAssignmentsPage() {
       </section>
 
       <ConfirmationDialog
-        open={Boolean(assignmentToDelete)}
+        open={Boolean(statusToggle)}
+        isConfirming={isToggling}
+        confirmFirst={!activating}
         onOpenChange={(open) => {
-          if (!open) handleDeleteCancel();
+          if (!open && !isToggling) setStatusToggle(null);
         }}
-        onConfirm={handleDeleteConfirm}
-        title="Delete assignment"
+        onConfirm={handleConfirmStatusToggle}
+        title="Confirmation"
         message={
-          assignmentToDelete
-            ? `Are you sure you want to delete "${assignmentToDelete.title}"?`
-            : ""
+          activating
+            ? `Activate assignment "${statusToggle?.assignment?.title}"? It will be marked active.`
+            : `Deactivate assignment "${statusToggle?.assignment?.title}"? It will be marked inactive.`
         }
-        confirmText="Yes, delete assignment"
-        cancelText="No, keep it"
-        isConfirming={isDeleting}
-        confirmingText="Deleting..."
-        confirmFirst
+        confirmText={activating ? "Yes, activate" : "Yes, deactivate"}
+        confirmVariant={activating ? "default" : "danger"}
+        cancelText="Cancel"
+        confirmingText="Updating..."
       />
     </main>
   );

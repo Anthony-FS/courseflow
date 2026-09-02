@@ -83,7 +83,8 @@ export async function PATCH(request, { params }) {
   const { supabase, error } = await requireAdmin();
   if (error) return error;
 
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const id = String(rawId ?? "").trim();
 
   if (!id) {
     return jsonError("Assignment id is required", 400);
@@ -95,6 +96,37 @@ export async function PATCH(request, { params }) {
     body = await request.json();
   } catch {
     return jsonError("Invalid JSON body", 400);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body ?? {}, "isActive")) {
+    if (typeof body.isActive !== "boolean") {
+      return jsonError("isActive must be a boolean.", 400);
+    }
+
+    const { data: assignment, error: statusError } = await supabase
+      .from("assignments")
+      .update({ is_active: body.isActive })
+      .eq("id", id)
+      .select("id, is_active, updated_at")
+      .maybeSingle();
+
+    if (statusError) {
+      return jsonError(
+        statusError.message || "Failed to update assignment status",
+        500,
+      );
+    }
+
+    if (!assignment?.id) {
+      return jsonError("Assignment not found", 404);
+    }
+
+    return jsonOk({
+      id: assignment.id,
+      is_active: assignment.is_active !== false,
+      updated_at: assignment.updated_at ?? null,
+      success: true,
+    });
   }
 
   const courseId = String(body.courseId ?? "").trim();
