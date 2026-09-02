@@ -263,6 +263,35 @@ describe("Admin Assignment Edit/Delete API", () => {
       });
     });
 
+    it("updates a 4-choice assignment to multiple correct letters", async () => {
+      const supabase = createMockSupabase();
+      mockAdmin(supabase);
+
+      const response = await updateAssignment(
+        patchRequest({
+          courseId: "course-1",
+          lessonId: "lesson-1",
+          subLessonId: "sub-1",
+          title: "Pick the keywords",
+          description: "",
+          submissionType: "choice",
+          choiceA: "var",
+          choiceB: "let",
+          choiceC: "const",
+          choiceD: "function",
+          correctChoice: "A,C",
+        }),
+        assignmentParams(),
+      );
+
+      expect(response.status).toBe(200);
+      const updates = updatesFor(supabase, "assignments");
+      expect(updates[0].payload).toMatchObject({
+        submission_type: "choice",
+        correct_choice: "A,C",
+      });
+    });
+
     it("rejects an update with a missing title", async () => {
       const supabase = createMockSupabase();
       mockAdmin(supabase);

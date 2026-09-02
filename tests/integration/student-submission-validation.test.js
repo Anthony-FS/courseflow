@@ -77,6 +77,22 @@ describe("validateStudentSubmissionContent", () => {
     expect(result).toEqual({ ok: true, content: "C" });
   });
 
+  it("rejects a blank choice", () => {
+    const result = validateStudentSubmissionContent("choice", "  ", {
+      userId: USER_ID,
+      assignmentId: ASSIGNMENT_ID,
+    });
+    expect(result).toEqual({ ok: false, message: EMPTY_FIELD_MESSAGE });
+  });
+
+  it("canonicalizes multiple choice letters", () => {
+    const result = validateStudentSubmissionContent("choice", "C,A", {
+      userId: USER_ID,
+      assignmentId: ASSIGNMENT_ID,
+    });
+    expect(result).toEqual({ ok: true, content: "A,C" });
+  });
+
   it("rejects a file path that is not this user's assignment folder", () => {
     const result = validateStudentSubmissionContent(
       "file",
@@ -188,6 +204,12 @@ describe("answerKeyFields", () => {
     expect(
       answerKeyFields("choice", { correct_choice: "B" }),
     ).toEqual({ correctChoice: "B" });
+  });
+
+  it("returns a multi-letter correctChoice", () => {
+    expect(
+      answerKeyFields("choice", { correct_choice: "A,C" }),
+    ).toEqual({ correctChoice: "A,C" });
   });
 
   it("returns nothing for file and url", () => {

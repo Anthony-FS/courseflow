@@ -190,6 +190,33 @@ describe("POST /api/admin/assignments", () => {
     });
   });
 
+  it("creates a 4-choice assignment with multiple correct letters", async () => {
+    const supabase = createMockSupabase();
+    mockAdmin(supabase);
+
+    const response = await postAssignment({
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      subLessonId: "sub-1",
+      title: "Pick the keywords",
+      description: "",
+      submissionType: "choice",
+      choiceA: "var",
+      choiceB: "let",
+      choiceC: "const",
+      choiceD: "function",
+      correctChoice: "A,C",
+    });
+
+    expect(response.status).toBe(201);
+
+    const assignmentInserts = insertsFor(supabase, "assignments");
+    expect(assignmentInserts[0].rows[0]).toMatchObject({
+      submission_type: "choice",
+      correct_choice: "A,C",
+    });
+  });
+
   it("rejects a 4-choice assignment missing a correct letter", async () => {
     const supabase = createMockSupabase();
     mockAdmin(supabase);
