@@ -269,23 +269,6 @@ function CourseLessonsSection({
                         )}
                       >
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            aria-label={`Delete ${lesson.name}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteLesson(lesson);
-                            }}
-                            className="rounded-md p-1.5 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:shadow-focus"
-                          >
-                            <Image
-                              src="/delete.svg"
-                              alt=""
-                              width={18}
-                              height={21}
-                              className="h-5 w-[18px]"
-                            />
-                          </button>
                           <Link
                             href={
                               courseId
@@ -303,6 +286,23 @@ function CourseLessonsSection({
                               className="size-5"
                             />
                           </Link>
+                          <button
+                            type="button"
+                            aria-label={`Delete ${lesson.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteLesson(lesson);
+                            }}
+                            className="rounded-md p-1.5 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:shadow-focus"
+                          >
+                            <Image
+                              src="/delete.svg"
+                              alt=""
+                              width={18}
+                              height={21}
+                              className="h-5 w-[18px]"
+                            />
+                          </button>
                         </div>
                       </td>
                     </tr>
