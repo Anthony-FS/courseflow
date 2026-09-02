@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonError, jsonOk, jsonTooManyRequests } from "@/lib/api";
 import { enrollPaidUser, loadPayableCourse, upsertPaymentRecord } from "@/lib/payments";
 import { toSatang } from "@/lib/mock-checkout";
 import {
@@ -66,6 +66,9 @@ export async function POST(request) {
   });
 
   if (priced.error) {
+    if (priced.status === 429) {
+      return jsonTooManyRequests(priced.retryAfterSec, priced.error);
+    }
     return jsonError(priced.error, priced.status || 400);
   }
 

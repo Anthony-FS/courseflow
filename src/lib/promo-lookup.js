@@ -1,16 +1,8 @@
-import {
-  calculatePromoPricing,
-  isPromoCurrentlyValid,
-  promoAppliesToCourse,
-} from "@/lib/promo-validate";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { calculatePromoPricing } from "@/lib/promo-validate";
+import { createClient } from "@/lib/supabase/server";
 
-export async function getPromoLookupClient() {
-  const service = createServiceClient();
-  if (service) return service;
-  return createClient();
-}
-
+// Use the caller's session: the RPC checks auth.uid(), course scope, dates
+// and a shared database rate limit. Never fall back to direct SELECT.
 export async function resolvePromoTotal({ code, courseId, subtotal }) {
   if (!code) {
     return {
@@ -21,39 +13,20 @@ export async function resolvePromoTotal({ code, courseId, subtotal }) {
     };
   }
 
-  const supabase = await getPromoLookupClient();
-  const { data: promo, error: promoError } = await supabase
-    .from("promo_codes")
-    .select(
-      "id, code, discount_type, discount_value, min_purchase_amount, course_id, starts_at, ends_at, is_active, promo_code_courses(course_id)",
-    )
-    .eq("code", code)
-    .maybeSingle();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("lookup_checkout_promo", {
+    p_code: code,
+    p_course_id: courseId,
+  });
 
-  if (promoError) {
-    return {
-      error: promoError.message || "Failed to validate promo code.",
-      status: 500,
-    };
+  if (error || !data) {
+    return { error: "Promo validation is temporarily unavailable.", status: 503 };
   }
+  if (data.error) return data;
 
-  if (!promo) {
-    return { error: "Promo code not found.", status: 404 };
-  }
-
-  if (!isPromoCurrentlyValid(promo)) {
-    return { error: "This promo code is not active.", status: 400 };
-  }
-
-  if (!promoAppliesToCourse(promo, courseId)) {
-    return {
-      error: "This promo code does not apply to this course.",
-      status: 400,
-    };
-  }
-
+  const promo = data.promo;
   const pricing = calculatePromoPricing({
-    subtotal,
+    subtotal: data.subtotal,
     discountType: promo.discount_type,
     discountValue: promo.discount_value,
     minPurchaseAmount: promo.min_purchase_amount,
