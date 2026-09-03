@@ -1,8 +1,13 @@
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonError, jsonOk, jsonTooManyRequests } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { normalizePromoCode } from "@/lib/promo-codes";
+import { PROMO_CODE_MAX_LENGTH, PROMO_COURSE_ID_PATTERN } from "@/lib/promo-code-validation";
 import { resolvePromoTotal } from "@/lib/promo-lookup";
 
 export async function POST(request) {
+  const { error } = await requireUser();
+  if (error) return error;
+
   let body;
   try {
     body = await request.json();
@@ -10,23 +15,28 @@ export async function POST(request) {
     return jsonError("Invalid JSON body", 400);
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return jsonError("Invalid promo request", 400);
+  }
+  if (typeof body.code !== "string" || body.code.length > PROMO_CODE_MAX_LENGTH) {
+    return jsonError(`Promo code must be at most ${PROMO_CODE_MAX_LENGTH} characters.`, 400);
+  }
   const code = normalizePromoCode(body.code);
   const courseId = String(body.courseId ?? "").trim();
-  const subtotal = Number(body.subtotal);
 
   if (!code) {
     return jsonError("Promo code is required.", 400);
   }
 
-  if (!courseId) {
-    return jsonError("Course id is required.", 400);
+  if (!PROMO_COURSE_ID_PATTERN.test(courseId)) {
+    return jsonError("A valid course id is required.", 400);
   }
 
-  if (!Number.isFinite(subtotal) || subtotal < 0) {
-    return jsonError("Subtotal must be a non-negative number.", 400);
+  // Price comes from the database, never from the browser's subtotal.
+  const result = await resolvePromoTotal({ code, courseId });
+  if (result.status === 429) {
+    return jsonTooManyRequests(result.retryAfterSec, result.error);
   }
-
-  const result = await resolvePromoTotal({ code, courseId, subtotal });
   if (result.error) {
     return jsonError(result.error, result.status || 400);
   }

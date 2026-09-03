@@ -152,7 +152,8 @@ There are three Supabase clients, chosen by context:
    handlers.
 3. **Service-role client** (`createServiceClient()`) — bypasses RLS. Returns
    `null` when `SUPABASE_SERVICE_ROLE_KEY` is unset. Used for the cached public
-   catalog, promo lookups, and payment fulfilment.
+   catalog and payment fulfilment. Promo lookups use the signed-in session with
+   a database RPC that enforces a shared per-account rate limit.
 
 Query and mapping logic is kept in `src/lib` rather than in components, so the
 same helpers back both server components and route handlers.
@@ -284,6 +285,10 @@ Files in order:
 | `022_enrollment_progress_indexes.sql` | Indexes for batch-loading learner progress on My Courses |
 | `022_seed_basic_programming_sub_lesson_content.sql` | Expands Basic Programming sub-lesson copy |
 | `023_basic_programming_remove_videos.sql` | Keeps video only on Basic Programming's intro sub-lesson |
+| `025_promo_code_security.sql` | Restricts promo listing, rate-limits validation, and saves admin promo edits atomically |
+
+For the coordinated promo code application/database rollout and verification,
+see [Promo code security rollout](docs/promo-code-security.md).
 
 Notes on specific files:
 

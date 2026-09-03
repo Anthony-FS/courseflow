@@ -1,87 +1,61 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { jsonError } from "@/lib/api";
 
-import { createMockSupabase, insertsFor, deletesFor } from "../helpers/mock-supabase.js";
-
-vi.mock("@/lib/auth", () => ({
-  requireAdmin: vi.fn(),
-}));
-
+vi.mock("@/lib/auth", () => ({ requireAdmin: vi.fn() }));
 import { requireAdmin } from "@/lib/auth";
-import { POST as createPromoCode } from "@/app/api/admin/promo-codes/route";
-import { PATCH as updatePromoCode } from "@/app/api/admin/promo-codes/[id]/route";
+import { POST } from "@/app/api/admin/promo-codes/route";
+import { PATCH } from "@/app/api/admin/promo-codes/[id]/route";
 
-const COURSE_IDS = [
-  "11111111-1111-1111-1111-111111111111",
-  "22222222-2222-2222-2222-222222222222",
-];
-
-function mockAdmin(supabase) {
-  requireAdmin.mockResolvedValue({
-    supabase,
-    user: { id: "admin-id" },
-    profile: { role: "admin", is_active: true },
-    error: null,
-  });
+const COURSE = "11111111-1111-1111-1111-111111111111";
+const PROMO = "22222222-2222-2222-2222-222222222222";
+const valid = { code: "save25", discountType: "percent", discountValue: 25, minPurchaseAmount: 0, courseIds: [COURSE] };
+let supabase;
+function request(body, method = "POST") {
+  return new Request("http://localhost/api/admin/promo-codes", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
 
-describe("admin promo code course relationships", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+beforeEach(() => {
+  vi.resetAllMocks();
+  supabase = { rpc: vi.fn().mockResolvedValue({ data: PROMO, error: null }) };
+  requireAdmin.mockResolvedValue({ supabase, user: { id: "admin" }, error: null });
+});
 
-  it("creates one promo row and links it to multiple courses", async () => {
-    const supabase = createMockSupabase({ courseId: "promo-id" });
-    mockAdmin(supabase);
-
-    const response = await createPromoCode(new Request("http://localhost/api/admin/promo-codes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: "MULTI25",
-        minPurchaseAmount: "1000",
-        discountType: "percent",
-        discountValue: "25",
-        courseIds: COURSE_IDS,
-      }),
-    }));
-
+describe("admin promo API", () => {
+  it("creates promo and deduplicated links in one database call", async () => {
+    const response = await POST(request({ ...valid, courseIds: [COURSE, COURSE] }));
     expect(response.status).toBe(201);
-    expect(insertsFor(supabase, "promo_codes")[0].rows).toHaveLength(1);
-    expect(insertsFor(supabase, "promo_codes")[0].rows[0]).toMatchObject({
-      code: "MULTI25",
-      course_id: null,
+    expect(await response.json()).toEqual({ id: PROMO });
+    expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith("save_admin_promo", {
+      p_id: null, p_code: "SAVE25", p_discount_type: "percent", p_discount_value: 25,
+      p_min_purchase_amount: 0, p_course_ids: [COURSE],
     });
-    expect(insertsFor(supabase, "promo_code_courses")[0].rows).toEqual([
-      { promo_code_id: "promo-id", course_id: COURSE_IDS[0] },
-      { promo_code_id: "promo-id", course_id: COURSE_IDS[1] },
-    ]);
   });
 
-  it("replaces course links when a promo code is edited", async () => {
-    const supabase = createMockSupabase({ courseId: "promo-id" });
-    mockAdmin(supabase);
-
-    const response = await updatePromoCode(
-      new Request("http://localhost/api/admin/promo-codes/promo-id", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: "MULTI25",
-          minPurchaseAmount: "1000",
-          discountType: "percent",
-          discountValue: "25",
-          courseIds: [COURSE_IDS[1]],
-        }),
-      }),
-      { params: Promise.resolve({ id: "promo-id" }) },
-    );
-
+  it("updates through the same transaction and supports explicit all-course scope", async () => {
+    const response = await PATCH(request({ ...valid, courseIds: [] }, "PATCH"), { params: Promise.resolve({ id: PROMO }) });
     expect(response.status).toBe(200);
-    expect(deletesFor(supabase, "promo_code_courses")[0].filters).toEqual([
-      { column: "promo_code_id", value: "promo-id" },
-    ]);
-    expect(insertsFor(supabase, "promo_code_courses")[0].rows).toEqual([
-      { promo_code_id: "promo-id", course_id: COURSE_IDS[1] },
-    ]);
+    expect(supabase.rpc).toHaveBeenCalledWith("save_admin_promo", expect.objectContaining({ p_id: PROMO, p_course_ids: [] }));
   });
+
+  it("denies students before accessing the database", async () => {
+    requireAdmin.mockResolvedValue({ error: jsonError("Forbidden", 403) });
+    expect((await POST(request(valid))).status).toBe(403);
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([null, [], { ...valid, courseIds: ["bad-id"] }, { ...valid, courseIds: "all" }, { ...valid, code: "A".repeat(65) }, { ...valid, discountValue: 101 }])(
+    "rejects malformed admin input %j without saving", async (body) => {
+      expect((await POST(request(body))).status).toBe(400);
+      expect(supabase.rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([["23505", 409], ["23503", 400], ["P0002", 404], ["PGRST202", 503]])(
+    "maps database error %s to %i without leaking internal details", async (code, status) => {
+      supabase.rpc.mockResolvedValue({ data: null, error: { code, message: "private database detail" } });
+      const response = await POST(request(valid));
+      expect(response.status).toBe(status);
+      expect((await response.json()).error).not.toContain("private database detail");
+    },
+  );
 });
