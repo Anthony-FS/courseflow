@@ -88,7 +88,7 @@ erDiagram
     string title
     text description
     int sort_order
-    boolean is_preview
+    boolean is_preview "legacy, unused"
   }
 
   materials {
@@ -231,7 +231,7 @@ A sub-lesson may have many assignments. `start_at` and `end_at` stay unused by t
 - Course `price` is `numeric` (`0` = free) so promo discounts have something to apply to.
 - Promo `discount_type` is `thb` | `percent`. `min_purchase_amount` defaults to `0`. `max_redemptions` / `starts_at` / `ends_at` may be null when not collected by the form.
 - A course has many **lessons**; each lesson has many **sub_lessons**. `sub_lessons.course_id` is kept for convenient course-scoped queries.
-- Sub-lesson samples: `sub_lessons.is_preview`. Full sub-lesson content is gated by enrollment in app logic.
+- Course outline (lesson and sub-lesson titles) is public via `public.sub_lesson_outline`. Full sub-lesson content (`sub_lessons.description`) is gated by enrollment in RLS and app logic. `sub_lessons.is_preview` is unused and kept only for legacy rows.
 - `materials.content` holds text (or HTML) when the item is not a file. `file_url` / `file_type` stay for PDF, video, and images; unused columns stay null.
 - Assignment `submission_type` is `text` | `file` | `url` | `choice`. `allowed_file_types` (`pdf`, `doc`, `image`) and `max_file_size_mb` (5 / 10 / 20 / 50) are set only for `file`; otherwise both stay null. `answer_text` is used only for `text`. `choice_a`–`choice_d` and `correct_choice` (unique letters from `A`/`B`/`C`/`D`, sorted A→D, comma-joined; e.g. `C`, `A,C`, `A,B,C,D`) are used only for `choice`. A sub-lesson may have many assignments.
 - Overdue assignment status is computed from `assignments.end_at`, not stored. The Add Assignment form does not set `start_at` or `end_at`.

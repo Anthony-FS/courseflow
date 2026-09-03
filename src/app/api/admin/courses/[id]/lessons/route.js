@@ -176,7 +176,6 @@ export async function POST(request, { params }) {
         title: String(sub.title).trim(),
         description: sub.description ? String(sub.description).trim() : null,
         sort_order: i + 1,
-        is_preview: Boolean(sub.isPreview),
       })
       .select("id")
       .single();

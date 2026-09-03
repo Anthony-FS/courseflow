@@ -9,7 +9,10 @@ const ATTACHMENT_BUCKET = "course-attachments";
 
 const COURSE_DETAIL_COLUMNS =
   "id, title, course_code, summary, description, price, is_active, cover_image_url, cover_file_url, video_trailer_url, tag_id";
-const COURSE_DETAIL_WITH_LESSONS = `${COURSE_DETAIL_COLUMNS}, lessons ( id, title, sort_order, sub_lessons ( id, title, sort_order ) )`;
+
+// Titles only. sub_lessons itself stays enrollment-gated by RLS, so the
+// outline comes from the sub_lesson_outline view (no description column).
+const SUB_LESSON_OUTLINE_TABLE = "sub_lesson_outline";
 
 function toPublicStorageUrl(objectPath, supabaseUrl) {
   const base = String(supabaseUrl ?? "").replace(/\/$/, "");
@@ -520,18 +523,47 @@ export function mapCourseDetail(row) {
   };
 }
 
-async function fetchLessonsForCourse(supabase, courseId) {
-  const { data, error } = await supabase
-    .from("lessons")
-    .select("id, title, sort_order, sub_lessons ( id, title, sort_order )")
-    .eq("course_id", courseId)
-    .order("sort_order", { ascending: true });
+async function fetchCourseOutline(supabase, courseId) {
+  const [lessonsResult, subLessonsResult] = await Promise.all([
+    supabase
+      .from("lessons")
+      .select("id, title, sort_order")
+      .eq("course_id", courseId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from(SUB_LESSON_OUTLINE_TABLE)
+      .select("id, lesson_id, title, sort_order")
+      .eq("course_id", courseId)
+      .order("sort_order", { ascending: true }),
+  ]);
 
-  if (error) {
+  if (lessonsResult.error) {
     return [];
   }
 
-  return data ?? [];
+  const subLessonsByLessonId = new Map();
+  const subLessonRows = subLessonsResult.error
+    ? []
+    : (subLessonsResult.data ?? []);
+
+  for (const row of subLessonRows) {
+    const lessonId = row?.lesson_id;
+    if (!lessonId) {
+      continue;
+    }
+
+    const existing = subLessonsByLessonId.get(lessonId);
+    if (existing) {
+      existing.push(row);
+    } else {
+      subLessonsByLessonId.set(lessonId, [row]);
+    }
+  }
+
+  return (lessonsResult.data ?? []).map((lesson) => ({
+    ...lesson,
+    sub_lessons: subLessonsByLessonId.get(lesson.id) ?? [],
+  }));
 }
 
 function isCourseCodeMatch(row, normalized) {
@@ -576,22 +608,6 @@ export async function getCourseByCode(supabase, code, catalogSupabase) {
 
   const catalog = catalogSupabase ?? supabase;
 
-  const data = await fetchCourseRowByCode(
-    supabase,
-    COURSE_DETAIL_WITH_LESSONS,
-    normalized,
-  );
-
-  if (data) {
-    const nestedLessons = Array.isArray(data.lessons) ? data.lessons : [];
-    if (nestedLessons.length > 0) {
-      return mapCourseDetail(data);
-    }
-
-    const lessons = await fetchLessonsForCourse(catalog, data.id);
-    return mapCourseDetail({ ...data, lessons });
-  }
-
   const course = await fetchCourseRowByCode(
     supabase,
     COURSE_DETAIL_COLUMNS,
@@ -602,7 +618,7 @@ export async function getCourseByCode(supabase, code, catalogSupabase) {
     return null;
   }
 
-  const lessons = await fetchLessonsForCourse(catalog, course.id);
+  const lessons = await fetchCourseOutline(catalog, course.id);
   return mapCourseDetail({ ...course, lessons });
 }
 

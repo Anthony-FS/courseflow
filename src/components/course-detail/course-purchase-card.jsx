@@ -17,6 +17,8 @@ function PurchaseActions({
   initiallySaved,
   isSubscribed,
   isPurchasable = true,
+  loginHref,
+  requiresLogin = false,
 }) {
   const buttonClassName = compact
     ? "min-h-12 rounded-full px-3 py-3 text-body3 whitespace-normal"
@@ -53,12 +55,16 @@ function PurchaseActions({
         courseId={courseId}
         initiallySaved={initiallySaved}
         className={buttonClassName}
+        loginHref={loginHref}
+        requiresLogin={requiresLogin}
       />
       <SubscribeButton
         courseId={courseId}
         courseTitle={courseTitle}
         className={buttonClassName}
         label={compact ? "Subscribe" : undefined}
+        loginHref={loginHref}
+        requiresLogin={requiresLogin}
       />
     </div>
   );
@@ -70,7 +76,9 @@ function CoursePurchaseSidebar({
   initiallySaved,
   isSubscribed,
   isPurchasable = true,
+  loginHref,
   price,
+  requiresLogin = false,
   summary,
   title,
 }) {
@@ -95,6 +103,8 @@ function CoursePurchaseSidebar({
           initiallySaved={initiallySaved}
           isSubscribed={isSubscribed}
           isPurchasable={isPurchasable}
+          loginHref={loginHref}
+          requiresLogin={requiresLogin}
         />
       </div>
     </aside>
@@ -107,7 +117,9 @@ function CoursePurchaseMobileBar({
   initiallySaved,
   isSubscribed,
   isPurchasable = true,
+  loginHref,
   price,
+  requiresLogin = false,
   summary,
   title,
 }) {
@@ -174,6 +186,8 @@ function CoursePurchaseMobileBar({
           initiallySaved={initiallySaved}
           isSubscribed={isSubscribed}
           isPurchasable={isPurchasable}
+          loginHref={loginHref}
+          requiresLogin={requiresLogin}
         />
       </div>
     </div>

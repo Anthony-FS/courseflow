@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { CourseTrailer } from "@/components/course-detail/course-trailer";
@@ -45,10 +45,6 @@ export default async function CourseDetailPage({ params }) {
   const { code } = await params;
   const { user, supabase } = await getSessionUser();
 
-  if (!user) {
-    redirect(`/login?next=/courses/${encodeURIComponent(code)}`);
-  }
-
   const course = await getCourseByCode(supabase, code, catalogClient(supabase));
   if (!course) {
     notFound();
@@ -56,12 +52,11 @@ export default async function CourseDetailPage({ params }) {
 
   const catalog = catalogClient(supabase);
   const [enrolledCourseIds, wishlistResult, attachment] = await Promise.all([
-    getUserEnrolledCourseIds(catalog, user.id),
-    supabase
-      .from("wishlists")
-      .select("course_id")
-      .eq("user_id", user.id),
-    getCourseAttachment(catalog, course.id),
+    user ? getUserEnrolledCourseIds(catalog, user.id) : [],
+    user
+      ? supabase.from("wishlists").select("course_id").eq("user_id", user.id)
+      : { data: [], error: null },
+    user ? getCourseAttachment(catalog, course.id) : null,
   ]);
   const wishlistCourseIds = wishlistResult.error
     ? []
@@ -74,6 +69,7 @@ export default async function CourseDetailPage({ params }) {
     tagId: course.tagId,
     limit: 3,
   });
+  const loginHref = `/login?next=/courses/${encodeURIComponent(course.courseCode || code)}`;
 
   return (
     <>
@@ -99,7 +95,9 @@ export default async function CourseDetailPage({ params }) {
           initiallySaved={inWishlist}
           isSubscribed={isSubscribed}
           isPurchasable={course.isActive !== false}
+          loginHref={loginHref}
           price={course.price}
+          requiresLogin={!user}
           summary={course.summary}
           title={course.title}
         />
@@ -136,7 +134,9 @@ export default async function CourseDetailPage({ params }) {
         initiallySaved={inWishlist}
         isSubscribed={isSubscribed}
         isPurchasable={course.isActive !== false}
+        loginHref={loginHref}
         price={course.price}
+        requiresLogin={!user}
         summary={course.summary}
         title={course.title}
       />

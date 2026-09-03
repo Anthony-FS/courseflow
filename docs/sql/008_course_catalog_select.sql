@@ -1,3 +1,4 @@
+-- SUPERSEDED by docs/sql/026_public_course_outline.sql — do not re-apply.
 -- CourseFlow: let logged-in learners read course catalog modules.
 -- Needed by /courses/[code] (Module Samples).
 -- Apply in Supabase Dashboard → SQL Editor (or via linked CLI).

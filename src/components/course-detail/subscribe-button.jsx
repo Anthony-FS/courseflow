@@ -12,9 +12,20 @@ function SubscribeButton({
   courseTitle,
   className,
   label = "Subscribe To This Course",
+  loginHref,
+  requiresLogin = false,
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  function handleClick() {
+    if (requiresLogin) {
+      router.push(loginHref || "/login");
+      return;
+    }
+
+    setOpen(true);
+  }
 
   function handleConfirm() {
     setOpen(false);
@@ -26,7 +37,7 @@ function SubscribeButton({
       <Button
         type="button"
         className={cn("w-full", className)}
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
       >
         {label}
       </Button>

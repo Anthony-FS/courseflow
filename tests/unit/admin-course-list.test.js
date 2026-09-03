@@ -251,7 +251,7 @@ describe("getCourseByCode", () => {
     });
   });
 
-  it("loads lessons from the catalog client when the session cannot see them", async () => {
+  it("builds the outline from lessons plus the sub_lesson_outline view", async () => {
     const courseRow = {
       id: "abc",
       title: "UX Research Basics",
@@ -261,11 +261,17 @@ describe("getCourseByCode", () => {
       price: 10,
       cover_image_url: "/courses/ux-ui-beginner.svg",
       video_trailer_url: null,
-      lessons: [],
     };
-    const catalogLessons = [
-      { id: "l1", title: "Introduction", sort_order: 1, sub_lessons: [] },
-    ];
+    const rowsByTable = {
+      lessons: [
+        { id: "l2", title: "Prototyping", sort_order: 2 },
+        { id: "l1", title: "Introduction", sort_order: 1 },
+      ],
+      sub_lesson_outline: [
+        { id: "s2", lesson_id: "l1", title: "Course Overview", sort_order: 2 },
+        { id: "s1", lesson_id: "l1", title: "Welcome", sort_order: 1 },
+      ],
+    };
     const sessionSupabase = {
       from() {
         return {
@@ -275,7 +281,10 @@ describe("getCourseByCode", () => {
                 return {
                   limit() {
                     return {
-                      maybeSingle: async () => ({ data: courseRow, error: null }),
+                      maybeSingle: async () => ({
+                        data: courseRow,
+                        error: null,
+                      }),
                     };
                   },
                 };
@@ -286,13 +295,16 @@ describe("getCourseByCode", () => {
       },
     };
     const catalogSupabase = {
-      from() {
+      from(table) {
         return {
           select() {
             return {
               eq() {
                 return {
-                  order: async () => ({ data: catalogLessons, error: null }),
+                  order: async () => ({
+                    data: rowsByTable[table] ?? [],
+                    error: null,
+                  }),
                 };
               },
             };
@@ -301,12 +313,20 @@ describe("getCourseByCode", () => {
       },
     };
 
-    await expect(
-      getCourseByCode(sessionSupabase, "SD101", catalogSupabase),
-    ).resolves.toMatchObject({
-      id: "abc",
-      courseCode: "SD101",
-      lessons: [{ id: "l1", title: "Introduction", subLessons: [] }],
-    });
+    const detail = await getCourseByCode(
+      sessionSupabase,
+      "SD101",
+      catalogSupabase,
+    );
+
+    expect(detail.lessons.map((lesson) => lesson.title)).toEqual([
+      "Introduction",
+      "Prototyping",
+    ]);
+    expect(detail.lessons[0].subLessons.map((item) => item.title)).toEqual([
+      "Welcome",
+      "Course Overview",
+    ]);
+    expect(detail.lessons[1].subLessons).toEqual([]);
   });
 });

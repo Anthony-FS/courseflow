@@ -58,7 +58,6 @@ export async function GET(_request, { params }) {
         title,
         description,
         sort_order,
-        is_preview,
         materials (
           id,
           name,
@@ -102,7 +101,6 @@ export async function GET(_request, { params }) {
         attachmentName: attachmentMaterial?.name || "",
         attachmentType: attachmentMaterial?.file_type || null,
         attachmentFile: null,
-        isPreview: Boolean(sub.is_preview),
       };
     });
 
@@ -177,7 +175,6 @@ export async function PUT(request, { params }) {
         title: String(sub.title).trim(),
         description: sub.description ? String(sub.description).trim() : null,
         sort_order: i + 1,
-        is_preview: Boolean(sub.isPreview),
       })
       .select("id")
       .single();

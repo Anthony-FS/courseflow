@@ -42,7 +42,6 @@ describe("Lesson Management API", () => {
             attachmentUrl: "course-attachments/user/notes.pdf",
             attachmentName: "notes.pdf",
             attachmentType: "application/pdf",
-            isPreview: true,
           },
           {
             title: "Tools Overview",
@@ -51,7 +50,6 @@ describe("Lesson Management API", () => {
             videoName: "",
             attachmentUrl: null,
             attachmentName: "",
-            isPreview: false,
           },
         ],
       };
@@ -78,7 +76,7 @@ describe("Lesson Management API", () => {
       expect(subLessonInserts[0].rows[0].description).toBe(
         "Learn the basics of Figma interface and tools.",
       );
-      expect(subLessonInserts[0].rows[0].is_preview).toBe(true);
+      expect(subLessonInserts[0].rows[0]).not.toHaveProperty("is_preview");
 
       const materialInserts = insertsFor(supabase, "materials");
       expect(materialInserts.length).toBe(2); // 1 video + 1 attachment
@@ -140,7 +138,6 @@ describe("Lesson Management API", () => {
             videoName: "autolayout.mp4",
             attachmentUrl: "course-attachments/user/cheatsheet.pdf",
             attachmentName: "cheatsheet.pdf",
-            isPreview: false,
           },
         ],
       };
@@ -208,7 +205,6 @@ describe("Lesson Management API", () => {
                 title: "Sub 1",
                 description: "Sub 1 desc",
                 sort_order: 1,
-                is_preview: true,
                 materials: [
                   {
                     id: "m-1",
@@ -242,7 +238,6 @@ describe("Lesson Management API", () => {
       expect(body.lesson.subLessons).toHaveLength(1);
       expect(body.lesson.subLessons[0].title).toBe("Sub 1");
       expect(body.lesson.subLessons[0].description).toBe("Sub 1 desc");
-      expect(body.lesson.subLessons[0].isPreview).toBe(true);
       expect(body.lesson.subLessons[0].videoUrl).toBe(
         "course-trailers/user/video.mp4",
       );
