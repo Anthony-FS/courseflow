@@ -1,3 +1,7 @@
+-- The admin write policies here are EXTENDED by docs/sql/028_course_videos_bucket.sql
+-- to cover the private course-videos bucket. Re-applying this file alone would
+-- drop that bucket from the allowed list.
+--
 -- CourseFlow: let signed-in admins upload cover, trailer, and attachment
 -- files with the anon/publishable key (no service role).
 -- Apply in Supabase Dashboard → SQL Editor (or via apply-supabase-sql.mjs).

@@ -32,6 +32,24 @@ export async function uploadAdminFile(kind, file) {
   return data;
 }
 
+/** Signed URL for a private lesson video, used by the editor preview. */
+export async function getAdminSignedMediaUrl(path) {
+  const value = String(path ?? "").trim();
+  if (!value) return null;
+
+  const response = await fetch(
+    `/api/admin/uploads/signed-url?path=${encodeURIComponent(value)}`,
+    { cache: "no-store" },
+  );
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    throw createApiError(data, "Failed to sign media");
+  }
+
+  return data?.signedUrl ?? null;
+}
+
 export async function createAdminCourse(payload) {
   const response = await fetch("/api/admin/courses", {
     method: "POST",

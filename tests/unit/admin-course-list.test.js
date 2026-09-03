@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   embeddedCount,
@@ -6,6 +6,7 @@ import {
   getCourseByCode,
   mapCourseDetail,
   resolveCoverUrl,
+  resolveLessonVideoHref,
   resolveTrailerUrl,
   searchCourses,
 } from "@/lib/courses";
@@ -147,6 +148,52 @@ describe("resolveTrailerUrl", () => {
     ).toBe(
       "https://xyz.supabase.co/storage/v1/object/public/course-trailers/admin/trailer.mp4",
     );
+  });
+});
+
+describe("resolveLessonVideoHref", () => {
+  function storageStub(signedUrl) {
+    const createSignedUrl = vi.fn(async () => ({
+      data: signedUrl ? { signedUrl } : null,
+      error: signedUrl ? null : { message: "not found" },
+    }));
+
+    return {
+      client: { storage: { from: vi.fn(() => ({ createSignedUrl })) } },
+      createSignedUrl,
+    };
+  }
+
+  it("signs objects stored in the private lesson video bucket", async () => {
+    const { client, createSignedUrl } = storageStub(
+      "https://xyz.supabase.co/storage/v1/object/sign/course-videos/admin/lesson.mp4?token=abc",
+    );
+
+    await expect(
+      resolveLessonVideoHref(client, "course-videos/admin/lesson.mp4"),
+    ).resolves.toContain("token=abc");
+    expect(client.storage.from).toHaveBeenCalledWith("course-videos");
+    expect(createSignedUrl).toHaveBeenCalledWith(
+      "admin/lesson.mp4",
+      expect.any(Number),
+    );
+  });
+
+  it("never falls back to a public url when signing fails", async () => {
+    const { client } = storageStub(null);
+
+    await expect(
+      resolveLessonVideoHref(client, "course-videos/admin/lesson.mp4"),
+    ).resolves.toBeNull();
+  });
+
+  it("leaves legacy trailer paths and external urls alone", async () => {
+    const { client } = storageStub("unused");
+
+    await expect(
+      resolveLessonVideoHref(client, "https://cdn.example/lesson.mp4"),
+    ).resolves.toBe("https://cdn.example/lesson.mp4");
+    expect(client.storage.from).not.toHaveBeenCalled();
   });
 });
 

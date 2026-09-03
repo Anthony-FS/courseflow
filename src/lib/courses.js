@@ -6,6 +6,9 @@ const FALLBACK_COVER = "/courses/service-design.svg";
 const COVER_BUCKET = "course-covers";
 const TRAILER_BUCKET = "course-trailers";
 const ATTACHMENT_BUCKET = "course-attachments";
+const LESSON_VIDEO_BUCKET = "course-videos";
+
+export const LESSON_VIDEO_SIGNED_URL_TTL_SECONDS = 60 * 60 * 4;
 
 const COURSE_DETAIL_COLUMNS =
   "id, title, course_code, summary, description, price, is_active, cover_image_url, cover_file_url, video_trailer_url, tag_id";
@@ -74,6 +77,57 @@ export function resolveTrailerUrl(
     : `${TRAILER_BUCKET}/${value}`;
 
   return toPublicStorageUrl(objectPath, supabaseUrl);
+}
+
+/**
+ * Object path inside the private lesson video bucket, or null when the value
+ * points somewhere else (external URL, legacy public trailer path, blob).
+ */
+export function lessonVideoObjectPath(fileUrl) {
+  const value = String(fileUrl ?? "").trim();
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const { pathname } = new URL(value);
+      const marker = `/${LESSON_VIDEO_BUCKET}/`;
+      const index = pathname.indexOf(marker);
+      return index < 0
+        ? null
+        : decodeURIComponent(pathname.slice(index + marker.length)) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  return value.startsWith(`${LESSON_VIDEO_BUCKET}/`)
+    ? value.slice(LESSON_VIDEO_BUCKET.length + 1) || null
+    : null;
+}
+
+/**
+ * Sign a sub-lesson video for playback. Callers must verify enrollment (or
+ * admin) first — the bucket is private and has no public fallback, so a failed
+ * signature yields null instead of a guessable URL.
+ * Values outside the private bucket fall back to the legacy trailer handling.
+ */
+export async function resolveLessonVideoHref(supabase, fileUrl) {
+  const objectPath = lessonVideoObjectPath(fileUrl);
+  if (!objectPath) {
+    return resolveTrailerUrl(fileUrl);
+  }
+
+  if (typeof supabase?.storage?.from !== "function") {
+    return null;
+  }
+
+  const { data } = await supabase.storage
+    .from(LESSON_VIDEO_BUCKET)
+    .createSignedUrl(objectPath, LESSON_VIDEO_SIGNED_URL_TTL_SECONDS);
+
+  return data?.signedUrl ?? null;
 }
 
 export async function resolveAttachmentHref(supabase, fileUrl) {

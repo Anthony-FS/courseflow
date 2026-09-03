@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText,
   Image as ImageIcon,
@@ -28,7 +28,70 @@ import {
   moveBlock,
 } from "@/lib/sub-lesson-blocks";
 import { SubLessonRenderer } from "@/components/course-learn/sub-lesson-renderer";
+import { getAdminSignedMediaUrl } from "@/lib/admin-courses";
 import { cn } from "@/lib/utils";
+
+/**
+ * Lesson videos sit in a private bucket, so previewing an already stored video
+ * needs a signed URL from the server. Keyed by the stored `bucket/path` value.
+ */
+function useLessonVideoPreviews(blocks) {
+  const [signedUrls, setSignedUrls] = useState({});
+  const requested = useRef(new Set());
+
+  const storedVideoUrls = useMemo(() => {
+    const urls = new Set();
+
+    for (const block of blocks ?? []) {
+      if (block?.type !== BLOCK_TYPES.VIDEO) continue;
+      const embed = getVideoEmbedInfo(block.url);
+      if (embed?.storagePath) {
+        urls.add(String(block.url).trim());
+      }
+    }
+
+    return [...urls];
+  }, [blocks]);
+
+  useEffect(() => {
+    const pending = storedVideoUrls.filter(
+      (url) => !requested.current.has(url),
+    );
+    if (pending.length === 0) return;
+
+    for (const url of pending) {
+      requested.current.add(url);
+    }
+
+    let cancelled = false;
+
+    Promise.all(
+      pending.map(async (url) => {
+        try {
+          return [url, await getAdminSignedMediaUrl(url)];
+        } catch {
+          return [url, null];
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+
+      setSignedUrls((previous) => {
+        const next = { ...previous };
+        for (const [url, signedUrl] of entries) {
+          if (signedUrl) next[url] = signedUrl;
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storedVideoUrls]);
+
+  return signedUrls;
+}
 
 /**
  * Text Formatting Helper: Wraps selected text or inserts markdown snippet
@@ -186,6 +249,18 @@ export function SubLessonBlockBuilder({
   subLessonIndex = 0,
 }) {
   const [showPreview, setShowPreview] = useState(false);
+  const videoPreviewUrls = useLessonVideoPreviews(blocks);
+
+  const previewBlocks = useMemo(
+    () =>
+      (blocks ?? []).map((block) => {
+        const signedUrl = videoPreviewUrls[String(block?.url ?? "").trim()];
+        return block?.type === BLOCK_TYPES.VIDEO && signedUrl
+          ? { ...block, playbackUrl: signedUrl }
+          : block;
+      }),
+    [blocks, videoPreviewUrls],
+  );
 
   function handleAddBlock(type) {
     const newBlock = createBlock(type);
@@ -278,7 +353,7 @@ export function SubLessonBlockBuilder({
           <p className="mb-4 text-xs font-semibold tracking-wider text-[#9CA3AF] uppercase">
             Student View Preview
           </p>
-          <SubLessonRenderer description={JSON.stringify(blocks)} />
+          <SubLessonRenderer description={JSON.stringify(previewBlocks)} />
         </div>
       ) : null}
 
@@ -490,6 +565,11 @@ export function SubLessonBlockBuilder({
                           const embed = getVideoEmbedInfo(block.url);
                           if (!embed) return null;
 
+                          const directSrc =
+                            videoPreviewUrls[String(block.url).trim()] ||
+                            embed.src;
+                          if (embed.type === "video" && !directSrc) return null;
+
                           return (
                             <div className="relative aspect-video max-w-sm overflow-hidden rounded-lg bg-black">
                               {embed.type === "youtube" ||
@@ -503,7 +583,7 @@ export function SubLessonBlockBuilder({
                                 />
                               ) : (
                                 <video
-                                  src={embed.src}
+                                  src={directSrc}
                                   controls
                                   className="h-full w-full object-contain"
                                 />
