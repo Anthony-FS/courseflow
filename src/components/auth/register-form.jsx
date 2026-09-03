@@ -20,7 +20,7 @@ import {
 import { registerGuest } from "@/lib/register-guest";
 import {
   hasRegisterErrors,
-  todayIsoDate,
+  latestAdultDobIsoDate,
   validateAll,
   validateField,
 } from "@/lib/register-validation";
@@ -197,7 +197,7 @@ export function RegisterForm() {
       onSubmit={handleSubmit}
       noValidate
     >
-      <h1 className="text-center text-headline3 text-blue-800">
+      <h1 className="text-center text-headline3 text-[#22269E]">
         Register to start learning!
       </h1>
 
@@ -226,7 +226,7 @@ export function RegisterForm() {
             value={values.dob}
             error={errors.dob}
             disabled={submitting}
-            max={todayIsoDate()}
+            max={latestAdultDobIsoDate()}
             showCalendar
             onChange={(event) => updateField("dob", event.target.value)}
             onBlur={(event) => handleBlur("dob", event.target.value)}

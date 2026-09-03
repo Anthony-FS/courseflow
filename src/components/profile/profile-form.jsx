@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Calendar, LockKeyhole, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { validateAll, validateField, todayIsoDate } from "@/lib/register-validation";
+import { validateAll, validateField, latestAdultDobIsoDate } from "@/lib/register-validation";
 
 const FIELD_DEFINITIONS = [
   { key: "fullName", label: "Name", type: "text", autoComplete: "name" },
@@ -152,7 +152,7 @@ export function ProfileForm({ initialProfile, email }) {
                 type={type}
                 value={values[key]}
                 placeholder={key === "education" ? "Enter Educational Background" : undefined}
-                max={type === "date" ? todayIsoDate() : undefined}
+                max={type === "date" ? latestAdultDobIsoDate() : undefined}
                 autoComplete={autoComplete}
                 aria-invalid={errors[key] ? "true" : undefined}
                 onChange={(event) => updateValue(key, event.target.value)}

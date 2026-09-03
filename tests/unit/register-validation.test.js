@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { validateAll, validateField } from "@/lib/register-validation";
+import {
+  latestAdultDobIsoDate,
+  validateAll,
+  validateField,
+} from "@/lib/register-validation";
 
 // ข้อมูล Guest ที่ผ่านทุกช่อง — ใช้เป็นฐานแล้วค่อย override ช่องที่อยากทำให้พัง
 const valid = {
@@ -117,5 +121,19 @@ describe("register field validation", () => {
     vi.setSystemTime(new Date("2026-08-17T12:00:00.000Z"));
 
     expect(validateAll({ ...valid, dob: "2008-08-17" }).dob).toBe("");
+  });
+
+  it("returns the latest date of birth a user can pick at age 18", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-17T12:00:00.000Z"));
+
+    expect(latestAdultDobIsoDate()).toBe("2008-08-17");
+  });
+
+  it("uses February 28 when the 18-year cutoff falls on a missing leap day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-02-29T12:00:00.000Z"));
+
+    expect(latestAdultDobIsoDate()).toBe("2006-02-28");
   });
 });
