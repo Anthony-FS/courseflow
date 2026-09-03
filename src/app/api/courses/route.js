@@ -44,14 +44,11 @@ export async function GET(request) {
     return jsonTooManyRequests(limited.retryAfterSec);
   }
 
+  // The catalog only needs courses + lesson counts, both readable by the anon
+  // role since 026_public_course_outline.sql, so a missing service role key is
+  // no longer fatal.
   const serviceSupabase = createServiceClient();
-  let supabase = serviceSupabase;
-  if (!supabase) {
-    if (process.env.NODE_ENV !== "development") {
-      return jsonError("Course catalog is unavailable", 500);
-    }
-    supabase = await createClient();
-  }
+  const supabase = serviceSupabase ?? (await createClient());
 
   const { user, supabase: sessionSupabase } = await getSessionUser();
   let excludeCourseIds = [];

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
-import { ArrowLeft, Plus, X, Loader2, Eye } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2 } from "lucide-react";
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { SubLessonBlockBuilder } from "@/components/admin/sub-lesson-block-builder";
@@ -103,7 +103,6 @@ export default function LessonForm({
           attachmentUrl: null,
           attachmentFile: null,
           attachmentName: "",
-          isPreview: false,
         },
       ],
   );
@@ -221,7 +220,6 @@ export default function LessonForm({
         attachmentUrl: null,
         attachmentFile: null,
         attachmentName: "",
-        isPreview: false,
       },
     ]);
   };
@@ -264,12 +262,6 @@ export default function LessonForm({
     const updated = [...subLessons];
     updated[index].blocks = newBlocks;
     updated[index].description = serializeSubLessonContent(newBlocks);
-    setSubLessons(updated);
-  };
-
-  const handleTogglePreview = (index) => {
-    const updated = [...subLessons];
-    updated[index].isPreview = !updated[index].isPreview;
     setSubLessons(updated);
   };
 
@@ -420,7 +412,6 @@ export default function LessonForm({
               ? null
               : sub.attachmentUrl || null,
             attachmentName: attachmentIsInBlocks ? "" : sub.attachmentName || "",
-            isPreview: Boolean(sub.isPreview),
           };
         }),
       );
@@ -676,7 +667,7 @@ export default function LessonForm({
 
                           {/* Sub-Lesson Inputs */}
                           <div className="flex-1 space-y-6">
-                            {/* Top Row: Label, Free Preview Toggle & Delete Button */}
+                            {/* Top Row: Label & Delete Button */}
                             <div className="flex flex-wrap items-center justify-between gap-3">
                               <div className="flex items-center gap-3">
                                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#E2E8F5] text-[#2F5FAC] text-xs font-bold">
@@ -688,25 +679,6 @@ export default function LessonForm({
                               </div>
 
                               <div className="flex items-center gap-4">
-                                {/* Free Preview Toggle */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleTogglePreview(index)}
-                                  className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border",
-                                    sub.isPreview
-                                      ? "bg-[#E6F4EA] text-[#137333] border-[#CEEAD6]"
-                                      : "bg-white text-[#646D89] border-[#D6D9E4] hover:bg-[#F1F3F9]",
-                                  )}
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>
-                                    {sub.isPreview
-                                      ? "Free Preview ON"
-                                      : "Free Preview OFF"}
-                                  </span>
-                                </button>
-
                                 {/* Delete Button */}
                                 <button
                                   type="button"

@@ -1,3 +1,4 @@
+-- SUPERSEDED by docs/sql/026_public_course_outline.sql — do not re-apply.
 -- CourseFlow: Fix security vulnerability in RLS policies for lessons and sub_lessons
 -- Scope select access to enrolled users or preview sub-lessons only.
 -- Apply in Supabase Dashboard → SQL Editor (or via linked CLI).

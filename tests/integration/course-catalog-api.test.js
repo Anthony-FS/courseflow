@@ -29,7 +29,7 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => {
   };
 });
 
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getCatalogCourses } from "@/lib/courses";
 import { getSessionUser } from "@/lib/auth";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
@@ -183,18 +183,20 @@ describe("GET /api/courses", () => {
     );
   });
 
-  it("returns 500 without querying when the service client is unavailable in production", async () => {
+  it("falls back to the session client when the service client is unavailable in production", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = "production";
     createServiceClient.mockReturnValue(null);
+    createClient.mockResolvedValue({ anon: true });
 
     try {
       const response = await getCourses();
-      const body = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(body.error).toMatch(/catalog is unavailable/i);
-      expect(getCatalogCourses).not.toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(getCatalogCourses).toHaveBeenCalledWith(
+        { anon: true },
+        expect.objectContaining({ page: 1, pageSize: 12 }),
+      );
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
     }

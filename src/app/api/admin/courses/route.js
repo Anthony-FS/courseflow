@@ -317,7 +317,6 @@ export async function POST(request) {
                 String(sub.title ?? "").trim() || `Sub-lesson ${subIdx + 1}`,
               description: sub.description ? String(sub.description).trim() : null,
               sort_order: subIdx + 1,
-              is_preview: Boolean(sub.isPreview),
             })
             .select("id")
             .single();

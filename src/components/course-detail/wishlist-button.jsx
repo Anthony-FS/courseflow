@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { addCourseToWishlist, removeCourseFromWishlist } from "@/lib/wishlist";
 import { cn } from "@/lib/utils";
 
-function WishlistButton({ courseId, initiallySaved = false, className }) {
+function WishlistButton({
+  courseId,
+  initiallySaved = false,
+  className,
+  loginHref,
+  requiresLogin = false,
+}) {
   const router = useRouter();
   const [saved, setSaved] = useState(initiallySaved);
   const [isPending, setIsPending] = useState(false);
@@ -21,6 +27,11 @@ function WishlistButton({ courseId, initiallySaved = false, className }) {
 
   async function handleClick() {
     if (isPending) {
+      return;
+    }
+
+    if (requiresLogin) {
+      router.push(loginHref || "/login");
       return;
     }
 
