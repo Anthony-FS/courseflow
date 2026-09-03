@@ -166,11 +166,14 @@ function DiagramImageCard({ url, caption, alt }) {
 /**
  * Renders a Video Player Block (supports YouTube, Vimeo, and direct video files)
  */
-function InlineVideoPlayer({ url, caption, courseId, subLessonId }) {
+function InlineVideoPlayer({ url, caption, courseId, subLessonId, playbackUrl }) {
   if (!url) return null;
 
   const embed = getVideoEmbedInfo(url);
   if (!embed) return null;
+
+  const directSrc = playbackUrl || embed.src;
+  if (embed.type === "video" && !directSrc) return null;
 
   const visibleCaption = sanitizeVideoCaption(caption);
   const title = visibleCaption || "Lesson Video";
@@ -188,7 +191,7 @@ function InlineVideoPlayer({ url, caption, courseId, subLessonId }) {
         ) : (
           <DirectFileVideoPlayer
             title={title}
-            videoUrl={embed.src}
+            videoUrl={directSrc}
             courseId={courseId}
             subLessonId={subLessonId}
             className="border border-gray-200 bg-gray-900 shadow-card"
@@ -370,6 +373,7 @@ export function SubLessonRenderer({
                 caption={block.caption}
                 courseId={courseId}
                 subLessonId={subLessonId}
+                playbackUrl={block.playbackUrl}
               />
             );
 

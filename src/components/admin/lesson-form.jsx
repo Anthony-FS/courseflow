@@ -347,7 +347,10 @@ export default function LessonForm({
           let finalVideoName = sub.videoName || "";
 
           if (sub.videoFile) {
-            const uploadRes = await uploadAdminFile("trailer", sub.videoFile);
+            const uploadRes = await uploadAdminFile(
+              "lessonVideo",
+              sub.videoFile,
+            );
             finalVideoUrl = uploadRes.fileUrl;
             finalVideoName = uploadRes.name || sub.videoName;
           }
@@ -379,7 +382,7 @@ export default function LessonForm({
                   return { ...block, url: res.fileUrl, file: null };
                 }
                 if (block.type === BLOCK_TYPES.VIDEO && block.file) {
-                  const res = await uploadAdminFile("trailer", block.file);
+                  const res = await uploadAdminFile("lessonVideo", block.file);
                   return { ...block, url: res.fileUrl, file: null };
                 }
                 if (block.type === BLOCK_TYPES.ATTACHMENT && block.file) {

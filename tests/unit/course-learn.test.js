@@ -212,4 +212,48 @@ describe("course-learn helpers", () => {
       content: "Welcome to mobile and game development!",
     });
   });
+
+  it("signs private lesson videos stored in content blocks", async () => {
+    const description = JSON.stringify([
+      { id: "v1", type: "video", url: "course-videos/admin/lesson.mp4" },
+    ]);
+
+    const supabase = {
+      storage: {
+        from: () => ({
+          createSignedUrl: async (path) => ({
+            data: { signedUrl: `https://signed.example/${path}?token=abc` },
+            error: null,
+          }),
+        }),
+      },
+      from(table) {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          maybeSingle: async () =>
+            table === "sub_lessons"
+              ? { data: { id: "sub-1", title: "Lesson", description }, error: null }
+              : { data: null, error: null },
+          then: (onFulfilled, onRejected) =>
+            Promise.resolve({ data: [], error: null }).then(
+              onFulfilled,
+              onRejected,
+            ),
+        };
+        return chain;
+      },
+    };
+
+    const result = await getSubLessonLearningContent(supabase, {
+      courseId: "course-1",
+      subLessonId: "sub-1",
+    });
+
+    const blocks = parseSubLessonContent(result.description);
+    expect(blocks[0].url).toBe("course-videos/admin/lesson.mp4");
+    expect(blocks[0].playbackUrl).toBe(
+      "https://signed.example/admin/lesson.mp4?token=abc",
+    );
+  });
 });

@@ -2,7 +2,11 @@
  * Sub-Lesson Rich Content Block Types & Utilities
  */
 
-import { resolveCoverFileUrl, resolveTrailerUrl } from "@/lib/courses";
+import {
+  lessonVideoObjectPath,
+  resolveCoverFileUrl,
+  resolveTrailerUrl,
+} from "@/lib/courses";
 
 export const BLOCK_TYPES = {
   TEXT: "text",
@@ -58,14 +62,22 @@ export function getVideoEmbedInfo(url) {
     };
   }
 
-  const src = isEphemeralMediaUrl(trimmed)
-    ? trimmed
-    : resolveTrailerUrl(trimmed) || trimmed;
+  if (isEphemeralMediaUrl(trimmed)) {
+    return { type: "video", src: trimmed, storagePath: null };
+  }
 
-  // Direct video file, storage path, or generic stream URL
+  // Sub-lesson videos live in a private bucket, so there is no src to build
+  // here. The caller supplies a signed URL it obtained server-side.
+  const storagePath = lessonVideoObjectPath(trimmed);
+  if (storagePath) {
+    return { type: "video", src: null, storagePath };
+  }
+
+  // Direct video file, legacy public trailer path, or generic stream URL
   return {
     type: "video",
-    src,
+    src: resolveTrailerUrl(trimmed) || trimmed,
+    storagePath: null,
   };
 }
 

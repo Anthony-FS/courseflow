@@ -43,11 +43,13 @@ describe("sub-lesson-blocks utilities", () => {
     expect(getVideoEmbedInfo("https://cdn.example.com/video.mp4")).toEqual({
       type: "video",
       src: "https://cdn.example.com/video.mp4",
+      storagePath: null,
     });
 
     expect(getVideoEmbedInfo("blob:http://localhost:3000/abc")).toEqual({
       type: "video",
       src: "blob:http://localhost:3000/abc",
+      storagePath: null,
     });
 
     const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,6 +57,7 @@ describe("sub-lesson-blocks utilities", () => {
     expect(getVideoEmbedInfo("course-trailers/admin/lesson.mp4")).toEqual({
       type: "video",
       src: "https://example.supabase.co/storage/v1/object/public/course-trailers/admin/lesson.mp4",
+      storagePath: null,
     });
     if (previousUrl === undefined) {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -64,6 +67,14 @@ describe("sub-lesson-blocks utilities", () => {
 
     expect(getVideoEmbedInfo("")).toBeNull();
     expect(getVideoEmbedInfo(null)).toBeNull();
+  });
+
+  it("never builds a public src for private lesson videos", () => {
+    expect(getVideoEmbedInfo("course-videos/admin/lesson.mp4")).toEqual({
+      type: "video",
+      src: null,
+      storagePath: "admin/lesson.mp4",
+    });
   });
 
   it("resolves stored image paths to public storage URLs", () => {

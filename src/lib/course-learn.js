@@ -1,4 +1,4 @@
-import { resolveAttachmentHref, resolveTrailerUrl } from "@/lib/courses";
+import { resolveAttachmentHref, resolveLessonVideoHref } from "@/lib/courses";
 import {
   BLOCK_TYPES,
   hasVideoContentBlock,
@@ -119,7 +119,8 @@ export function pickVideoMaterial(materials) {
       const url = String(row?.file_url ?? "").toLowerCase();
       return (
         Boolean(row?.file_url) &&
-        (url.includes("course-trailers") ||
+        (url.includes("course-videos") ||
+          url.includes("course-trailers") ||
           url.includes("trailer") ||
           /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url))
       );
@@ -143,20 +144,37 @@ export function pickAttachmentMaterial(materials) {
   );
 }
 
-async function withAttachmentDownloadUrls(supabase, blocks) {
+function storedBlockUrl(block) {
+  const value = String(block?.url ?? "").trim();
+  if (!value || value.startsWith("blob:") || value.startsWith("data:")) {
+    return null;
+  }
+  return value;
+}
+
+/**
+ * Attach short-lived URLs for private Storage objects (attachments and
+ * sub-lesson videos). Only reached after the page verified enrollment.
+ */
+async function withSignedBlockMedia(supabase, blocks) {
   return Promise.all(
     (blocks ?? []).map(async (block) => {
-      if (block?.type !== BLOCK_TYPES.ATTACHMENT || !block.url) {
+      const value = storedBlockUrl(block);
+      if (!value) {
         return block;
       }
 
-      const value = String(block.url).trim();
-      if (!value || value.startsWith("blob:") || value.startsWith("data:")) {
-        return block;
+      if (block.type === BLOCK_TYPES.ATTACHMENT) {
+        const downloadUrl = await resolveAttachmentHref(supabase, value);
+        return downloadUrl ? { ...block, downloadUrl } : block;
       }
 
-      const downloadUrl = await resolveAttachmentHref(supabase, value);
-      return downloadUrl ? { ...block, downloadUrl } : block;
+      if (block.type === BLOCK_TYPES.VIDEO) {
+        const playbackUrl = await resolveLessonVideoHref(supabase, value);
+        return playbackUrl ? { ...block, playbackUrl } : block;
+      }
+
+      return block;
     }),
   );
 }
@@ -208,12 +226,9 @@ export async function getSubLessonLearningContent(
     attachmentMaterial?.name ?? "",
     attachmentMaterial?.file_type ?? "",
   );
-  const blocksWithDownloadUrls = await withAttachmentDownloadUrls(
-    supabase,
-    blocks,
-  );
-  const description = serializeSubLessonContent(blocksWithDownloadUrls);
-  const hasBlockVideo = hasVideoContentBlock(blocksWithDownloadUrls);
+  const signedBlocks = await withSignedBlockMedia(supabase, blocks);
+  const description = serializeSubLessonContent(signedBlocks);
+  const hasBlockVideo = hasVideoContentBlock(signedBlocks);
 
   return {
     title: subLesson.title ?? "",
@@ -221,7 +236,7 @@ export async function getSubLessonLearningContent(
     videoUrl:
       hasBlockVideo || !videoMaterial?.file_url
         ? null
-        : resolveTrailerUrl(videoMaterial.file_url),
+        : await resolveLessonVideoHref(supabase, videoMaterial.file_url),
     videoName: hasBlockVideo ? "" : (videoMaterial?.name ?? ""),
   };
 }
