@@ -65,6 +65,26 @@ describe("upload media type and size validation", () => {
     expect(result.message).toMatch(/exceeds max size of 20 MB/i);
   });
 
+  it("accepts valid lessonVideo mp4 under size limit", () => {
+    const file = makeFile({
+      name: "lesson.mp4",
+      type: "video/mp4",
+      sizeBytes: 2048,
+    });
+    const result = validateUpload("lessonVideo", file);
+
+    expect(result.ok).toBe(true);
+    expect(result.config.bucket).toBe("course-videos");
+  });
+
+  it("rejects unsupported lessonVideo mime type", () => {
+    const file = makeFile({ name: "clip.webm", type: "video/webm" });
+    const result = validateUpload("lessonVideo", file);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/unsupported file type/i);
+  });
+
   it("accepts valid cover jpeg under size limit", () => {
     const file = makeFile({
       name: "ok.jpg",

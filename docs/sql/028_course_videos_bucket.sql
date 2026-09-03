@@ -10,7 +10,26 @@
 --
 -- Requires private.is_admin() / private.is_active_user() from
 -- docs/sql/007_admin_course_media_rls.sql.
--- Apply in Supabase Dashboard → SQL Editor (or via linked CLI).
+--
+-- HOW TO APPLY (prefer Dashboard for this project):
+-- The SQL Editor postgres role often cannot CREATE POLICY on storage.objects
+-- (owned by supabase_storage_admin → error 42501). Prefer:
+--
+--   1. Storage → New bucket
+--      - Name: course-videos
+--      - Public: OFF
+--      - Size limit: 20 MB
+--      - MIME: video/mp4, video/quicktime, video/x-msvideo, video/avi
+--   2. Policies on course-videos (role = authenticated for all):
+--      - Admin INSERT  → bucket_id = 'course-videos' AND private.is_admin()
+--      - Admin UPDATE  → same (UI may auto-add SELECT)
+--      - Admin DELETE  → same (UI may auto-add SELECT)
+--      - User SELECT   → bucket_id = 'course-videos' AND private.is_active_user()
+--
+-- The statements below are a reference / fallback when the linked role can
+-- manage storage.objects. Skip them if you already created the bucket and
+-- policies in the Dashboard — do not re-run DROP POLICY on the shared
+-- admin_* policies unless you intend to rewrite them.
 
 begin;
 
@@ -29,10 +48,7 @@ set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
-alter table storage.objects enable row level security;
-
--- Read: signed URLs only. The learn page checks enrollment before signing, and
--- the object path is never handed to the client.
+-- Read: signed URLs only. The learn page checks enrollment before signing.
 drop policy if exists "course_videos_authenticated_read" on storage.objects;
 create policy "course_videos_authenticated_read"
 on storage.objects for select
@@ -43,6 +59,8 @@ using (
 );
 
 -- Extend the admin write policies from 007 to cover the new bucket.
+-- WARNING: these DROP + recreate the shared admin_* policies. If you already
+-- created per-bucket policies in the Dashboard, skip this section.
 drop policy if exists "admin_insert_course_media" on storage.objects;
 create policy "admin_insert_course_media"
 on storage.objects for insert
