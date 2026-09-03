@@ -29,6 +29,9 @@
 /docs/superpowers/
 .superpowers/
 
+# local interview notes — not for GitHub
+/docs/interview/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
