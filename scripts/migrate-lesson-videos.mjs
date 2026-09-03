@@ -15,6 +15,10 @@
  *   node --env-file=.env.local scripts/migrate-lesson-videos.mjs            # dry run
  *   node --env-file=.env.local scripts/migrate-lesson-videos.mjs --apply
  *   node --env-file=.env.local scripts/migrate-lesson-videos.mjs --apply --delete-source
+ *
+ * After a prior --apply, --apply --delete-source still removes leftover
+ * duplicates from course-trailers (paths that already exist in course-videos,
+ * excluding real marketing trailers).
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -145,7 +149,22 @@ async function main() {
   console.log(`sub_lessons rows to rewrite: ${subLessonUpdates.length}`);
   console.log(`materials rows to rewrite: ${materialUpdates.length}`);
 
+  // After a previous --apply, DB paths already point at course-videos. In that
+  // case --delete-source still cleans leftover copies from course-trailers.
   if (paths.length === 0) {
+    if (deleteSource && apply) {
+      await deleteLeftoverSources(trailerPaths);
+      console.log("Done.");
+      return;
+    }
+
+    if (deleteSource && !apply) {
+      console.log(
+        "Dry run: pass --apply --delete-source to remove leftover copies from course-trailers.",
+      );
+      return;
+    }
+
     console.log("Nothing to do.");
     return;
   }
@@ -212,24 +231,85 @@ async function main() {
 
   if (deleteSource) {
     const removable = copied.filter((path) => !trailerPaths.has(path));
-    if (removable.length > 0) {
-      const { error } = await supabase.storage
-        .from(SOURCE_BUCKET)
-        .remove(removable);
-
-      if (error) {
-        console.error(`  FAILED delete from ${SOURCE_BUCKET}: ${error.message}`);
-      } else {
-        console.log(`Deleted ${removable.length} source objects.`);
-      }
-    }
+    await removeSourcePaths(removable);
   } else {
     console.log(
-      `Left ${copiedSet.size} objects in ${SOURCE_BUCKET}. Re-run with --delete-source once playback is verified.`,
+      `Left ${copiedSet.size} objects in ${SOURCE_BUCKET}. Re-run with --apply --delete-source once playback is verified.`,
     );
   }
 
   console.log("Done.");
+}
+
+/** List every object path under a storage bucket (recursive). */
+async function listAllObjectPaths(bucket) {
+  const paths = [];
+  const queue = [""];
+
+  while (queue.length > 0) {
+    const prefix = queue.shift();
+    const { data, error } = await supabase.storage.from(bucket).list(prefix, {
+      limit: 1000,
+    });
+
+    if (error) {
+      throw new Error(`Failed to list ${bucket}/${prefix}: ${error.message}`);
+    }
+
+    for (const entry of data ?? []) {
+      const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      // Folders have id === null in Storage list responses.
+      if (entry.id === null) {
+        queue.push(fullPath);
+      } else {
+        paths.push(fullPath);
+      }
+    }
+  }
+
+  return paths;
+}
+
+async function removeSourcePaths(paths) {
+  if (paths.length === 0) {
+    console.log(`No leftover objects to delete from ${SOURCE_BUCKET}.`);
+    return;
+  }
+
+  const { error } = await supabase.storage.from(SOURCE_BUCKET).remove(paths);
+
+  if (error) {
+    console.error(`  FAILED delete from ${SOURCE_BUCKET}: ${error.message}`);
+    return;
+  }
+
+  console.log(`Deleted ${paths.length} source objects from ${SOURCE_BUCKET}.`);
+}
+
+/**
+ * Remove course-trailers copies that already exist in course-videos, without
+ * touching real marketing trailers referenced by courses.video_trailer_url.
+ */
+async function deleteLeftoverSources(trailerPaths) {
+  const [targetPaths, sourcePaths] = await Promise.all([
+    listAllObjectPaths(TARGET_BUCKET),
+    listAllObjectPaths(SOURCE_BUCKET),
+  ]);
+
+  const inTarget = new Set(targetPaths);
+  const removable = sourcePaths.filter(
+    (path) => inTarget.has(path) && !trailerPaths.has(path),
+  );
+
+  console.log(
+    `Leftover duplicates in ${SOURCE_BUCKET} (also in ${TARGET_BUCKET}): ${removable.length}`,
+  );
+
+  for (const path of removable) {
+    console.log(`  delete ${SOURCE_BUCKET}/${path}`);
+  }
+
+  await removeSourcePaths(removable);
 }
 
 main().catch((error) => {
