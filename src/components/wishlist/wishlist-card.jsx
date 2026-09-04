@@ -150,10 +150,15 @@ export function WishlistCard({
     router.push(`/courses/${encodeURIComponent(code || id)}`);
   }
 
+  // `w-full` is what keeps every card the same size. Every consumer renders the
+  // card inside a `display:flex` cell, where a flex item sizes to its content on
+  // the main axis — so a card with little text collapsed to a narrower box,
+  // which in turn shrank its aspect-ratio thumbnail and pulled the price and
+  // meta rows upward. Stretch only ever equalised height, never width.
   return (
     <Link
       href={href || `/courses/${encodeURIComponent(code || id)}`}
-      className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="group relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       {/* Course Cover Image */}
       <div className="relative aspect-16/10 w-full overflow-hidden bg-blue-100">
@@ -207,21 +212,31 @@ export function WishlistCard({
       {/* Card Content */}
       <div className="flex flex-1 flex-col p-6">
         <p className="text-body3 font-medium text-orange-500">Course</p>
-        <h2 className="mt-1 text-headline3 font-medium text-black transition-colors group-hover:text-blue-500 line-clamp-1">
+        {/*
+          Both text blocks clamp to 2 lines AND reserve those 2 lines, so a
+          one-word title sits in the same box as a wrapping one and everything
+          below stays aligned. `2lh` is exactly two line boxes of each element's
+          own computed line-height, so the reserve tracks the type tokens (and
+          `leading-relaxed` here) without hard-coded pixels.
+        */}
+        <h2 className="mt-1 line-clamp-2 min-h-[2lh] text-headline3 font-medium text-black transition-colors group-hover:text-blue-500">
           {title}
         </h2>
-        {displayDescription ? (
-          <p className="mt-2 text-body3 leading-relaxed text-gray-700 line-clamp-2">
-            {displayDescription}
-          </p>
-        ) : null}
+        {/* Always rendered — an absent summary must still hold its space. */}
+        <p className="mt-2 line-clamp-2 min-h-[2lh] text-body3 leading-relaxed text-gray-700">
+          {displayDescription}
+        </p>
 
+        {/*
+          Fixed-height slot so the price variant and the progress variant end at
+          the same offset, keeping the divider and meta row aligned everywhere.
+        */}
         {progress === undefined ? (
-          <p className="mt-4 text-headline3 font-medium text-gray-900">
+          <p className="mt-4 flex min-h-10 items-end text-headline3 font-medium text-gray-900">
             THB {formatPrice(price)}
           </p>
         ) : (
-          <div className="mt-4">
+          <div className="mt-4 flex min-h-10 flex-col justify-end">
             <p className="text-body3 font-medium text-black">
               {displayProgress}% Complete
             </p>

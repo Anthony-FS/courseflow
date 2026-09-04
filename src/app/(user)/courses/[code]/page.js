@@ -67,7 +67,10 @@ export default async function CourseDetailPage({ params }) {
     excludeCourseId: course.id,
     enrolledCourseIds,
     tagId: course.tagId,
-    limit: 3,
+    limit: 9,
+    // Suggestions must genuinely share this course's tag, so show fewer (or
+    // none) rather than padding the carousel with unrelated courses.
+    strictTag: true,
   });
   const loginHref = `/login?next=/courses/${encodeURIComponent(course.courseCode || code)}`;
 

@@ -447,9 +447,24 @@ export async function getCatalogCourses(
   };
 }
 
+/**
+ * Suggested courses for the course detail page.
+ *
+ * By default this prefers same-tag courses and tops the list up with other
+ * active courses so the section always fills `limit` slots. Pass
+ * `strictTag: true` to return same-tag courses only (returning fewer than
+ * `limit`, or none, rather than filling with unrelated courses).
+ */
 export async function getOtherInterestingCourses(
   supabase,
-  { excludeCourseId, userId, enrolledCourseIds, tagId, limit = 3 } = {},
+  {
+    excludeCourseId,
+    userId,
+    enrolledCourseIds,
+    tagId,
+    limit = 3,
+    strictTag = false,
+  } = {},
 ) {
   if (!supabase) {
     return [];
@@ -523,7 +538,7 @@ export async function getOtherInterestingCourses(
     if (id) excludeIds.add(id);
   }
 
-  const remaining = Math.max(0, limit - sameTagRows.length);
+  const remaining = strictTag ? 0 : Math.max(0, limit - sameTagRows.length);
   const fillRows =
     remaining > 0
       ? await fetchCandidates({ matchTag: false, take: remaining })
