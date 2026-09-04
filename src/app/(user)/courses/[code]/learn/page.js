@@ -15,6 +15,7 @@ import {
   resolveActiveSubLesson,
 } from "@/lib/course-learn";
 import { getCourseProgress } from "@/lib/course-learn-progress";
+import { LEARN_CONTENT_PANE_ID } from "@/lib/course-learn-scroll";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
 import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
@@ -145,7 +146,10 @@ export default async function CourseLearnPage({ params, searchParams }) {
           initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 justify-center lg:overflow-y-auto lg:overscroll-y-none">
+        <div
+          id={LEARN_CONTENT_PANE_ID}
+          className="flex min-h-0 min-w-0 flex-1 justify-center lg:overflow-y-auto lg:overscroll-y-none"
+        >
           <div className="w-full max-w-3xl flex-1 xl:max-w-4xl">
             <LessonContent
               title={subLessonContent?.title ?? active.title}
