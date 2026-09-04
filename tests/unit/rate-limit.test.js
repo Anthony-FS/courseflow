@@ -6,8 +6,14 @@ import {
   CATALOG_RATE_WINDOW_MS,
   ADMIN_SEARCH_RATE_LIMIT,
   ADMIN_SEARCH_RATE_WINDOW_MS,
+  AUTH_REGISTER_RATE_LIMIT,
+  AUTH_REGISTER_RATE_WINDOW_MS,
+  ADMIN_ASSIGNMENT_CREATE_RATE_LIMIT,
+  ADMIN_ASSIGNMENT_CREATE_RATE_WINDOW_MS,
   catalogRateLimitKey,
   adminSearchRateLimitKey,
+  authRegisterRateLimitKey,
+  adminAssignmentCreateRateLimitKey,
   checkRateLimit,
   getClientIp,
   resetRateLimitStore,
@@ -107,5 +113,19 @@ describe("checkRateLimit", () => {
     expect(adminSearchRateLimitKey("8.8.8.8")).toBe("admin-search:8.8.8.8");
     expect(ADMIN_SEARCH_RATE_LIMIT).toBe(120);
     expect(ADMIN_SEARCH_RATE_WINDOW_MS).toBe(60_000);
+  });
+
+  it("uses a stricter auth register key and window", () => {
+    expect(authRegisterRateLimitKey("8.8.8.8")).toBe("auth-register:8.8.8.8");
+    expect(AUTH_REGISTER_RATE_LIMIT).toBe(5);
+    expect(AUTH_REGISTER_RATE_WINDOW_MS).toBe(15 * 60_000);
+  });
+
+  it("uses a per-admin assignment create key and window", () => {
+    expect(adminAssignmentCreateRateLimitKey("admin-1")).toBe(
+      "admin-assignment-create:admin-1",
+    );
+    expect(ADMIN_ASSIGNMENT_CREATE_RATE_LIMIT).toBe(20);
+    expect(ADMIN_ASSIGNMENT_CREATE_RATE_WINDOW_MS).toBe(15 * 60_000);
   });
 });

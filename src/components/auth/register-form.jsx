@@ -17,14 +17,12 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { registerGuest } from "@/lib/register-guest";
 import {
   hasRegisterErrors,
-  todayIsoDate,
+  latestAdultDobIsoDate,
   validateAll,
   validateField,
 } from "@/lib/register-validation";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const EMPTY_VALUES = {
@@ -165,16 +163,22 @@ export function RegisterForm() {
     setSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const result = await registerGuest(supabase, values);
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json().catch(() => ({}));
 
       if (result.errors) {
         setErrors(result.errors);
         return;
       }
 
-      if (result.error) {
-        setSubmitError(result.error);
+      if (!response.ok) {
+        setSubmitError(
+          result.error || "Registration failed. Please try again.",
+        );
         return;
       }
 
@@ -197,7 +201,7 @@ export function RegisterForm() {
       onSubmit={handleSubmit}
       noValidate
     >
-      <h1 className="text-center text-headline3 text-blue-800">
+      <h1 className="text-center text-headline3 text-[#22269E]">
         Register to start learning!
       </h1>
 
@@ -226,7 +230,7 @@ export function RegisterForm() {
             value={values.dob}
             error={errors.dob}
             disabled={submitting}
-            max={todayIsoDate()}
+            max={latestAdultDobIsoDate()}
             showCalendar
             onChange={(event) => updateField("dob", event.target.value)}
             onBlur={(event) => handleBlur("dob", event.target.value)}

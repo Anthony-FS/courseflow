@@ -4,6 +4,20 @@ export function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function latestAdultDobIsoDate() {
+  const [year, month, day] = todayIsoDate().split("-").map(Number);
+  const latest = new Date(year - 18, month - 1, day);
+
+  if (latest.getMonth() !== month - 1) {
+    latest.setDate(0);
+  }
+
+  const yyyy = String(latest.getFullYear()).padStart(4, "0");
+  const mm = String(latest.getMonth() + 1).padStart(2, "0");
+  const dd = String(latest.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function ageInYears(dobIso) {
   const [year, month, day] = dobIso.split("-").map(Number);
   const [todayYear, todayMonth, todayDay] = todayIsoDate()
