@@ -12,6 +12,8 @@ export const ADMIN_SEARCH_RATE_LIMIT = 120;
 export const ADMIN_SEARCH_RATE_WINDOW_MS = 60_000;
 export const AUTH_REGISTER_RATE_LIMIT = 5;
 export const AUTH_REGISTER_RATE_WINDOW_MS = 15 * 60_000;
+export const AUTH_FORGOT_PASSWORD_RATE_LIMIT = 1;
+export const AUTH_FORGOT_PASSWORD_RATE_WINDOW_MS = 60_000;
 export const ADMIN_ASSIGNMENT_CREATE_RATE_LIMIT = 20;
 export const ADMIN_ASSIGNMENT_CREATE_RATE_WINDOW_MS = 15 * 60_000;
 
@@ -47,13 +49,20 @@ export function authRegisterRateLimitKey(ip) {
   return `auth-register:${ip || "unknown"}`;
 }
 
+export function authForgotPasswordRateLimitKey(ip, email) {
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
+  return `auth-forgot-password:${ip || "unknown"}:${normalizedEmail || "unknown"}`;
+}
+
 export function adminAssignmentCreateRateLimitKey(adminId) {
   return `admin-assignment-create:${adminId || "unknown"}`;
 }
 
 export function checkRateLimit(
   key,
-  { limit, windowMs, now = Date.now() } = {},
+  { limit, windowMs, now = Date.now(), dryRun = false } = {},
 ) {
   const max = Number(limit);
   const window = Number(windowMs);
@@ -76,8 +85,13 @@ export function checkRateLimit(
     };
   }
 
-  timestamps.push(now);
-  buckets.set(key, timestamps);
+  if (!dryRun) {
+    timestamps.push(now);
+    buckets.set(key, timestamps);
+  } else {
+    buckets.set(key, timestamps);
+  }
+
   return { allowed: true, retryAfterSec: 0 };
 }
 
