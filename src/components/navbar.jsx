@@ -30,7 +30,7 @@ export default async function Navbar() {
           aria-label="Main navigation"
         >
           <Link
-            className="font-medium text-body2 text-blue-700 max-[760px]:hidden"
+            className="font-bold text-body2 text-blue-700 max-[760px]:hidden"
             href="/courses"
           >
             Our Courses
@@ -59,7 +59,7 @@ export default async function Navbar() {
           )}
         </nav>
         <div className="hidden items-center gap-4 max-[760px]:flex">
-          <Link className="font-medium text-body2 text-blue-700" href="/courses">
+          <Link className="font-bold text-body2 text-blue-700" href="/courses">
             Our Courses
           </Link>
           {user ? (
