@@ -798,7 +798,7 @@ export function PaymentForm({ course }) {
         </dl>
 
         {checkoutError ? (
-          <p className="mt-4 text-body4 text-orange-500" role="alert">
+          <p className="mt-4 text-body2 font-medium text-red-600" role="alert">
             {checkoutError}
           </p>
         ) : checkoutMessage ? (
