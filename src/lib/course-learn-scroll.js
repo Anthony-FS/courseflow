@@ -1,6 +1,5 @@
 export const LEARN_LESSON_CONTENT_ID = "learn-lesson-content";
-
-const SCROLL_INTENT_KEY = "courseflow:scroll-to-lesson-content";
+export const LEARN_CONTENT_PANE_ID = "learn-content-pane";
 
 export function isMobileLearnLayout() {
   if (typeof window === "undefined") {
@@ -10,25 +9,27 @@ export function isMobileLearnLayout() {
   return window.matchMedia("(max-width: 1023px)").matches;
 }
 
-export function markScrollToLessonContentIntent() {
+/**
+ * The learn shell locks document scroll, so the window is never what moves.
+ * Desktop scrolls the content pane; mobile scrolls the outer wrapper that
+ * stacks the sidebar above the content. Reset only the lesson content — the
+ * sidebar keeps its own scroll position.
+ */
+export function resetLessonContentScroll() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const pane = document.getElementById(LEARN_CONTENT_PANE_ID);
+  if (pane) {
+    pane.scrollTop = 0;
+  }
+
   if (!isMobileLearnLayout()) {
     return;
   }
 
-  sessionStorage.setItem(SCROLL_INTENT_KEY, "1");
-}
-
-export function consumeScrollToLessonContentIntent() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  if (sessionStorage.getItem(SCROLL_INTENT_KEY) !== "1") {
-    return false;
-  }
-
-  sessionStorage.removeItem(SCROLL_INTENT_KEY);
-  return true;
+  scrollToLessonContent();
 }
 
 export function scrollToLessonContent() {
@@ -37,5 +38,5 @@ export function scrollToLessonContent() {
     return;
   }
 
-  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.scrollIntoView({ behavior: "auto", block: "start" });
 }

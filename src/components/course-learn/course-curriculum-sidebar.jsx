@@ -12,7 +12,6 @@ import {
 } from "@/lib/course-learn";
 import {
   isMobileLearnLayout,
-  markScrollToLessonContentIntent,
   scrollToLessonContent,
 } from "@/lib/course-learn-scroll";
 import { SUB_LESSON_PROGRESS_EVENT } from "@/lib/course-learn-progress";
@@ -197,16 +196,11 @@ function CourseCurriculumSidebar({
                             <Link
                               href={learnSubLessonHref(courseCode, subLesson.id)}
                               onClick={() => {
-                                if (!isMobileLearnLayout()) {
-                                  return;
-                                }
-
-                                if (isActive) {
+                                // Re-clicking the current lesson doesn't change
+                                // the URL, so nothing else would scroll it back.
+                                if (isActive && isMobileLearnLayout()) {
                                   scrollToLessonContent();
-                                  return;
                                 }
-
-                                markScrollToLessonContentIntent();
                               }}
                               className={cn(
                                 "flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 text-body3 text-gray-700 transition-colors",
