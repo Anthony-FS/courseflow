@@ -1,7 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 
-export default function LearningCta() {
+import { getSessionUser } from "@/lib/auth";
+
+export default async function LearningCta() {
+  const { user } = await getSessionUser();
+
   return (
     <section className="relative min-h-125 overflow-hidden bg-linear1" aria-labelledby="learning-cta-title">
       <div className="relative z-1 mx-auto flex min-h-125 w-[calc(100%-3rem)] max-w-280 items-center max-[760px]:flex-col max-[760px]:justify-start max-[760px]:py-12">
@@ -10,10 +14,10 @@ export default function LearningCta() {
             Want to start learning?
           </h2>
           <Link
-            href="/register"
+            href={user ? "/my-courses" : "/register"}
             className="mt-6 inline-flex min-h-15 min-w-42.25 items-center justify-center rounded-[10px] border border-orange-500 bg-white px-8 text-body2 font-medium text-orange-500 transition-colors hover:bg-orange-500 hover:text-white max-[760px]:mt-5"
           >
-            Register here
+            {user ? "Go to My Courses" : "Register here"}
           </Link>
         </div>
 
