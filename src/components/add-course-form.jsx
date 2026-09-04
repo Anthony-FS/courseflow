@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Play, Plus, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  Play,
+  Plus,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { useAddCourseDraft } from "@/components/admin/add-course-draft-content";
@@ -109,29 +116,99 @@ function TextInput({ id, className, error, onChange, hint, ...props }) {
   );
 }
 
-function FieldSelect({ id, className, error, onChange, children, ...props }) {
+/**
+ * Single-select dropdown styled to match the "Courses Included" control on the
+ * promo-code create/edit forms (src/app/admin/promo-codes/*). That control is
+ * inline markup rather than a shared component, so the trigger and menu classes
+ * below are deliberately kept identical to it. It is multi-select (checkboxes);
+ * this field is single-select, so it uses radios and closes on choose — the
+ * appearance is shared, the selection model is not.
+ */
+function FieldTagSelect({ id, name, value, options, onChange, error }) {
   const hasError = Boolean(error);
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    function handleOutsideClick(event) {
+      if (!menuRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const selected = options.find((option) => option.slug === value);
 
   return (
     <div>
-      <select
-        id={id}
-        {...props}
-        aria-invalid={hasError || undefined}
-        aria-describedby={hasError ? `${id}-error` : undefined}
-        onChange={onChange}
-        className={cn(
-          "h-12 min-h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-body3",
-          className,
-        )}
-        style={
-          hasError
-            ? { borderColor: ERROR_COLOR, boxShadow: "none" }
-            : undefined
-        }
-      >
-        {children}
-      </select>
+      <div className="relative" ref={menuRef}>
+        <button
+          type="button"
+          id={id}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          // `aria-invalid` is not valid on role=button; the error below carries
+          // role="alert" and is linked via aria-describedby instead.
+          aria-describedby={hasError ? `${id}-error` : undefined}
+          onClick={() => setIsOpen((open) => !open)}
+          className={`relative flex min-h-12 w-full items-center rounded-lg border bg-white px-3 pr-12 text-left text-body2 outline-none focus:border-orange-100 ${
+            isOpen ? "border-orange-100" : "border-gray-400"
+          }`}
+          style={hasError ? { borderColor: ERROR_COLOR } : undefined}
+        >
+          <span>{selected?.name}</span>
+          {isOpen ? (
+            <ChevronUp
+              aria-hidden="true"
+              className="pointer-events-none absolute right-4 size-4 text-gray-500"
+            />
+          ) : (
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-4 size-4 text-gray-500"
+            />
+          )}
+        </button>
+
+        {isOpen ? (
+          <div className="absolute z-20 mt-3 max-h-80 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-card">
+            {options.map((option) => (
+              <label
+                key={option.slug}
+                className="flex cursor-pointer items-center gap-3 px-2 py-2 text-gray-700"
+              >
+                <input
+                  type="radio"
+                  name={name}
+                  value={option.slug}
+                  checked={option.slug === value}
+                  onChange={() => {
+                    onChange(option.slug);
+                    setIsOpen(false);
+                  }}
+                  className="size-5 accent-blue-500"
+                />
+                <span>{option.name}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
       <FieldError id={`${id}-error`} message={error} />
     </div>
   );
@@ -787,20 +864,14 @@ function AddCourseForm({
               <FieldLabel htmlFor="course-tag" required>
                 Tag
               </FieldLabel>
-              <FieldSelect
+              <FieldTagSelect
                 id="course-tag"
                 name="tag"
                 value={values.tag || DEFAULT_COURSE_TAG}
-                required
-                onChange={(event) => updateField("tag", event.target.value)}
+                options={COURSE_TAG_OPTIONS}
+                onChange={(slug) => updateField("tag", slug)}
                 error={errors.tag}
-              >
-                {COURSE_TAG_OPTIONS.map((option) => (
-                  <option key={option.slug} value={option.slug}>
-                    {option.name}
-                  </option>
-                ))}
-              </FieldSelect>
+              />
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
