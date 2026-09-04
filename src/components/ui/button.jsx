@@ -5,7 +5,7 @@ import { Slot } from "radix-ui";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium outline-none select-none transition-[background-color,border-color,color,box-shadow] duration-300 ease-out focus-visible:shadow-focus disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-medium outline-none select-none transition-[background-color,border-color,color,box-shadow] duration-300 ease-out focus-visible:shadow-focus disabled:pointer-events-none disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -19,6 +19,8 @@ const buttonVariants = cva(
           "rounded-[12px] border border-border bg-background px-8 py-[18px] text-body2 text-foreground hover:bg-muted",
         destructive:
           "rounded-[12px] border border-transparent bg-destructive/10 px-8 py-[18px] text-body2 text-destructive hover:bg-destructive/20",
+        danger:
+          "rounded-[12px] border border-transparent bg-red-500 px-8 py-[18px] text-body2 text-white shadow-button hover:bg-red-600 active:bg-red-700 disabled:bg-gray-400 disabled:text-gray-600 disabled:shadow-none",
         link: "text-blue-500 underline-offset-4 hover:underline",
       },
       size: {

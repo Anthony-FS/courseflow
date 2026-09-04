@@ -1,0 +1,43 @@
+<svg width="520" height="420" viewBox="0 0 520 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img">
+  <!-- CourseFlow status illustration: flat vector, brand palette, matching the landing page treatment -->
+  <defs>
+    <linearGradient id="cf-blob" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5697ff"/>
+      <stop offset="100%" stop-color="#2558dd"/>
+    </linearGradient>
+  </defs>
+
+  <!-- soft background blob -->
+  <ellipse cx="260" cy="232" rx="214" ry="166" fill="#e5ecf8"/>
+
+  <!-- floating geometric decorations (echo the landing page's circles/plus/triangle) -->
+  <circle cx="48" cy="96" r="24" fill="#c6d6ef"/>
+  <circle cx="474" cy="330" r="16" fill="#8dade0"/>
+  <circle cx="432" cy="72" r="10" fill="url(#cf-blob)"/>
+  <path d="M78 330 l16 28 h-32 z" fill="#fbaa1c"/>
+  <g stroke="#2fac8e" stroke-width="5" stroke-linecap="round">
+    <path d="M446 150 v28"/>
+    <path d="M432 164 h28"/>
+  </g>
+  <g stroke="#a52bb5" stroke-width="4" stroke-linecap="round" opacity="0.7">
+    <path d="M92 196 v20"/>
+    <path d="M82 206 h20"/>
+  </g>
+
+  <!-- document card with folded corner -->
+  <rect x="176" y="86" width="168" height="212" rx="16" fill="#ffffff"/>
+  <path d="M304 86 h24 a16 16 0 0 1 16 16 v24 h-40 z" fill="#c6d6ef"/>
+  <g fill="#e4e6ed">
+    <rect x="204" y="216" width="112" height="12" rx="6"/>
+    <rect x="204" y="244" width="76" height="12" rx="6"/>
+  </g>
+
+  <!-- magnifying glass over the card -->
+  <circle cx="260" cy="166" r="46" fill="none" stroke="#2f5fac" stroke-width="12"/>
+  <circle cx="260" cy="166" r="34" fill="#f6f7fc"/>
+  <path d="M294 200 l34 34" stroke="#2f5fac" stroke-width="16" stroke-linecap="round"/>
+  <path d="M246 152 l28 28 M274 152 l-28 28" stroke="#f47e20" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- ground shadow -->
+  <ellipse cx="260" cy="322" rx="104" ry="14" fill="#c6d6ef" opacity="0.55"/>
+</svg>

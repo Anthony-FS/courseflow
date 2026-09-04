@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="96" viewBox="0 0 160 96" role="img" aria-label="Software developer course cover">
+  <rect width="160" height="96" fill="#183056"/>
+  <rect x="24" y="16" width="112" height="64" rx="6" fill="#2A2E3F"/>
+  <rect x="32" y="24" width="96" height="40" rx="3" fill="#020D1E"/>
+  <rect x="40" y="32" width="36" height="4" rx="2" fill="#2FAC8E"/>
+  <rect x="40" y="42" width="64" height="4" rx="2" fill="#5483D0"/>
+  <rect x="40" y="52" width="48" height="4" rx="2" fill="#9AA1B9"/>
+  <rect x="60" y="80" width="40" height="6" rx="2" fill="#424C6B"/>
+</svg>
