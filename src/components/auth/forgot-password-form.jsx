@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { buildRecoveryRedirectUrl } from "@/lib/auth-recovery";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-const SUCCESS_MESSAGE =
-  "If an account exists for this email, you will receive a password reset link shortly.";
+const COOLDOWN_SEC = 60;
+const COOLDOWN_STORAGE_PREFIX = "forgot-password-cooldown:";
+
+function buildSuccessMessage(email) {
+  return `We've sent a password reset link to ${email}. Click the link in the email to set a new password.`;
+}
 
 function validateEmail(email) {
   const value = email.trim();
@@ -23,6 +26,37 @@ function validateEmail(email) {
   }
 
   return "";
+}
+
+function cooldownStorageKey(email) {
+  return `${COOLDOWN_STORAGE_PREFIX}${email.trim().toLowerCase()}`;
+}
+
+function readRemainingCooldown(email) {
+  if (typeof window === "undefined" || !email.trim()) {
+    return 0;
+  }
+
+  try {
+    const raw = sessionStorage.getItem(cooldownStorageKey(email));
+    if (!raw) return 0;
+    const endsAt = Number(raw);
+    if (!Number.isFinite(endsAt)) return 0;
+    return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+  } catch {
+    return 0;
+  }
+}
+
+function persistCooldown(email, seconds = COOLDOWN_SEC) {
+  try {
+    sessionStorage.setItem(
+      cooldownStorageKey(email),
+      String(Date.now() + seconds * 1000),
+    );
+  } catch {
+    // Ignore storage failures (private mode, etc.).
+  }
 }
 
 function FieldErrorIcon() {
@@ -53,6 +87,24 @@ export function ForgotPasswordForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    setCooldown(readRemainingCooldown(email));
+  }, [email]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+
+    const timerId = window.setInterval(() => {
+      setCooldown((seconds) => {
+        if (seconds <= 1) return 0;
+        return seconds - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [cooldown]);
 
   function handleEmailChange(event) {
     const value = event.target.value;
@@ -62,6 +114,12 @@ export function ForgotPasswordForm() {
     if (submitted) {
       setEmailError(validateEmail(value));
     }
+  }
+
+  function startCooldown(seconds = COOLDOWN_SEC) {
+    const next = Math.max(1, Number(seconds) || COOLDOWN_SEC);
+    persistCooldown(email, next);
+    setCooldown(next);
   }
 
   async function handleSubmit(event) {
@@ -76,22 +134,47 @@ export function ForgotPasswordForm() {
       return;
     }
 
+    const remaining = readRemainingCooldown(email);
+    if (remaining > 0) {
+      setCooldown(remaining);
+      setFormError(`Please wait ${remaining}s before requesting another reset link.`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const redirectTo = buildRecoveryRedirectUrl(window.location.origin);
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo,
+      const trimmedEmail = email.trim().toLowerCase();
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          redirectTo: buildRecoveryRedirectUrl(window.location.origin),
+        }),
       });
 
-      if (error) {
-        setFormError("Unable to send reset email. Please try again.");
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers.get("Retry-After")) || COOLDOWN_SEC;
+        startCooldown(retryAfter);
+        setFormError(
+          data?.error || "Please wait before requesting another reset link.",
+        );
         return;
       }
 
-      // Same message whether or not the account exists (anti-enumeration).
-      setSuccessMessage(SUCCESS_MESSAGE);
+      if (!response.ok) {
+        setFormError(
+          data?.error || "Unable to send reset email. Please try again.",
+        );
+        return;
+      }
+
+      const cooldownSec = Number(data?.cooldownSec) || COOLDOWN_SEC;
+      startCooldown(cooldownSec);
+      setSuccessMessage(buildSuccessMessage(data?.email || trimmedEmail));
     } catch {
       setFormError("Unable to send reset email. Please try again.");
     } finally {
@@ -100,6 +183,7 @@ export function ForgotPasswordForm() {
   }
 
   const emailInvalid = Boolean(emailError);
+  const submitDisabled = isSubmitting || cooldown > 0;
 
   return (
     <form
@@ -151,13 +235,21 @@ export function ForgotPasswordForm() {
         ) : null}
 
         {successMessage ? (
-          <p className="text-body3 text-gray-700" aria-live="polite">
+          <p
+            className="rounded-[8px] border border-green-200 bg-green-50 px-3 py-2 text-body3 text-green-800"
+            role="status"
+            aria-live="polite"
+          >
             {successMessage}
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full rounded-[12px]" disabled={isSubmitting}>
-          {isSubmitting ? "Sending..." : "Send reset link"}
+        <Button type="submit" className="w-full rounded-[12px]" disabled={submitDisabled}>
+          {isSubmitting
+            ? "Sending..."
+            : cooldown > 0
+              ? `Resend in ${cooldown}s`
+              : "Send reset link"}
         </Button>
       </div>
 
