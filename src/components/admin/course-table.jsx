@@ -117,6 +117,9 @@ export function CourseTable({
                 Course name
               </th>
               <th scope="col" className="px-6 py-3 font-medium">
+                Tag
+              </th>
+              <th scope="col" className="px-6 py-3 font-medium">
                 Lesson
               </th>
               <th scope="col" className="px-6 py-3 font-medium">
@@ -139,7 +142,7 @@ export function CourseTable({
           <tbody className="text-body2 text-gray-800">
             {courses.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-6 py-10 text-center text-gray-600">
+                <td colSpan={11} className="px-6 py-10 text-center text-gray-600">
                   {emptyMessage}
                 </td>
               </tr>
@@ -163,6 +166,9 @@ export function CourseTable({
                     <td className="px-6 py-4">{course.course_code || "-"}</td>
                     <td className="max-w-60 truncate px-6 py-4" title={course.title}>
                       {course.title}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {course.tag_name || course.tag || "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {course.lesson_count} Lessons

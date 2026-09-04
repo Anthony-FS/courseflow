@@ -25,6 +25,7 @@ import { CourseLessonsSection } from "@/components/course-lessons-section";
 import {
   createAdminCourse,
   getAdminCourse,
+  getAdminCourseTags,
   updateAdminCourse,
   uploadAdminFile,
 } from "@/lib/admin-courses";
@@ -475,6 +476,7 @@ function AddCourseForm({
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadStatus, setLoadStatus] = useState(isEdit ? "loading" : "ready");
+  const [tagOptions, setTagOptions] = useState(COURSE_TAG_OPTIONS);
 
   const promoEnabled = useDraft
     ? draftContent.draft.promoEnabled
@@ -490,6 +492,29 @@ function AddCourseForm({
     : videoTrailerState;
   const attachment = useDraft ? draftContent.draft.attachment : attachmentState;
   const lessons = useDraft ? draftContent.draft.lessons : lessonsState;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTags() {
+      try {
+        const data = await getAdminCourseTags();
+        const tags = Array.isArray(data?.tags) ? data.tags : [];
+        if (!cancelled && tags.length > 0) {
+          setTagOptions(tags);
+        }
+      } catch {
+        if (!cancelled) {
+          setTagOptions(COURSE_TAG_OPTIONS);
+        }
+      }
+    }
+
+    loadTags();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isEdit || !courseId) return undefined;
@@ -868,7 +893,7 @@ function AddCourseForm({
                 id="course-tag"
                 name="tag"
                 value={values.tag || DEFAULT_COURSE_TAG}
-                options={COURSE_TAG_OPTIONS}
+                options={tagOptions}
                 onChange={(slug) => updateField("tag", slug)}
                 error={errors.tag}
               />

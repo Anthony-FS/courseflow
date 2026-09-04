@@ -72,7 +72,7 @@ export function isValidCourseTag(value) {
  */
 export async function resolveCourseTagId(supabase, tagSlug) {
   const slug = normalizeCourseTag(tagSlug);
-  if (!isValidCourseTag(slug)) return null;
+  if (!slug) return null;
 
   const { data, error } = await supabase
     .from("course_tags")
@@ -114,8 +114,6 @@ export function validateCourseFields({
 
   if (isBlank(tag)) {
     errors.tag = EMPTY_FIELD_MESSAGE;
-  } else if (!isValidCourseTag(tag)) {
-    errors.tag = INVALID_COURSE_TAG_MESSAGE;
   }
 
   if (isBlank(price)) {

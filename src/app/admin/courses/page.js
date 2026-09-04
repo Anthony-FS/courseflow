@@ -6,14 +6,17 @@ import { Plus, Search } from "lucide-react";
 
 import { CourseTable } from "@/components/admin/course-table";
 import { CourseStatusFilter } from "@/components/admin/course-status-filter";
+import { CourseTagFilter } from "@/components/admin/course-tag-filter";
 import { AdminPagination } from "@/components/admin/pagination";
 import { SortFilterBar } from "@/components/admin/sort-filter-bar";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
+  getAdminCourseTags,
   getAdminCoursesPage,
   updateAdminCourseStatus,
 } from "@/lib/admin-courses";
+import { COURSE_TAG_OPTIONS } from "@/lib/course-validation";
 import { ITEMS_PER_PAGE, getTotalPages } from "@/lib/pagination";
 
 const COURSE_SORT_OPTIONS = [
@@ -56,6 +59,8 @@ export default function AdminCoursesPage() {
   const [sortBy, setSortBy] = useState("courseCode");
   const [sortDirection, setSortDirection] = useState("asc");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
+  const [tagOptions, setTagOptions] = useState(COURSE_TAG_OPTIONS);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadedPage, setLoadedPage] = useState(1);
   const [statusToggle, setStatusToggle] = useState(null);
@@ -80,6 +85,7 @@ export default function AdminCoursesPage() {
           sortBy,
           sortDirection,
           status: statusFilter,
+          tag: tagFilter,
         });
 
         if (!cancelled) {
@@ -101,7 +107,30 @@ export default function AdminCoursesPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, currentPage, sortBy, sortDirection, statusFilter]);
+  }, [query, currentPage, sortBy, sortDirection, statusFilter, tagFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTags() {
+      try {
+        const data = await getAdminCourseTags();
+        const tags = Array.isArray(data?.tags) ? data.tags : [];
+        if (!cancelled && tags.length > 0) {
+          setTagOptions(tags);
+        }
+      } catch {
+        if (!cancelled) {
+          setTagOptions(COURSE_TAG_OPTIONS);
+        }
+      }
+    }
+
+    loadTags();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const totalPages = getTotalPages(total, ITEMS_PER_PAGE);
 
@@ -118,6 +147,11 @@ export default function AdminCoursesPage() {
 
   function handleStatusFilterChange(nextStatus) {
     setStatusFilter(nextStatus);
+    setCurrentPage(1);
+  }
+
+  function handleTagFilterChange(nextTag) {
+    setTagFilter(nextTag);
     setCurrentPage(1);
   }
 
@@ -186,6 +220,11 @@ export default function AdminCoursesPage() {
               className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-gray-600"
             />
           </label>
+          <CourseTagFilter
+            value={tagFilter}
+            options={tagOptions}
+            onChange={handleTagFilterChange}
+          />
           <CourseStatusFilter
             value={statusFilter}
             onChange={handleStatusFilterChange}

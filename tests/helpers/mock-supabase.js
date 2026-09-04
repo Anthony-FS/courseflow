@@ -205,6 +205,12 @@ export function createMockSupabase({
         limit() {
           return chain;
         },
+        or() {
+          return chain;
+        },
+        range() {
+          return chain;
+        },
         order() {
           return chain;
         },
