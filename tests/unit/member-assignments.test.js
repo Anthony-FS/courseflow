@@ -81,6 +81,7 @@ describe("member assignment mapping", () => {
     expect(mapped).toEqual({
       id: "assignment-1",
       title: "Map a customer journey",
+      courseId: ENROLLED_COURSE_ID,
       courseTitle: "Service Design",
       lessonTitle: "Research",
       subLessonTitle: "Journey maps",
@@ -91,5 +92,16 @@ describe("member assignment mapping", () => {
     expect(mapped).not.toHaveProperty("answer_text");
     expect(mapped).not.toHaveProperty("correctChoice");
     expect(mapped).not.toHaveProperty("correct_choice");
+  });
+
+  it("uses the assignment course_id when the course join is missing", () => {
+    const [mapped] = mapMemberAssignments(
+      [assignmentRow({ course: null })],
+      [],
+      [ENROLLED_COURSE_ID],
+    );
+
+    expect(mapped.courseId).toBe(ENROLLED_COURSE_ID);
+    expect(mapped.courseTitle).toBe("-");
   });
 });

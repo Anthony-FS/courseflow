@@ -48,6 +48,7 @@ export function mapMemberAssignments(rows, submissions, enrolledCourseIds) {
       return {
         id: row.id,
         title: row.title ?? "",
+        courseId: course?.id || row.course_id,
         courseTitle: course?.title ?? "-",
         lessonTitle: lesson?.title ?? "-",
         subLessonTitle: subLesson?.title ?? "-",
