@@ -7,12 +7,15 @@ export function AdminPagination({
   totalPages,
   onPageChange,
   label,
+  disabled = false,
 }) {
   function goToPreviousPage() {
+    if (disabled) return;
     onPageChange(Math.max(1, currentPage - 1));
   }
 
   function goToNextPage() {
+    if (disabled) return;
     onPageChange(Math.min(totalPages, currentPage + 1));
   }
 
@@ -24,7 +27,7 @@ export function AdminPagination({
       <button
         type="button"
         onClick={goToPreviousPage}
-        disabled={currentPage === 1}
+        disabled={disabled || currentPage === 1}
         className="flex size-10 cursor-pointer items-center justify-center rounded-lg border border-gray-300 bg-white disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Previous page"
       >
@@ -38,7 +41,7 @@ export function AdminPagination({
       <button
         type="button"
         onClick={goToNextPage}
-        disabled={currentPage === totalPages}
+        disabled={disabled || currentPage === totalPages}
         className="flex size-10 cursor-pointer items-center justify-center rounded-lg border border-gray-300 bg-white disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Next page"
       >

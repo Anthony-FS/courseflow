@@ -57,6 +57,7 @@ export default function AdminCoursesPage() {
   const [sortDirection, setSortDirection] = useState("asc");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadedPage, setLoadedPage] = useState(1);
   const [statusToggle, setStatusToggle] = useState(null);
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -84,6 +85,7 @@ export default function AdminCoursesPage() {
         if (!cancelled) {
           setCourses(data.courses ?? []);
           setTotal(data.total ?? 0);
+          setLoadedPage(data.page ?? currentPage);
           setStatus("ready");
           setErrorMessage("");
         }
@@ -215,15 +217,17 @@ export default function AdminCoursesPage() {
             isLoading={status === "loading"}
             onToggleStatus={handleToggleStatus}
             togglingCourseId={togglingCourseId}
-            rowOffset={(currentPage - 1) * ITEMS_PER_PAGE}
+            rowOffset={(loadedPage - 1) * ITEMS_PER_PAGE}
           />
         </div>
 
-        {status === "ready" && total > 0 ? (
+        {(status === "ready" || (status === "loading" && courses.length > 0)) &&
+        total > 0 ? (
           <AdminPagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            disabled={status === "loading"}
             label="Course pagination"
           />
         ) : null}
