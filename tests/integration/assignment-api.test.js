@@ -1,12 +1,22 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createMockSupabase, insertsFor } from "../helpers/mock-supabase.js";
+import { jsonError } from "@/lib/api";
 import { EMPTY_FIELD_MESSAGE } from "@/lib/course-validation";
 
 vi.mock("@/lib/auth", () => ({
   requireAdmin: vi.fn(),
 }));
 
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    checkRateLimit: vi.fn(),
+  };
+});
+
 import { requireAdmin } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { POST as createAssignment } from "@/app/api/admin/assignments/route";
 
 const ADMIN_USER = { id: "11111111-1111-1111-1111-111111111111" };
@@ -33,6 +43,54 @@ function mockAdmin(supabase) {
 describe("POST /api/admin/assignments", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    checkRateLimit.mockReturnValue({ allowed: true, retryAfterSec: 0 });
+  });
+
+  it("returns 401 without rate limiting when the caller is not an admin", async () => {
+    const from = vi.fn();
+    requireAdmin.mockResolvedValue({
+      supabase: { from },
+      user: null,
+      error: jsonError("Unauthorized", 401),
+    });
+
+    const response = await postAssignment({
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      subLessonId: "sub-1",
+      title: "Week 1 homework",
+      submissionType: "text",
+      answerText: "A summary",
+    });
+
+    expect(response.status).toBe(401);
+    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 without inserting when the create limit is exceeded", async () => {
+    const from = vi.fn();
+    mockAdmin({ from });
+    checkRateLimit.mockReturnValue({ allowed: false, retryAfterSec: 27 });
+
+    const response = await postAssignment({
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      subLessonId: "sub-1",
+      title: "Week 1 homework",
+      submissionType: "text",
+      answerText: "A summary",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("27");
+    expect(body.error).toMatch(/too many assignment creates/i);
+    expect(from).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      `admin-assignment-create:${ADMIN_USER.id}`,
+      expect.objectContaining({ limit: 20, windowMs: 15 * 60_000 }),
+    );
   });
 
   it("creates a text assignment attached to a sub-lesson", async () => {

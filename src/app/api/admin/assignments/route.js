@@ -1,8 +1,11 @@
 import { requireAdmin } from "@/lib/auth";
 import { jsonError, jsonOk, jsonTooManyRequests } from "@/lib/api";
 import {
+  ADMIN_ASSIGNMENT_CREATE_RATE_LIMIT,
+  ADMIN_ASSIGNMENT_CREATE_RATE_WINDOW_MS,
   ADMIN_SEARCH_RATE_LIMIT,
   ADMIN_SEARCH_RATE_WINDOW_MS,
+  adminAssignmentCreateRateLimitKey,
   adminSearchRateLimitKey,
   checkRateLimit,
   getClientIp,
@@ -92,8 +95,22 @@ function parseAllowedFileTypes(value) {
 }
 
 export async function POST(request) {
-  const { supabase, error } = await requireAdmin();
+  const { supabase, user, error } = await requireAdmin();
   if (error) return error;
+
+  const limited = checkRateLimit(
+    adminAssignmentCreateRateLimitKey(user?.id),
+    {
+      limit: ADMIN_ASSIGNMENT_CREATE_RATE_LIMIT,
+      windowMs: ADMIN_ASSIGNMENT_CREATE_RATE_WINDOW_MS,
+    },
+  );
+  if (!limited.allowed) {
+    return jsonTooManyRequests(
+      limited.retryAfterSec,
+      "Too many assignment creates, try again in a moment",
+    );
+  }
 
   let body;
   try {

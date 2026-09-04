@@ -10,6 +10,10 @@ export const CATALOG_RATE_LIMIT = 60;
 export const CATALOG_RATE_WINDOW_MS = 60_000;
 export const ADMIN_SEARCH_RATE_LIMIT = 120;
 export const ADMIN_SEARCH_RATE_WINDOW_MS = 60_000;
+export const AUTH_REGISTER_RATE_LIMIT = 5;
+export const AUTH_REGISTER_RATE_WINDOW_MS = 15 * 60_000;
+export const ADMIN_ASSIGNMENT_CREATE_RATE_LIMIT = 20;
+export const ADMIN_ASSIGNMENT_CREATE_RATE_WINDOW_MS = 15 * 60_000;
 
 export function getClientIp(request) {
   const forwarded = request?.headers?.get?.("x-forwarded-for");
@@ -37,6 +41,14 @@ export function catalogRateLimitKey(ip) {
 
 export function adminSearchRateLimitKey(ip) {
   return `admin-search:${ip || "unknown"}`;
+}
+
+export function authRegisterRateLimitKey(ip) {
+  return `auth-register:${ip || "unknown"}`;
+}
+
+export function adminAssignmentCreateRateLimitKey(adminId) {
+  return `admin-assignment-create:${adminId || "unknown"}`;
 }
 
 export function checkRateLimit(

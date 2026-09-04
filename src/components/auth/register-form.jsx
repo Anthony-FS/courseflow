@@ -17,14 +17,12 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { registerGuest } from "@/lib/register-guest";
 import {
   hasRegisterErrors,
   latestAdultDobIsoDate,
   validateAll,
   validateField,
 } from "@/lib/register-validation";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const EMPTY_VALUES = {
@@ -165,16 +163,22 @@ export function RegisterForm() {
     setSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const result = await registerGuest(supabase, values);
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json().catch(() => ({}));
 
       if (result.errors) {
         setErrors(result.errors);
         return;
       }
 
-      if (result.error) {
-        setSubmitError(result.error);
+      if (!response.ok) {
+        setSubmitError(
+          result.error || "Registration failed. Please try again.",
+        );
         return;
       }
 
