@@ -58,6 +58,10 @@ function createEnrollmentReadMock({
           query.filters.push({ column, value });
           return chain;
         },
+        in(column, value) {
+          query.filters.push({ column, value });
+          return chain;
+        },
         order(column, options) {
           query.order = { column, options };
           return Promise.resolve({
@@ -113,6 +117,7 @@ describe("GET /api/enrollments", () => {
       ],
       progressRows: [
         {
+          course_id: COURSE_ID,
           sub_lesson_id: "sub-lesson-1",
           visited_at: "2026-08-02T00:00:00Z",
           completed_at: "2026-08-02T00:00:00Z",
@@ -175,6 +180,7 @@ describe("GET /api/enrollments", () => {
 
   it("clamps calculated progress to the 0–100 range", async () => {
     const completed = (id) => ({
+      course_id: COURSE_ID,
       sub_lesson_id: id,
       visited_at: "2026-08-02T00:00:00Z",
       completed_at: "2026-08-02T00:00:00Z",

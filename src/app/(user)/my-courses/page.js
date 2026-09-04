@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 export default async function MyCoursesPage() {
-  const { user } = await getSessionUser();
+  const { user, profile } = await getSessionUser();
 
   if (!user) {
     redirect("/login?next=/my-courses");
@@ -21,12 +21,22 @@ export default async function MyCoursesPage() {
       <main className="relative flex-1 overflow-hidden" aria-label="My Courses">
         <WishlistDecorations />
 
-        <div className="relative z-1 mx-auto w-[calc(100%-3rem)] max-w-280 py-10 sm:py-16">
+        <div className="relative z-1 mx-auto w-[calc(100%-3rem)] max-w-300 py-10 sm:py-16">
           <h1 className="text-center text-headline2 font-medium tracking-[-0.02em] text-black">
             My Courses
           </h1>
 
-          <MyCoursesList />
+          <MyCoursesList
+            member={{
+              displayName:
+                profile?.full_name ||
+                user.user_metadata?.full_name ||
+                user.email ||
+                "User",
+              avatarUrl:
+                profile?.avatar_url || user.user_metadata?.avatar_url || "",
+            }}
+          />
         </div>
       </main>
 

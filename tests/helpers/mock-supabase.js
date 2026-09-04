@@ -248,6 +248,14 @@ export function createMockSupabase({
               data: { id: courseId },
               error: updateErrors[table] ?? null,
             }),
+            maybeSingle: async () => ({
+              data:
+                applyFilters(
+                  selectRows(table),
+                  entry.filters.map((filter) => ({ ...filter, op: "eq" })),
+                )[0] ?? null,
+              error: updateErrors[table] ?? null,
+            }),
           };
         },
         then(onFulfilled, onRejected) {
