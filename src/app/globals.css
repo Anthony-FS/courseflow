@@ -345,6 +345,28 @@
     font-family: inherit;
   }
 
+  :where(
+    button,
+    [type="button"],
+    [type="submit"],
+    [type="reset"],
+    [role="button"],
+    [role="tab"],
+    [role="option"],
+    [role="menuitem"],
+    [role="radio"],
+    [role="checkbox"],
+    [role="switch"],
+    select,
+    summary,
+    input[type="checkbox"],
+    input[type="radio"],
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"])
+  ):not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
   :where(button, input, textarea, select, [role="button"]) {
     -webkit-tap-highlight-color: transparent;
   }
@@ -363,6 +385,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
     gap: 10px;
     border: 1px solid transparent;
     border-radius: 12px;
