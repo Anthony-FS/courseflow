@@ -7,18 +7,26 @@ import {
   MemberAssignmentTable,
   getMemberAssignmentPage,
   memberAssignmentListReducer,
+  uniqueMemberAssignmentCourses,
 } from "@/components/assignments/member-assignment-table";
 
+const SERVICE_DESIGN_ID = "course-service-design";
+const BASIC_PROGRAMMING_ID = "course-basic-programming";
+
 function assignments(count = 23) {
-  return Array.from({ length: count }, (_, index) => ({
-    id: `assignment-${index + 1}`,
-    title: index === 14 ? "Special research" : `Assignment ${String(index + 1).padStart(2, "0")}`,
-    courseTitle: "Service Design",
-    lessonTitle: "Research",
-    subLessonTitle: `Topic ${index + 1}`,
-    status: index % 2 === 0 ? "submitted" : "pending",
-    href: `/courses/service-design/learn?subLessonId=topic-${index + 1}`,
-  }));
+  return Array.from({ length: count }, (_, index) => {
+    const isProgramming = index >= 20;
+    return {
+      id: `assignment-${index + 1}`,
+      title: index === 14 ? "Special research" : `Assignment ${String(index + 1).padStart(2, "0")}`,
+      courseId: isProgramming ? BASIC_PROGRAMMING_ID : SERVICE_DESIGN_ID,
+      courseTitle: isProgramming ? "Basic Programming" : "Service Design",
+      lessonTitle: "Research",
+      subLessonTitle: `Topic ${index + 1}`,
+      status: index % 2 === 0 ? "submitted" : "pending",
+      href: `/courses/service-design/learn?subLessonId=topic-${index + 1}`,
+    };
+  });
 }
 
 function buttonsByLabel(tree) {
@@ -91,8 +99,82 @@ describe("member assignment pagination data", () => {
       }),
     );
 
-    expect(noResults).toContain("No assignments match your search.");
+    expect(noResults).toContain("No assignments match your filters.");
     expect(noResults).not.toContain('aria-label="Assignment pagination"');
+  });
+
+  it("keeps course and status filters when searching and resets the page", () => {
+    const nextState = memberAssignmentListReducer(
+      {
+        query: "",
+        courseId: SERVICE_DESIGN_ID,
+        status: "pending",
+        currentPage: 3,
+      },
+      { type: "search", query: "special" },
+    );
+
+    expect(nextState).toEqual({
+      query: "special",
+      courseId: SERVICE_DESIGN_ID,
+      status: "pending",
+      currentPage: 1,
+    });
+  });
+
+  it("resets to page 1 when the course or status filter changes", () => {
+    const courseState = memberAssignmentListReducer(
+      {
+        query: "research",
+        courseId: "all",
+        status: "all",
+        currentPage: 2,
+      },
+      { type: "course", courseId: BASIC_PROGRAMMING_ID },
+    );
+    const statusState = memberAssignmentListReducer(courseState, {
+      type: "status",
+      status: "submitted",
+    });
+
+    expect(courseState.currentPage).toBe(1);
+    expect(courseState.courseId).toBe(BASIC_PROGRAMMING_ID);
+    expect(statusState).toMatchObject({
+      query: "research",
+      courseId: BASIC_PROGRAMMING_ID,
+      status: "submitted",
+      currentPage: 1,
+    });
+  });
+
+  it("filters by course and status before paginating", () => {
+    const rows = assignments();
+    const byCourse = getMemberAssignmentPage(rows, "", 1, 10, {
+      courseId: BASIC_PROGRAMMING_ID,
+    });
+    const pending = getMemberAssignmentPage(rows, "", 2, 10, {
+      status: "pending",
+    });
+
+    expect(byCourse.filteredAssignments.map((row) => row.id)).toEqual([
+      "assignment-21",
+      "assignment-22",
+      "assignment-23",
+    ]);
+    expect(byCourse.assignments).toHaveLength(3);
+    expect(pending.filteredAssignments.every((row) => row.status === "pending")).toBe(
+      true,
+    );
+    expect(pending.filteredAssignments).toHaveLength(11);
+    expect(pending.assignments).toHaveLength(1);
+    expect(pending.currentPage).toBe(2);
+  });
+
+  it("builds unique course options sorted by title", () => {
+    expect(uniqueMemberAssignmentCourses(assignments())).toEqual([
+      { value: BASIC_PROGRAMMING_ID, label: "Basic Programming" },
+      { value: SERVICE_DESIGN_ID, label: "Service Design" },
+    ]);
   });
 });
 
@@ -136,6 +218,8 @@ describe("MemberAssignmentPagination", () => {
 
     expect(html).toContain("Submitted");
     expect(html).toContain("Pending");
+    expect(html).toContain("All courses");
+    expect(html).toContain("All status");
     expect(html).toContain(">View<");
     expect(html).toContain("/courses/service-design/learn?subLessonId=topic-1");
     expect(html).toContain('aria-label="Assignment pagination"');

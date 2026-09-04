@@ -4,6 +4,10 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useReducer } from "react";
 
+import {
+  MEMBER_ASSIGNMENT_STATUS_OPTIONS,
+  MemberAssignmentSelectFilter,
+} from "@/components/assignments/member-assignment-filters";
 import { MemberAssignmentPagination } from "@/components/assignments/member-assignment-pagination";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -11,6 +15,13 @@ import {
   getTotalPages,
   paginateItems,
 } from "@/lib/pagination";
+
+const INITIAL_LIST_STATE = {
+  query: "",
+  courseId: "all",
+  status: "all",
+  currentPage: 1,
+};
 
 function matchesSearch(assignment, query) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -27,9 +38,42 @@ function matchesSearch(assignment, query) {
     .includes(normalizedQuery);
 }
 
+function matchesCourse(assignment, courseId) {
+  if (!courseId || courseId === "all") return true;
+  return assignment.courseId === courseId;
+}
+
+function matchesStatus(assignment, status) {
+  if (!status || status === "all") return true;
+  return assignment.status === status;
+}
+
+export function uniqueMemberAssignmentCourses(assignments) {
+  const courses = new Map();
+
+  for (const assignment of assignments ?? []) {
+    const courseId = assignment?.courseId;
+    if (!courseId || courses.has(courseId)) continue;
+    courses.set(courseId, {
+      value: courseId,
+      label: assignment.courseTitle || "Untitled course",
+    });
+  }
+
+  return [...courses.values()].sort((left, right) =>
+    left.label.localeCompare(right.label),
+  );
+}
+
 export function memberAssignmentListReducer(state, action) {
   if (action.type === "search") {
-    return { query: action.query, currentPage: 1 };
+    return { ...state, query: action.query, currentPage: 1 };
+  }
+  if (action.type === "course") {
+    return { ...state, courseId: action.courseId, currentPage: 1 };
+  }
+  if (action.type === "status") {
+    return { ...state, status: action.status, currentPage: 1 };
   }
   if (action.type === "page") {
     return { ...state, currentPage: action.page };
@@ -45,9 +89,13 @@ export function getMemberAssignmentPage(
   query,
   currentPage,
   pageSize = ITEMS_PER_PAGE,
+  { courseId = "all", status = "all" } = {},
 ) {
-  const filteredAssignments = assignments.filter((assignment) =>
-    matchesSearch(assignment, query),
+  const filteredAssignments = assignments.filter(
+    (assignment) =>
+      matchesSearch(assignment, query) &&
+      matchesCourse(assignment, courseId) &&
+      matchesStatus(assignment, status),
   );
   const totalPages = getTotalPages(filteredAssignments.length, pageSize);
   const validPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -61,13 +109,21 @@ export function getMemberAssignmentPage(
 }
 
 export function MemberAssignmentTable({ assignments = [] }) {
-  const [state, dispatch] = useReducer(memberAssignmentListReducer, {
-    query: "",
-    currentPage: 1,
-  });
+  const [state, dispatch] = useReducer(
+    memberAssignmentListReducer,
+    INITIAL_LIST_STATE,
+  );
+  const courseOptions = useMemo(
+    () => uniqueMemberAssignmentCourses(assignments),
+    [assignments],
+  );
   const page = useMemo(
-    () => getMemberAssignmentPage(assignments, state.query, state.currentPage),
-    [assignments, state.query, state.currentPage],
+    () =>
+      getMemberAssignmentPage(assignments, state.query, state.currentPage, ITEMS_PER_PAGE, {
+        courseId: state.courseId,
+        status: state.status,
+      }),
+    [assignments, state.query, state.courseId, state.status, state.currentPage],
   );
 
   useEffect(() => {
@@ -78,7 +134,23 @@ export function MemberAssignmentTable({ assignments = [] }) {
 
   return (
     <section aria-label="My assignment list">
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-4">
+        <MemberAssignmentSelectFilter
+          label="Course"
+          value={state.courseId}
+          options={courseOptions}
+          allOptionLabel="All courses"
+          ariaLabel="Filter by course"
+          onChange={(courseId) => dispatch({ type: "course", courseId })}
+        />
+        <MemberAssignmentSelectFilter
+          label="Status"
+          value={state.status}
+          options={MEMBER_ASSIGNMENT_STATUS_OPTIONS}
+          allOptionLabel="All status"
+          ariaLabel="Filter by status"
+          onChange={(status) => dispatch({ type: "status", status })}
+        />
         <label className="relative block w-full sm:w-80">
           <span className="sr-only">Search assignments</span>
           <input
@@ -117,7 +189,7 @@ export function MemberAssignmentTable({ assignments = [] }) {
               {page.filteredAssignments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-gray-600">
-                    No assignments match your search.
+                    No assignments match your filters.
                   </td>
                 </tr>
               ) : (
