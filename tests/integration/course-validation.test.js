@@ -42,13 +42,14 @@ describe("course field validation", () => {
     );
   });
 
-  it("rejects an invalid course tag", () => {
+  it("rejects an empty course tag", () => {
     expect(validateCourseFields({ ...valid, tag: "" }).tag).toBe(
       "Please fill out this field",
     );
-    expect(validateCourseFields({ ...valid, tag: "design" }).tag).toMatch(
-      /valid course tag/i,
-    );
+  });
+
+  it("does not reject a tag slug that is not in the hardcoded list", () => {
+    expect(validateCourseFields({ ...valid, tag: "design" })).toEqual({});
   });
 
   it("rejects a whitespace-only course code", () => {

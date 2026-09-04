@@ -65,6 +65,13 @@ export async function createAdminCourse(payload) {
   return data;
 }
 
+export async function getAdminCourseTags() {
+  const response = await fetch("/api/admin/course-tags", { cache: "no-store" });
+  const data = await parseJson(response);
+  if (!response.ok) throw createApiError(data, "Failed to load course tags");
+  return data;
+}
+
 export async function getAdminCoursesPage({
   query = "",
   page = 1,
@@ -72,6 +79,7 @@ export async function getAdminCoursesPage({
   sortBy = "courseCode",
   sortDirection = "asc",
   status = "all",
+  tag = "all",
 } = {}) {
   const params = new URLSearchParams({
     q: query,
@@ -80,6 +88,7 @@ export async function getAdminCoursesPage({
     sortBy,
     sortDirection,
     status,
+    tag,
   });
   const response = await fetch(`/api/admin/courses?${params}`, { cache: "no-store" });
   const data = await parseJson(response);

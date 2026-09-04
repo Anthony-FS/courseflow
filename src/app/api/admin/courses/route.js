@@ -26,7 +26,7 @@ import {
 } from "@/lib/course-validation";
 
 const ADMIN_COURSE_COLUMNS =
-  "id, title, course_code, cover_file_url, cover_file_type, cover_image_url, price, is_active, created_at, updated_at, lessons(count)";
+  "id, title, course_code, cover_file_url, cover_file_type, cover_image_url, price, is_active, created_at, updated_at, tag_id, course_tags(slug, name), lessons(count)";
 
 const COURSE_SORT_COLUMNS = {
   courseCode: "course_code",
@@ -41,6 +41,11 @@ function mapAdminCourse(row) {
   const lessonCount = Array.isArray(lessons)
     ? lessons[0]?.count ?? lessons.length
     : lessons?.count ?? 0;
+  const tagRow = Array.isArray(row?.course_tags)
+    ? row.course_tags[0]
+    : row?.course_tags;
+  const tagSlug = String(tagRow?.slug ?? "").trim();
+  const tagName = String(tagRow?.name ?? "").trim();
 
   return {
     id: row.id,
@@ -50,6 +55,8 @@ function mapAdminCourse(row) {
     cover_file_type: row.cover_file_type,
     price: row.price ?? 0,
     lesson_count: lessonCount,
+    tag: tagSlug,
+    tag_name: tagName || tagSlug,
     is_active: row.is_active !== false,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
@@ -75,12 +82,28 @@ export async function GET(request) {
   const sortBy = COURSE_SORT_COLUMNS[searchParams.get("sortBy")] ?? "course_code";
   const ascending = searchParams.get("sortDirection") !== "desc";
   const statusFilter = searchParams.get("status") ?? "all";
+  const tagFilter = normalizeCourseTag(searchParams.get("tag") ?? "");
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
   let requestQuery = supabase
     .from("courses")
     .select(ADMIN_COURSE_COLUMNS, { count: "exact" });
+
+  if (tagFilter && tagFilter !== "all") {
+    let tagId;
+    try {
+      tagId = await resolveCourseTagId(supabase, tagFilter);
+    } catch (tagError) {
+      return jsonError(tagError?.message || "Failed to resolve course tag", 500);
+    }
+
+    if (!tagId) {
+      return jsonOk({ courses: [], total: 0, page, pageSize });
+    }
+
+    requestQuery = requestQuery.eq("tag_id", tagId);
+  }
 
   if (query) {
     const escaped = query.replace(/[(),"]/g, " ").replaceAll("%", "\\%").replaceAll("_", "\\_");
