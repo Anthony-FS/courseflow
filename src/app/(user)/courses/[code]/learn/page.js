@@ -1,24 +1,32 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 
 import { CourseCurriculumSidebar } from "@/components/course-learn/course-curriculum-sidebar";
-import { LessonContent } from "@/components/course-learn/lesson-content";
-import { LessonNav } from "@/components/course-learn/lesson-nav";
+import {
+  LearnLessonNavLoader,
+  LearnLessonPane,
+} from "@/components/course-learn/learn-lesson-pane";
+import {
+  LearnLessonContentPending,
+  LearnNavigationProvider,
+} from "@/components/course-learn/learn-navigation";
+import {
+  LessonContentSkeleton,
+  LessonNavSkeleton,
+} from "@/components/course-learn/lesson-content-skeleton";
 import { LockLearnPageScroll } from "@/components/course-learn/lock-learn-page-scroll";
 import { ScrollToLessonContentOnNavigate } from "@/components/course-learn/scroll-to-lesson-content";
 import { getSessionUser } from "@/lib/auth";
 import {
   flattenSubLessons,
-  getAssignmentAnswerKeys,
   getAssignmentsForCourse,
   getSubLessonLearningContent,
-  getUserAssignmentSubmissions,
   resolveActiveSubLesson,
 } from "@/lib/course-learn";
 import { getCourseProgress } from "@/lib/course-learn-progress";
 import { LEARN_CONTENT_PANE_ID } from "@/lib/course-learn-scroll";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
-import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
 import {
   createClient as createServerClient,
   createServiceClient,
@@ -76,17 +84,14 @@ export default async function CourseLearnPage({ params, searchParams }) {
   }
 
   const assignmentsPromise = getAssignmentsForCourse(catalog, course.id);
-  const progressPromise = getCourseProgress(
-    supabase,
-    user.id,
-    course.id,
-    { assignmentsPromise },
-  );
-  const [subLessonContent, courseAssignments, progress] = await Promise.all([
-    getSubLessonLearningContent(catalog, {
-      courseId: course.id,
-      subLessonId: active.id,
-    }),
+  const progressPromise = getCourseProgress(supabase, user.id, course.id, {
+    assignmentsPromise,
+  });
+  const contentPromise = getSubLessonLearningContent(catalog, {
+    courseId: course.id,
+    subLessonId: active.id,
+  });
+  const [courseAssignments, progress] = await Promise.all([
     assignmentsPromise,
     progressPromise,
   ]);
@@ -96,88 +101,67 @@ export default async function CourseLearnPage({ params, searchParams }) {
   const activeAssignments = courseAssignments.filter(
     (assignment) => assignment.subLessonId === active.id,
   );
-  const {
-    submissions: submissionsByAssignment,
-    answerKeys: answerKeysByAssignment,
-  } = await getUserAssignmentSubmissions(
-    supabase,
-    user.id,
-    activeAssignments.map((assignment) => assignment.id),
-  ).then((submissions) =>
-    getAssignmentAnswerKeys(
-      catalog,
-      activeAssignments.filter((assignment) => submissions.has(assignment.id)),
-    ).then((answerKeys) => ({ submissions, answerKeys })),
-  );
-  const assignmentEntries = activeAssignments.map((assignment) => {
-    const submission = submissionsByAssignment.get(assignment.id) ?? null;
-    const answerKeys = submission
-      ? answerKeysByAssignment.get(assignment.id)
-      : null;
-
-    return {
-      assignment: answerKeys
-        ? { ...assignment, ...answerKeys }
-        : assignment,
-      submission,
-    };
-  });
-
-  const requiresVideo =
-    Boolean(subLessonContent?.videoUrl) ||
-    hasVideoContentBlock(subLessonContent?.description);
   const subLessonIds = flatSubLessons.map((subLesson) => subLesson.id);
 
   return (
-    <main className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-      <LockLearnPageScroll />
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none lg:flex-row lg:overflow-hidden">
-        <CourseCurriculumSidebar
-          key={active.lessonId}
-          courseId={course.id}
-          courseCode={courseCode}
-          courseTitle={course.title}
-          courseSummary={course.summary || course.description}
-          lessons={course.lessons}
-          activeSubLessonId={active.id}
-          assignmentSubLessonIds={assignmentSubLessonIds}
-          initialVisitedIds={progress.visitedIds}
-          initialCompletedIds={progress.completedIds}
-          initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
-        />
+    <LearnNavigationProvider activeSubLessonId={active.id}>
+      <main className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+        <LockLearnPageScroll />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none lg:flex-row lg:overflow-hidden">
+          <CourseCurriculumSidebar
+            key={active.lessonId}
+            courseId={course.id}
+            courseCode={courseCode}
+            courseTitle={course.title}
+            courseSummary={course.summary || course.description}
+            lessons={course.lessons}
+            activeSubLessonId={active.id}
+            assignmentSubLessonIds={assignmentSubLessonIds}
+            initialVisitedIds={progress.visitedIds}
+            initialCompletedIds={progress.completedIds}
+            initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
+          />
 
-        <div
-          id={LEARN_CONTENT_PANE_ID}
-          className="flex min-h-0 min-w-0 flex-1 justify-center lg:overflow-y-auto lg:overscroll-y-none"
-        >
-          <div className="w-full max-w-3xl flex-1 xl:max-w-4xl">
-            <LessonContent
-              title={subLessonContent?.title ?? active.title}
-              description={subLessonContent?.description}
-              coverUrl={course.coverUrl}
-              videoUrl={subLessonContent?.videoUrl ?? null}
-              assignmentEntries={assignmentEntries}
-              courseId={course.id}
-              subLessonId={active.id}
-            />
+          <div
+            id={LEARN_CONTENT_PANE_ID}
+            className="flex min-h-0 min-w-0 flex-1 justify-center lg:overflow-y-auto lg:overscroll-y-none"
+          >
+            <LearnLessonContentPending>
+              <Suspense
+                key={active.id}
+                fallback={<LessonContentSkeleton />}
+              >
+                <LearnLessonPane
+                  contentPromise={contentPromise}
+                  catalog={catalog}
+                  supabase={supabase}
+                  userId={user.id}
+                  course={course}
+                  active={active}
+                  activeAssignments={activeAssignments}
+                />
+              </Suspense>
+            </LearnLessonContentPending>
           </div>
+
+          <ScrollToLessonContentOnNavigate subLessonId={active.id} />
         </div>
 
-        <ScrollToLessonContentOnNavigate subLessonId={active.id} />
-      </div>
-
-      <div className="w-full shrink-0 bg-white">
-        <LessonNav
-          courseId={course.id}
-          courseCode={courseCode}
-          currentSubLessonId={active.id}
-          previous={prev}
-          next={next}
-          requiresVideo={requiresVideo}
-          subLessonIds={subLessonIds}
-          initialCompletedIds={progress.completedIds}
-        />
-      </div>
-    </main>
+        <div className="w-full shrink-0 bg-white">
+          <Suspense key={`nav-${active.id}`} fallback={<LessonNavSkeleton />}>
+            <LearnLessonNavLoader
+              contentPromise={contentPromise}
+              courseId={course.id}
+              courseCode={courseCode}
+              currentSubLessonId={active.id}
+              previous={prev}
+              next={next}
+              subLessonIds={subLessonIds}
+              initialCompletedIds={progress.completedIds}
+            />
+          </Suspense>
+        </div>
+      </main>
+    </LearnNavigationProvider>
   );
 }
