@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { useLearnNavigation } from "@/components/course-learn/learn-navigation";
 import {
   markSubLessonCompleted,
   SUB_LESSON_PROGRESS_EVENT,
@@ -31,6 +32,7 @@ function LessonNav({
   const [completedIds, setCompletedIds] = useState(() =>
     uniqueIds(initialCompletedIds),
   );
+  const { beginSubLessonNavigation } = useLearnNavigation();
 
   useEffect(() => {
     setCompletedIds(uniqueIds(initialCompletedIds));
@@ -93,6 +95,7 @@ function LessonNav({
         {previous ? (
           <Link
             href={learnSubLessonHref(courseCode, previous.id)}
+            onClick={() => beginSubLessonNavigation(previous.id)}
             className="text-body2 font-medium text-blue-500 transition-colors hover:text-blue-400"
           >
             Previous Lesson
@@ -108,7 +111,9 @@ function LessonNav({
               onClick={(event) => {
                 if (!completeCurrentLessonIfAllowed()) {
                   event.preventDefault();
+                  return;
                 }
+                beginSubLessonNavigation(next.id);
               }}
             >
               Next Lesson
