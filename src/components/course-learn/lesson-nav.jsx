@@ -70,6 +70,11 @@ function LessonNav({
       requiresVideo &&
       !hasWatchedLessonVideo(courseId, currentSubLessonId)
     ) {
+      toast.error(
+        next
+          ? "Please play the video before continuing to the next lesson."
+          : "Please play the video before finishing the course.",
+      );
       return false;
     }
     void markSubLessonCompleted(courseId, currentSubLessonId);
