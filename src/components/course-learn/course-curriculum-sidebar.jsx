@@ -5,16 +5,17 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 import { LessonStatusIcon } from "@/components/course-learn/lesson-status-icon";
+import { useLearnNavigation } from "@/components/course-learn/learn-navigation";
 import {
   learnSubLessonHref,
   mockProgressPercent,
   withMockLessonStatuses,
 } from "@/lib/course-learn";
+import { SUB_LESSON_PROGRESS_EVENT } from "@/lib/course-learn-progress";
 import {
   isMobileLearnLayout,
   scrollToLessonContent,
 } from "@/lib/course-learn-scroll";
-import { SUB_LESSON_PROGRESS_EVENT } from "@/lib/course-learn-progress";
 import { cn } from "@/lib/utils";
 
 function formatModuleNumber(index) {
@@ -59,6 +60,7 @@ function CourseCurriculumSidebar({
   const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState(() =>
     uniqueIds(initialSubmittedAssignmentIds),
   );
+  const { beginSubLessonNavigation } = useLearnNavigation();
 
   useEffect(() => {
     setCompletedIds(uniqueIds(initialCompletedIds));
@@ -196,6 +198,7 @@ function CourseCurriculumSidebar({
                             <Link
                               href={learnSubLessonHref(courseCode, subLesson.id)}
                               onClick={() => {
+                                beginSubLessonNavigation(subLesson.id);
                                 // Re-clicking the current lesson doesn't change
                                 // the URL, so nothing else would scroll it back.
                                 if (isActive && isMobileLearnLayout()) {
