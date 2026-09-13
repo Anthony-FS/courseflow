@@ -6,12 +6,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useLearnNavigation } from "@/components/course-learn/learn-navigation";
-import {
-  markSubLessonCompleted,
-  SUB_LESSON_PROGRESS_EVENT,
-} from "@/lib/course-learn-progress";
+import { SUB_LESSON_PROGRESS_EVENT } from "@/lib/course-learn-progress";
 import { learnSubLessonHref } from "@/lib/course-learn";
-import { hasWatchedLessonVideo } from "@/lib/course-learn-video";
 import { cn } from "@/lib/utils";
 
 function uniqueIds(ids) {
@@ -24,7 +20,6 @@ function LessonNav({
   currentSubLessonId,
   previous,
   next,
-  requiresVideo = false,
   subLessonIds = [],
   initialCompletedIds = [],
   className,
@@ -61,22 +56,13 @@ function LessonNav({
     };
   }, [courseId]);
 
+  // Navigation never completes a sub-lesson — only the scroll gate does. This
+  // reflects what the backend has already confirmed.
   const isLastLesson = !next;
   const otherLessonsComplete = (subLessonIds ?? [])
     .filter((id) => id && id !== currentSubLessonId)
     .every((id) => completedIds.includes(id));
   const canFinishCourse = isLastLesson && otherLessonsComplete;
-
-  function completeCurrentLessonIfAllowed() {
-    if (
-      requiresVideo &&
-      !hasWatchedLessonVideo(courseId, currentSubLessonId)
-    ) {
-      return false;
-    }
-    void markSubLessonCompleted(courseId, currentSubLessonId);
-    return true;
-  }
 
   return (
     <nav
@@ -103,29 +89,14 @@ function LessonNav({
           <Button asChild size="sm" className="min-h-12 px-6">
             <Link
               href={learnSubLessonHref(courseCode, next.id)}
-              onClick={(event) => {
-                if (!completeCurrentLessonIfAllowed()) {
-                  event.preventDefault();
-                  return;
-                }
-                beginSubLessonNavigation(next.id);
-              }}
+              onClick={() => beginSubLessonNavigation(next.id)}
             >
               Next Lesson
             </Link>
           </Button>
         ) : canFinishCourse ? (
           <Button asChild size="sm" className="min-h-12 px-6">
-            <Link
-              href="/my-courses"
-              onClick={(event) => {
-                if (!completeCurrentLessonIfAllowed()) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              Finish Course
-            </Link>
+            <Link href="/my-courses">Finish Course</Link>
           </Button>
         ) : (
           <button

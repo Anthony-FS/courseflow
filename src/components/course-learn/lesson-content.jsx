@@ -1,9 +1,13 @@
 import { LessonAssignmentList } from "@/components/course-learn/lesson-assignment-list";
-import { LessonReadSentinel } from "@/components/course-learn/lesson-read-sentinel";
+import { LessonProgressTracker } from "@/components/course-learn/lesson-progress-tracker";
 import { LessonVideo } from "@/components/course-learn/lesson-video";
 import { SubLessonRenderer } from "@/components/course-learn/sub-lesson-renderer";
 import { LEARN_LESSON_CONTENT_ID } from "@/lib/course-learn-scroll";
 import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
+
+function isSubmitted(submission) {
+  return Boolean(submission?.submittedAt || submission?.status === "submitted");
+}
 
 function LessonContent({
   title,
@@ -13,9 +17,15 @@ function LessonContent({
   assignmentEntries = [],
   courseId,
   subLessonId,
+  progress = {},
 }) {
-  const showLegacyVideo =
-    Boolean(videoUrl) && !hasVideoContentBlock(description);
+  const hasBlockVideo = hasVideoContentBlock(description);
+  const showLegacyVideo = Boolean(videoUrl) && !hasBlockVideo;
+  const hasVideo = Boolean(videoUrl) || hasBlockVideo;
+  const hasAssignment = assignmentEntries.length > 0;
+  const assignmentSubmitted =
+    hasAssignment &&
+    assignmentEntries.every(({ submission }) => isSubmitted(submission));
 
   return (
     <article
@@ -58,7 +68,17 @@ function LessonContent({
           />
         ) : null}
 
-        <LessonReadSentinel courseId={courseId} subLessonId={subLessonId} />
+        <LessonProgressTracker
+          key={subLessonId}
+          courseId={courseId}
+          subLessonId={subLessonId}
+          hasVideo={hasVideo}
+          hasAssignment={hasAssignment}
+          assignmentSubmitted={assignmentSubmitted}
+          videoPlayed={Boolean(progress.videoPlayed)}
+          completed={Boolean(progress.completed)}
+          visited={Boolean(progress.visited)}
+        />
       </div>
     </article>
   );

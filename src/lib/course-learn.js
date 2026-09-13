@@ -44,62 +44,6 @@ export function resolveActiveSubLesson(flatSubLessons, subLessonId) {
   };
 }
 
-/**
- * Badge status:
- * - completed (full green): only after Next Lesson (`completedIds`)
- * - pending-assignment (yellow half): visited lesson with unfinished assignment
- * - in-progress (green half): visited (scrolled to end of content), not completed
- * - not-started (empty green): never visited — opening a lesson alone does not count
- * Visiting alone must never produce a full green badge.
- */
-export function withMockLessonStatuses(
-  lessons,
-  _activeSubLessonId,
-  completedIds = [],
-  {
-    visitedIds = [],
-    assignmentSubLessonIds = [],
-    submittedAssignmentSubLessonIds = [],
-  } = {},
-) {
-  const completed = new Set(completedIds);
-  const visited = new Set(visitedIds);
-  const hasAssignment = new Set(assignmentSubLessonIds);
-  const assignmentSubmitted = new Set(submittedAssignmentSubLessonIds);
-
-  return (lessons ?? []).map((lesson) => ({
-    ...lesson,
-    subLessons: (lesson.subLessons ?? []).map((subLesson) => {
-      const id = subLesson.id;
-      const assignmentOpen =
-        hasAssignment.has(id) && !assignmentSubmitted.has(id);
-      const wasVisited = visited.has(id);
-      let status = "not-started";
-
-      if (completed.has(id) && !assignmentOpen) {
-        status = "completed";
-      } else if (wasVisited && assignmentOpen) {
-        status = "pending-assignment";
-      } else if (wasVisited) {
-        status = "in-progress";
-      }
-
-      return { ...subLesson, status };
-    }),
-  }));
-}
-
-export function mockProgressPercent(lessonsWithStatus) {
-  const all = (lessonsWithStatus ?? []).flatMap(
-    (lesson) => lesson.subLessons ?? [],
-  );
-  if (all.length === 0) {
-    return 0;
-  }
-  const completed = all.filter((item) => item.status === "completed").length;
-  return Math.round((completed / all.length) * 100);
-}
-
 export function learnSubLessonHref(courseCode, subLessonId) {
   const code = encodeURIComponent(String(courseCode ?? "").trim());
   const id = encodeURIComponent(String(subLessonId ?? "").trim());

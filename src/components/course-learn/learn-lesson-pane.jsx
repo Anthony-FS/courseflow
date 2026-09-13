@@ -4,7 +4,6 @@ import {
   getAssignmentAnswerKeys,
   getUserAssignmentSubmissions,
 } from "@/lib/course-learn";
-import { hasVideoContentBlock } from "@/lib/sub-lesson-blocks";
 
 async function LearnLessonPane({
   contentPromise,
@@ -14,6 +13,7 @@ async function LearnLessonPane({
   course,
   active,
   activeAssignments,
+  activeProgress,
 }) {
   const [subLessonContent, submissionsByAssignment] = await Promise.all([
     contentPromise,
@@ -53,6 +53,7 @@ async function LearnLessonPane({
       assignmentEntries={assignmentEntries}
       courseId={course.id}
       subLessonId={active.id}
+      progress={activeProgress}
     />
   );
 }
@@ -67,10 +68,8 @@ async function LearnLessonNavLoader({
   subLessonIds,
   initialCompletedIds,
 }) {
-  const subLessonContent = await contentPromise;
-  const requiresVideo =
-    Boolean(subLessonContent?.videoUrl) ||
-    hasVideoContentBlock(subLessonContent?.description);
+  // Wait for the content so the nav and the lesson body swap in together.
+  await contentPromise;
 
   return (
     <LessonNav
@@ -79,7 +78,6 @@ async function LearnLessonNavLoader({
       currentSubLessonId={currentSubLessonId}
       previous={previous}
       next={next}
-      requiresVideo={requiresVideo}
       subLessonIds={subLessonIds}
       initialCompletedIds={initialCompletedIds}
     />

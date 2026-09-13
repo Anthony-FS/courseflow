@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
 
-import { markLessonVideoWatched } from "@/lib/course-learn-video";
+import { markVideoPlayed } from "@/lib/course-learn-progress";
 import { cn } from "@/lib/utils";
 
 function DirectFileVideoPlayer({
@@ -33,7 +33,7 @@ function DirectFileVideoPlayer({
     try {
       await video.play();
       setIsPlaying(true);
-      markLessonVideoWatched(courseId, subLessonId);
+      markVideoPlayed(courseId, subLessonId);
     } catch {
       setIsPlaying(false);
     }
@@ -59,7 +59,7 @@ function DirectFileVideoPlayer({
           onEnded={() => setIsPlaying(false)}
           onPlay={() => {
             setIsPlaying(true);
-            markLessonVideoWatched(courseId, subLessonId);
+            markVideoPlayed(courseId, subLessonId);
           }}
           playsInline
           preload="metadata"

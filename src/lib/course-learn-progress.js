@@ -1,13 +1,22 @@
+import { markLessonVideoWatched } from "@/lib/course-learn-video";
+
 export const SUB_LESSON_PROGRESS_EVENT = "courseflow:sub-lesson-progress";
 export const SUB_LESSON_COMPLETED_EVENT = SUB_LESSON_PROGRESS_EVENT;
 
-const PROGRESS_ACTIONS = new Set(["visit", "complete", "submit_assignment"]);
+const PROGRESS_ACTIONS = new Set([
+  "visit",
+  "play_video",
+  "submit_assignment",
+  "complete",
+]);
 
-function emptyProgress() {
+function emptyProgress(loaded = true) {
   return {
     visitedIds: [],
     completedIds: [],
     submittedAssignmentIds: [],
+    videoPlayedIds: [],
+    loaded,
   };
 }
 
@@ -15,12 +24,18 @@ function mapProgressRows(rows) {
   const visitedIds = [];
   const completedIds = [];
   const submittedAssignmentIds = [];
+  const videoPlayedIds = [];
 
   for (const row of rows ?? []) {
     const id = row?.sub_lesson_id;
     if (!id) continue;
 
-    if (row.visited_at || row.completed_at || row.assignment_submitted_at) {
+    if (
+      row.visited_at ||
+      row.completed_at ||
+      row.assignment_submitted_at ||
+      row.video_played_at
+    ) {
       visitedIds.push(id);
     }
     if (row.completed_at) {
@@ -29,9 +44,12 @@ function mapProgressRows(rows) {
     if (row.assignment_submitted_at) {
       submittedAssignmentIds.push(id);
     }
+    if (row.video_played_at) {
+      videoPlayedIds.push(id);
+    }
   }
 
-  return { visitedIds, completedIds, submittedAssignmentIds };
+  return { visitedIds, completedIds, submittedAssignmentIds, videoPlayedIds };
 }
 
 function notifyProgress(courseId, { action, subLessonId } = {}) {
@@ -54,7 +72,7 @@ export function notifyAssignmentSubmitted(courseId, subLessonId) {
   });
 }
 
-/** Optimistic sidebar update when the learner reaches end of lesson content. */
+/** Optimistic sidebar update when the learner opens a sub-lesson. */
 export function notifySubLessonVisited(courseId, subLessonId) {
   notifyProgress(courseId, {
     action: "visit",
@@ -157,7 +175,7 @@ export async function getCourseProgress(
     supabase
       .from("sub_lesson_progress")
       .select(
-        "sub_lesson_id, visited_at, completed_at, assignment_submitted_at",
+        "sub_lesson_id, visited_at, completed_at, assignment_submitted_at, video_played_at",
       )
       .eq("user_id", user)
       .eq("course_id", course),
@@ -170,8 +188,10 @@ export async function getCourseProgress(
   ]);
 
   if (error || !Array.isArray(data)) {
+    // `loaded: false` keeps the sidebar on neutral badges rather than
+    // claiming every sub-lesson is untouched.
     return {
-      ...emptyProgress(),
+      ...emptyProgress(false),
       visitedIds: submittedFromSubmissions,
       submittedAssignmentIds: submittedFromSubmissions,
     };
@@ -192,7 +212,67 @@ export async function getCourseProgress(
     ...progress,
     visitedIds,
     submittedAssignmentIds,
+    loaded: true,
   };
+}
+
+/**
+ * Assignment submission is a hard prerequisite for completion, so the client
+ * gate is re-checked here before `completed_at` is written. The scroll
+ * condition is client-attested by nature; this one does not have to be.
+ */
+export async function checkCompletionAllowed(supabase, { userId, subLessonId }) {
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("assignments")
+    .select("id")
+    .eq("sub_lesson_id", subLessonId);
+
+  if (assignmentsError) {
+    return {
+      ok: false,
+      status: 500,
+      message:
+        assignmentsError.message || "Failed to verify assignment submissions",
+    };
+  }
+
+  const assignmentIds = (assignments ?? [])
+    .map((row) => row?.id)
+    .filter(Boolean);
+  if (assignmentIds.length === 0) {
+    return { ok: true };
+  }
+
+  const { data: submissions, error: submissionsError } = await supabase
+    .from("submissions")
+    .select("assignment_id, status, submitted_at")
+    .eq("user_id", userId)
+    .in("assignment_id", assignmentIds);
+
+  if (submissionsError) {
+    return {
+      ok: false,
+      status: 500,
+      message:
+        submissionsError.message || "Failed to verify assignment submissions",
+    };
+  }
+
+  const submitted = new Set(
+    (submissions ?? [])
+      .filter((row) => row?.submitted_at || row?.status === "submitted")
+      .map((row) => row.assignment_id),
+  );
+
+  if (assignmentIds.some((id) => !submitted.has(id))) {
+    return {
+      ok: false,
+      status: 409,
+      message: "Submit the assignment before completing this sub-lesson",
+    };
+  }
+
+  return { ok: true };
 }
 
 async function upsertSubLessonProgress(
@@ -223,7 +303,7 @@ async function upsertSubLessonProgress(
   if (action !== "visit") {
     const result = await supabase
       .from("sub_lesson_progress")
-      .select("id, completed_at, assignment_submitted_at")
+      .select("id, completed_at, assignment_submitted_at, video_played_at")
       .eq("user_id", userId)
       .eq("sub_lesson_id", subLessonId)
       .maybeSingle();
@@ -240,13 +320,19 @@ async function upsertSubLessonProgress(
     updated_at: now,
   };
 
-  // Only Next Lesson (complete) may set completed_at. Visits must never do so.
+  // Only the completion gate (scroll-to-end plus any media/assignment
+  // conditions) may set completed_at. Visits must never do so. Timestamps are
+  // kept at their first value so a repeat signal is not a rewrite.
   if (action === "complete") {
     patch.completed_at = existing?.completed_at || now;
   }
 
   if (action === "submit_assignment") {
     patch.assignment_submitted_at = existing?.assignment_submitted_at || now;
+  }
+
+  if (action === "play_video") {
+    patch.video_played_at = existing?.video_played_at || now;
   }
 
   if (existing?.id) {
@@ -270,6 +356,7 @@ async function upsertSubLessonProgress(
       sub_lesson_id: subLessonId,
       completed_at: action === "complete" ? now : null,
       assignment_submitted_at: action === "submit_assignment" ? now : null,
+      video_played_at: action === "play_video" ? now : null,
       ...patch,
     })
     .select("id")
@@ -334,6 +421,16 @@ export function markSubLessonVisited(courseId, subLessonId) {
 
 export function markSubLessonCompleted(courseId, subLessonId) {
   return postProgress(courseId, subLessonId, "complete");
+}
+
+/**
+ * Record that the learner started the sub-lesson video. Writes the local
+ * fast-path entry first so the gate closes even if the request fails, then
+ * persists it so the gate survives a different device.
+ */
+export function markVideoPlayed(courseId, subLessonId) {
+  markLessonVideoWatched(courseId, subLessonId);
+  return postProgress(courseId, subLessonId, "play_video").catch(() => null);
 }
 
 export function markAssignmentSubmitted(courseId, subLessonId) {

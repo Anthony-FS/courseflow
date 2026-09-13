@@ -717,7 +717,22 @@ Records a learner's progress event against a sub-lesson.
 |---|---|---|---|
 | `courseId` | uuid | Yes | |
 | `subLessonId` | uuid | Yes | Must belong to `courseId` |
-| `action` | string | Yes | Exactly one of `visit`, `complete`, `submit_assignment` |
+| `action` | string | Yes | Exactly one of `visit`, `play_video`, `submit_assignment`, `complete` |
+
+**Actions and the columns they stamp**
+
+| Action | Column | Fired when |
+|---|---|---|
+| `visit` | `visited_at` | The learner opens the sub-lesson |
+| `play_video` | `video_played_at` | The learner starts the sub-lesson video |
+| `submit_assignment` | `assignment_submitted_at` | Every assignment on the sub-lesson has a submission |
+| `complete` | `completed_at` | The completion gate passed |
+
+The completion gate is scroll-to-end of the sub-lesson content, plus the video
+having been played when the sub-lesson has one, plus the assignment having been
+submitted when it has one. Timestamps keep their first value, so a repeated
+action is not a rewrite. `complete` is re-verified server-side against the
+`submissions` table before `completed_at` is written.
 
 ```json
 {
@@ -749,6 +764,8 @@ Records a learner's progress event against a sub-lesson.
 | 401 | `{"error":"Unauthorized"}` | No session |
 | 403 | `{"error":"You must be enrolled in this course"}` | Not enrolled |
 | 404 | `{"error":"Sub-lesson not found"}` | Sub-lesson missing, or not in that course |
+| 409 | `{"error":"Submit the assignment before completing this sub-lesson"}` | `complete` while an assignment on the sub-lesson has no submission |
+| 500 | `{"error":"Failed to verify assignment submissions"}` | Assignment or submission lookup failed during a `complete` |
 | 500 | `{"error":"Failed to save progress"}` | Write failed |
 
 ---

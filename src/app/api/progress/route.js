@@ -1,9 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { isCourseEnrolled } from "@/lib/enrollments";
-import { recordSubLessonProgress } from "@/lib/course-learn-progress";
+import {
+  checkCompletionAllowed,
+  recordSubLessonProgress,
+} from "@/lib/course-learn-progress";
 
-const ACTIONS = new Set(["visit", "complete", "submit_assignment"]);
+const ACTIONS = new Set(["visit", "play_video", "submit_assignment", "complete"]);
 
 export async function POST(request) {
   const { supabase, user, error } = await requireUser();
@@ -51,6 +54,16 @@ export async function POST(request) {
 
   if (!subLesson?.id) {
     return jsonError("Sub-lesson not found", 404);
+  }
+
+  if (action === "complete") {
+    const allowed = await checkCompletionAllowed(supabase, {
+      userId: user.id,
+      subLessonId,
+    });
+    if (!allowed.ok) {
+      return jsonError(allowed.message, allowed.status);
+    }
   }
 
   try {

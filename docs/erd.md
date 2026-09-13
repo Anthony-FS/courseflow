@@ -150,7 +150,11 @@ erDiagram
   sub_lesson_progress {
     uuid id PK
     uuid user_id FK
+    uuid course_id FK
     uuid sub_lesson_id FK
+    timestamptz visited_at
+    timestamptz video_played_at
+    timestamptz assignment_submitted_at
     timestamptz completed_at
   }
 
