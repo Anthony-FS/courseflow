@@ -13,6 +13,7 @@ vi.mock("@/lib/auth", () => ({
 import { requireUser } from "@/lib/auth";
 import { POST as saveProgress } from "@/app/api/progress/route";
 import {
+  checkCompletionAllowed,
   getCourseProgress,
   recordSubLessonProgress,
 } from "@/lib/course-learn-progress";
@@ -40,8 +41,21 @@ function mockAuthedUser(supabase) {
   });
 }
 
+function enrolledSupabase(overrides = {}) {
+  return createMockSupabase({
+    enrollmentsSelect: {
+      id: "enroll-1",
+      user_id: USER.id,
+      course_id: COURSE_ID,
+    },
+    subLessonsSelect: { id: SUB_LESSON_ID, course_id: COURSE_ID },
+    progressSelect: [],
+    ...overrides,
+  });
+}
+
 describe("getCourseProgress", () => {
-  it("maps visited, completed, and submitted assignment ids", async () => {
+  it("maps visited, completed, played, and submitted assignment ids", async () => {
     const supabase = createMockSupabase({
       progressSelect: [
         {
@@ -49,12 +63,14 @@ describe("getCourseProgress", () => {
           visited_at: "2026-01-01T00:00:00.000Z",
           completed_at: "2026-01-01T00:00:00.000Z",
           assignment_submitted_at: null,
+          video_played_at: "2026-01-01T00:00:00.000Z",
         },
         {
           sub_lesson_id: "s2",
           visited_at: "2026-01-02T00:00:00.000Z",
           completed_at: null,
           assignment_submitted_at: "2026-01-02T00:00:00.000Z",
+          video_played_at: null,
         },
       ],
     });
@@ -65,6 +81,8 @@ describe("getCourseProgress", () => {
       visitedIds: ["s1", "s2"],
       completedIds: ["s1"],
       submittedAssignmentIds: ["s2"],
+      videoPlayedIds: ["s1"],
+      loaded: true,
     });
   });
 
@@ -73,6 +91,8 @@ describe("getCourseProgress", () => {
       visitedIds: [],
       completedIds: [],
       submittedAssignmentIds: [],
+      videoPlayedIds: [],
+      loaded: true,
     });
   });
 
@@ -105,6 +125,8 @@ describe("getCourseProgress", () => {
       visitedIds: ["s1"],
       completedIds: [],
       submittedAssignmentIds: ["s1"],
+      videoPlayedIds: [],
+      loaded: true,
     });
   });
 });
@@ -126,6 +148,31 @@ describe("recordSubLessonProgress", () => {
       course_id: COURSE_ID,
       sub_lesson_id: SUB_LESSON_ID,
     });
+  });
+
+  it("stamps video_played_at without completing the sub-lesson", async () => {
+    const supabase = createMockSupabase({
+      progressSelect: [
+        {
+          id: "progress-1",
+          sub_lesson_id: SUB_LESSON_ID,
+          completed_at: null,
+          assignment_submitted_at: null,
+          video_played_at: null,
+        },
+      ],
+    });
+
+    await recordSubLessonProgress(supabase, {
+      userId: USER.id,
+      courseId: COURSE_ID,
+      subLessonId: SUB_LESSON_ID,
+      action: "play_video",
+    });
+
+    const { payload } = updatesFor(supabase, "sub_lesson_progress")[0];
+    expect(payload.video_played_at).toEqual(expect.any(String));
+    expect(payload.completed_at).toBeUndefined();
   });
 
   it("updates an existing row when completing", async () => {
@@ -152,6 +199,30 @@ describe("recordSubLessonProgress", () => {
       completed_at: expect.any(String),
     });
   });
+
+  it("keeps the original completed_at when completing twice", async () => {
+    const supabase = createMockSupabase({
+      progressSelect: [
+        {
+          id: "progress-1",
+          sub_lesson_id: SUB_LESSON_ID,
+          completed_at: "2026-01-01T00:00:00.000Z",
+          assignment_submitted_at: null,
+        },
+      ],
+    });
+
+    await recordSubLessonProgress(supabase, {
+      userId: USER.id,
+      courseId: COURSE_ID,
+      subLessonId: SUB_LESSON_ID,
+      action: "complete",
+    });
+
+    expect(
+      updatesFor(supabase, "sub_lesson_progress")[0].payload.completed_at,
+    ).toBe("2026-01-01T00:00:00.000Z");
+  });
 });
 
 describe("POST /api/progress", () => {
@@ -160,11 +231,7 @@ describe("POST /api/progress", () => {
   });
 
   it("saves visit progress for an enrolled user", async () => {
-    const supabase = createMockSupabase({
-      enrollmentsSelect: { id: "enroll-1", user_id: USER.id, course_id: COURSE_ID },
-      subLessonsSelect: { id: SUB_LESSON_ID, course_id: COURSE_ID },
-      progressSelect: [],
-    });
+    const supabase = enrolledSupabase();
     mockAuthedUser(supabase);
 
     const response = await postProgress({
@@ -181,6 +248,67 @@ describe("POST /api/progress", () => {
       course_id: COURSE_ID,
       sub_lesson_id: SUB_LESSON_ID,
     });
+  });
+
+  it("saves a play_video action without completing", async () => {
+    const supabase = enrolledSupabase();
+    mockAuthedUser(supabase);
+
+    const response = await postProgress({
+      courseId: COURSE_ID,
+      subLessonId: SUB_LESSON_ID,
+      action: "play_video",
+    });
+
+    expect(response.status).toBe(201);
+    const row = insertsFor(supabase, "sub_lesson_progress")[0].rows[0];
+    expect(row.video_played_at).toEqual(expect.any(String));
+    expect(row.completed_at).toBeNull();
+  });
+
+  it("refuses to complete a sub-lesson with an unsubmitted assignment", async () => {
+    const supabase = enrolledSupabase({
+      assignmentsSelect: [{ id: "a1", sub_lesson_id: SUB_LESSON_ID }],
+      submissionsSelect: [],
+    });
+    mockAuthedUser(supabase);
+
+    const response = await postProgress({
+      courseId: COURSE_ID,
+      subLessonId: SUB_LESSON_ID,
+      action: "complete",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toMatch(/submit the assignment/i);
+    expect(insertsFor(supabase, "sub_lesson_progress")).toHaveLength(0);
+    expect(updatesFor(supabase, "sub_lesson_progress")).toHaveLength(0);
+  });
+
+  it("completes a sub-lesson once its assignment is submitted", async () => {
+    const supabase = enrolledSupabase({
+      assignmentsSelect: [{ id: "a1", sub_lesson_id: SUB_LESSON_ID }],
+      submissionsSelect: [
+        {
+          assignment_id: "a1",
+          status: "submitted",
+          submitted_at: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+    });
+    mockAuthedUser(supabase);
+
+    const response = await postProgress({
+      courseId: COURSE_ID,
+      subLessonId: SUB_LESSON_ID,
+      action: "complete",
+    });
+
+    expect(response.status).toBe(201);
+    expect(
+      insertsFor(supabase, "sub_lesson_progress")[0].rows[0].completed_at,
+    ).toEqual(expect.any(String));
   });
 
   it("returns 403 when the user is not enrolled", async () => {
@@ -216,5 +344,42 @@ describe("POST /api/progress", () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/invalid progress action/i);
+  });
+});
+
+describe("checkCompletionAllowed", () => {
+  it("allows a sub-lesson with no assignments", async () => {
+    const supabase = createMockSupabase({ assignmentsSelect: [] });
+
+    await expect(
+      checkCompletionAllowed(supabase, {
+        userId: USER.id,
+        subLessonId: SUB_LESSON_ID,
+      }),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("blocks while any assignment on the sub-lesson is unsubmitted", async () => {
+    const supabase = createMockSupabase({
+      assignmentsSelect: [
+        { id: "a1", sub_lesson_id: SUB_LESSON_ID },
+        { id: "a2", sub_lesson_id: SUB_LESSON_ID },
+      ],
+      submissionsSelect: [
+        {
+          assignment_id: "a1",
+          status: "submitted",
+          submitted_at: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const result = await checkCompletionAllowed(supabase, {
+      userId: USER.id,
+      subLessonId: SUB_LESSON_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(409);
   });
 });
