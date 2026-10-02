@@ -82,7 +82,9 @@ export async function addCourseToWishlist(courseId) {
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to add this course to your wishlist.");
+    const error = new Error(data?.error || "Failed to add this course to your wishlist.");
+    error.status = response.status;
+    throw error;
   }
 
   updateWishlistCache("add", courseId);
@@ -104,7 +106,9 @@ export async function removeCourseFromWishlist(courseId) {
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || "Failed to remove this course from your wishlist.");
+    const error = new Error(data?.error || "Failed to remove this course from your wishlist.");
+    error.status = response.status;
+    throw error;
   }
 
   updateWishlistCache("remove", courseId);
