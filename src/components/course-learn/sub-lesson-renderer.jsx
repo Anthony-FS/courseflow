@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Info, AlertTriangle, Lightbulb, ExternalLink, File, Play } from "lucide-react";
 
 import { DirectFileVideoPlayer } from "@/components/course-learn/lesson-video";
-import { markLessonVideoWatched } from "@/lib/course-learn-video";
+import { markVideoPlayed } from "@/lib/course-learn-progress";
 import {
   BLOCK_TYPES,
   getAttachmentSrc,
@@ -220,7 +220,7 @@ function EmbedVideoPlayer({ embed, title, courseId, subLessonId }) {
       <button
         type="button"
         onClick={() => {
-          markLessonVideoWatched(courseId, subLessonId);
+          markVideoPlayed(courseId, subLessonId);
           setStarted(true);
         }}
         aria-label={`Play ${title}`}

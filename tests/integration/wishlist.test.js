@@ -535,3 +535,33 @@ describe("getUserWishlistCount and getUserWishlistCourseIds", () => {
     );
   });
 });
+
+describe("addCourseToWishlist and removeCourseFromWishlist client methods", () => {
+  it("attaches status 401 when API returns unauthorized", async () => {
+    const { addCourseToWishlist, removeCourseFromWishlist } = await import(
+      "@/lib/wishlist"
+    );
+
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Unauthorized" }),
+    });
+
+    try {
+      await expect(addCourseToWishlist("course-1")).rejects.toMatchObject({
+        message: "Unauthorized",
+        status: 401,
+      });
+
+      await expect(removeCourseFromWishlist("course-1")).rejects.toMatchObject({
+        message: "Unauthorized",
+        status: 401,
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});
+

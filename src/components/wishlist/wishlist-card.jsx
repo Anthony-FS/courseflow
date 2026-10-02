@@ -125,11 +125,14 @@ export function WishlistCard({
           ? `Failed to remove ${title || "course"} from your wishlist.`
           : `Failed to add ${title || "course"} to your wishlist.`);
 
-      if (
+      const isAuthError =
+        error?.status === 401 ||
+        msg.toLowerCase().includes("unauthorized") ||
         msg.toLowerCase().includes("unauthenticated") ||
         msg.toLowerCase().includes("log in") ||
-        msg.toLowerCase().includes("session")
-      ) {
+        msg.toLowerCase().includes("session");
+
+      if (isAuthError) {
         toast.error("Please log in to save courses to your wishlist", {
           action: {
             label: "Log in",
