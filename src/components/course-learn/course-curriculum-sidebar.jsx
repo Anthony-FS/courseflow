@@ -6,12 +6,12 @@ import { ChevronDown } from "lucide-react";
 
 import { LessonStatusIcon } from "@/components/course-learn/lesson-status-icon";
 import { useLearnNavigation } from "@/components/course-learn/learn-navigation";
-import {
-  learnSubLessonHref,
-  mockProgressPercent,
-  withMockLessonStatuses,
-} from "@/lib/course-learn";
+import { learnSubLessonHref } from "@/lib/course-learn";
 import { SUB_LESSON_PROGRESS_EVENT } from "@/lib/course-learn-progress";
+import {
+  courseProgressPercent,
+  withSubLessonStatuses,
+} from "@/lib/sub-lesson-status";
 import {
   isMobileLearnLayout,
   scrollToLessonContent,
@@ -27,8 +27,9 @@ function uniqueIds(ids) {
 }
 
 /**
- * Temporary curriculum sidebar matching the Figma prop contract.
- * Replace this export when the shared team component is ready.
+ * Curriculum sidebar. Renders the sub-lesson state machine — it derives no
+ * status of its own, and a sub-lesson only turns green once the backend has
+ * confirmed completion.
  *
  * Remount with `key={activeLessonId}` from the parent when the active
  * module changes so the accordion opens on the correct section.
@@ -44,6 +45,7 @@ function CourseCurriculumSidebar({
   initialVisitedIds = [],
   initialCompletedIds = [],
   initialSubmittedAssignmentIds = [],
+  isProgressReady = true,
 }) {
   const activeLessonId =
     lessons.find((lesson) =>
@@ -85,7 +87,12 @@ function CourseCurriculumSidebar({
         return;
       }
 
-      if (action === "visit" || action === "complete" || action === "submit_assignment") {
+      if (
+        action === "visit" ||
+        action === "play_video" ||
+        action === "complete" ||
+        action === "submit_assignment"
+      ) {
         setVisitedIds((current) =>
           current.includes(subLessonId) ? current : [...current, subLessonId],
         );
@@ -108,17 +115,14 @@ function CourseCurriculumSidebar({
     };
   }, [courseId]);
 
-  const lessonsWithStatus = withMockLessonStatuses(
-    lessons,
-    activeSubLessonId,
+  const lessonsWithStatus = withSubLessonStatuses(lessons, {
+    visitedIds,
     completedIds,
-    {
-      visitedIds,
-      assignmentSubLessonIds,
-      submittedAssignmentSubLessonIds: submittedAssignmentIds,
-    },
-  );
-  const progressPercent = mockProgressPercent(lessonsWithStatus);
+    assignmentSubLessonIds,
+    submittedAssignmentSubLessonIds: submittedAssignmentIds,
+    isReady: isProgressReady,
+  });
+  const progressPercent = courseProgressPercent(lessonsWithStatus);
 
   return (
     <aside className="flex w-full min-w-0 shrink-0 flex-col overflow-x-hidden bg-white px-6 py-8 lg:h-full lg:w-[22.5rem] lg:overflow-y-auto lg:overscroll-y-none lg:border-r lg:border-gray-300 lg:px-8">
@@ -134,22 +138,24 @@ function CourseCurriculumSidebar({
 
       <div className="mt-6 shrink-0">
         <p className="text-body3 font-medium text-black">
-          {progressPercent}% Complete
+          {isProgressReady ? `${progressPercent}% Complete` : "Progress unavailable"}
         </p>
         <div
           className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-300"
           role="progressbar"
-          aria-valuenow={progressPercent}
+          aria-valuenow={isProgressReady ? progressPercent : undefined}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Course progress"
         >
-          <div
-            className="h-full rounded-full bg-blue-500 transition-[width] duration-500 ease-out"
-            style={{
-              width: `${Math.min(100, Math.max(0, progressPercent))}%`,
-            }}
-          />
+          {isProgressReady ? (
+            <div
+              className="h-full rounded-full bg-blue-500 transition-[width] duration-500 ease-out"
+              style={{
+                width: `${Math.min(100, Math.max(0, progressPercent))}%`,
+              }}
+            />
+          ) : null}
         </div>
       </div>
 

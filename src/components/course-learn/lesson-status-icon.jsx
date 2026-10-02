@@ -1,9 +1,24 @@
 import { Check } from "lucide-react";
 
+import { SUB_LESSON_STATUS } from "@/lib/sub-lesson-status";
 import { cn } from "@/lib/utils";
 
-function LessonStatusIcon({ status = "not-started", className }) {
-  if (status === "completed") {
+function LessonStatusIcon({ status = SUB_LESSON_STATUS.NOT_STARTED, className }) {
+  // Progress could not be loaded — stay neutral rather than claiming the
+  // learner has not started this sub-lesson.
+  if (status === SUB_LESSON_STATUS.UNKNOWN) {
+    return (
+      <span
+        className={cn(
+          "size-5 shrink-0 rounded-full border-2 border-gray-400 bg-transparent",
+          className,
+        )}
+        aria-label="Progress unavailable"
+      />
+    );
+  }
+
+  if (status === SUB_LESSON_STATUS.COMPLETED) {
     return (
       <span
         className={cn(
@@ -17,7 +32,7 @@ function LessonStatusIcon({ status = "not-started", className }) {
     );
   }
 
-  if (status === "in-progress") {
+  if (status === SUB_LESSON_STATUS.IN_PROGRESS) {
     return (
       <span
         className={cn(
@@ -31,7 +46,7 @@ function LessonStatusIcon({ status = "not-started", className }) {
     );
   }
 
-  if (status === "pending-assignment") {
+  if (status === SUB_LESSON_STATUS.PENDING_ASSIGNMENT) {
     return (
       <span
         className={cn(

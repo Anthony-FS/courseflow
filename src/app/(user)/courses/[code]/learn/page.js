@@ -24,7 +24,10 @@ import {
   resolveActiveSubLesson,
 } from "@/lib/course-learn";
 import { getCourseProgress } from "@/lib/course-learn-progress";
-import { LEARN_CONTENT_PANE_ID } from "@/lib/course-learn-scroll";
+import {
+  LEARN_CONTENT_PANE_ID,
+  LEARN_SCROLL_SHELL_ID,
+} from "@/lib/course-learn-scroll";
 import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
 import {
@@ -102,12 +105,20 @@ export default async function CourseLearnPage({ params, searchParams }) {
     (assignment) => assignment.subLessonId === active.id,
   );
   const subLessonIds = flatSubLessons.map((subLesson) => subLesson.id);
+  const activeProgress = {
+    visited: progress.visitedIds.includes(active.id),
+    completed: progress.completedIds.includes(active.id),
+    videoPlayed: progress.videoPlayedIds.includes(active.id),
+  };
 
   return (
     <LearnNavigationProvider activeSubLessonId={active.id}>
       <main className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
         <LockLearnPageScroll />
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none lg:flex-row lg:overflow-hidden">
+        <div
+          id={LEARN_SCROLL_SHELL_ID}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none lg:flex-row lg:overflow-hidden"
+        >
           <CourseCurriculumSidebar
             key={active.lessonId}
             courseId={course.id}
@@ -120,6 +131,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
             initialVisitedIds={progress.visitedIds}
             initialCompletedIds={progress.completedIds}
             initialSubmittedAssignmentIds={progress.submittedAssignmentIds}
+            isProgressReady={progress.loaded}
           />
 
           <div
@@ -139,6 +151,7 @@ export default async function CourseLearnPage({ params, searchParams }) {
                   course={course}
                   active={active}
                   activeAssignments={activeAssignments}
+                  activeProgress={activeProgress}
                 />
               </Suspense>
             </LearnLessonContentPending>

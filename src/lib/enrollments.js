@@ -1,4 +1,7 @@
-import { mockProgressPercent, withMockLessonStatuses } from "@/lib/course-learn";
+import {
+  courseProgressPercent,
+  withSubLessonStatuses,
+} from "@/lib/sub-lesson-status";
 import { resolveCoverUrl } from "@/lib/courses";
 import { dispatchWishlistChange, updateWishlistCache } from "@/lib/wishlist";
 
@@ -365,12 +368,11 @@ export async function getUserEnrolledCourses(supabase, userId) {
         submittedAssignmentIds: [],
       };
       const assignments = progress.assignments ?? [];
-      const lessonsWithStatus = withMockLessonStatuses(
+      const lessonsWithStatus = withSubLessonStatuses(
         courseLessonsForProgress(course),
-        null,
-        progress.completedIds,
         {
           visitedIds: progress.visitedIds,
+          completedIds: progress.completedIds,
           assignmentSubLessonIds: assignments.map(
             (assignment) => assignment.subLessonId,
           ),
@@ -380,7 +382,10 @@ export async function getUserEnrolledCourses(supabase, userId) {
 
       return {
         ...mapped,
-        progress: Math.min(100, Math.max(0, mockProgressPercent(lessonsWithStatus))),
+        progress: Math.min(
+          100,
+          Math.max(0, courseProgressPercent(lessonsWithStatus)),
+        ),
       };
     });
 
