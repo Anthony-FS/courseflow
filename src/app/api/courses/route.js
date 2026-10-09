@@ -6,7 +6,11 @@ import {
   parseCatalogPageSize,
 } from "@/lib/courses";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
-import { getCachedPublicCatalogCourses } from "@/lib/public-course-catalog";
+import {
+  getCachedMemberCatalogCourses,
+  getCachedPublicCatalogCourses,
+  memberCatalogExcludeKey,
+} from "@/lib/public-course-catalog";
 import {
   CATALOG_RATE_LIMIT,
   CATALOG_RATE_WINDOW_MS,
@@ -79,22 +83,31 @@ export async function GET(request) {
 
   try {
     const result =
-      !user && serviceSupabase
-        ? await getCachedPublicCatalogCourses(
+      user && serviceSupabase
+        ? await getCachedMemberCatalogCourses(
             query,
             page,
             pageSize,
             sortBy,
             sortDirection,
+            memberCatalogExcludeKey(excludeCourseIds),
           )
-        : await getCatalogCourses(supabase, {
-            query,
-            page,
-            pageSize,
-            excludeCourseIds,
-            sortBy,
-            sortDirection,
-          });
+        : !user && serviceSupabase
+          ? await getCachedPublicCatalogCourses(
+              query,
+              page,
+              pageSize,
+              sortBy,
+              sortDirection,
+            )
+          : await getCatalogCourses(supabase, {
+              query,
+              page,
+              pageSize,
+              excludeCourseIds,
+              sortBy,
+              sortDirection,
+            });
     return jsonOk(
       {
         ...result,

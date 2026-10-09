@@ -17,6 +17,7 @@ import {
 import { LockLearnPageScroll } from "@/components/course-learn/lock-learn-page-scroll";
 import { ScrollToLessonContentOnNavigate } from "@/components/course-learn/scroll-to-lesson-content";
 import { getSessionUser } from "@/lib/auth";
+import { getCachedCourseByCode } from "@/lib/cached-course";
 import {
   flattenSubLessons,
   getAssignmentsForCourse,
@@ -28,17 +29,12 @@ import {
   LEARN_CONTENT_PANE_ID,
   LEARN_SCROLL_SHELL_ID,
 } from "@/lib/course-learn-scroll";
-import { getCourseByCode } from "@/lib/courses";
 import { isCourseEnrolled } from "@/lib/enrollments";
-import {
-  createClient as createServerClient,
-  createServiceClient,
-} from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export async function generateMetadata({ params }) {
   const { code } = await params;
-  const metadataSupabase = createServiceClient() ?? (await createServerClient());
-  const course = await getCourseByCode(metadataSupabase, code, metadataSupabase);
+  const course = await getCachedCourseByCode(code);
   if (!course) {
     return { title: "Course not found | CourseFlow" };
   }
@@ -56,13 +52,17 @@ export default async function CourseLearnPage({ params, searchParams }) {
   }
 
   const catalog = createServiceClient() ?? supabase;
-  const course = await getCourseByCode(supabase, code, catalog);
+  const course = await getCachedCourseByCode(code);
   if (!course) {
     notFound();
   }
 
   const courseCode = course.courseCode || code;
 
+  const assignmentsPromise = getAssignmentsForCourse(catalog, course.id);
+  const progressPromise = getCourseProgress(supabase, user.id, course.id, {
+    assignmentsPromise,
+  });
   const isSubscribed = await isCourseEnrolled(catalog, user.id, course.id);
   if (!isSubscribed) {
     redirect(`/courses/${encodeURIComponent(courseCode)}`);
@@ -86,10 +86,6 @@ export default async function CourseLearnPage({ params, searchParams }) {
     );
   }
 
-  const assignmentsPromise = getAssignmentsForCourse(catalog, course.id);
-  const progressPromise = getCourseProgress(supabase, user.id, course.id, {
-    assignmentsPromise,
-  });
   const contentPromise = getSubLessonLearningContent(catalog, {
     courseId: course.id,
     subLessonId: active.id,

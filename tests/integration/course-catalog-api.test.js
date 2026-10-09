@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("next/cache", () => ({
+  unstable_cache: (fn) => fn,
+  revalidateTag: vi.fn(),
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createServiceClient: vi.fn(),
   createClient: vi.fn(),

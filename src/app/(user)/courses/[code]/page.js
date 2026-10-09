@@ -12,14 +12,13 @@ import { OtherInterestingCourses } from "@/components/course-detail/other-intere
 import { CourseAttachmentSection } from "@/components/course-detail/subscribed-actions";
 import Footer from "@/components/footer";
 import { getSessionUser } from "@/lib/auth";
+import { getCachedCourseByCode } from "@/lib/cached-course";
 import {
   getCourseAttachment,
-  getCourseByCode,
   getOtherInterestingCourses,
 } from "@/lib/courses";
 import { getUserEnrolledCourseIds } from "@/lib/enrollments";
 import { createServiceClient } from "@/lib/supabase/server";
-import { createClient as createServerClient } from "@/lib/supabase/server";
 
 function catalogClient(sessionSupabase) {
   return createServiceClient() ?? sessionSupabase;
@@ -27,13 +26,7 @@ function catalogClient(sessionSupabase) {
 
 export async function generateMetadata({ params }) {
   const { code } = await params;
-  const metadataSupabase = createServiceClient() ?? (await createServerClient());
-
-  const course = await getCourseByCode(
-    metadataSupabase,
-    code,
-    catalogClient(metadataSupabase),
-  );
+  const course = await getCachedCourseByCode(code);
   if (!course) {
     return { title: "Course not found | CourseFlow" };
   }
@@ -45,33 +38,44 @@ export default async function CourseDetailPage({ params }) {
   const { code } = await params;
   const { user, supabase } = await getSessionUser();
 
-  const course = await getCourseByCode(supabase, code, catalogClient(supabase));
+  const course = await getCachedCourseByCode(code);
   if (!course) {
     notFound();
   }
 
   const catalog = catalogClient(supabase);
-  const [enrolledCourseIds, wishlistResult, attachment] = await Promise.all([
-    user ? getUserEnrolledCourseIds(catalog, user.id) : [],
-    user
-      ? supabase.from("wishlists").select("course_id").eq("user_id", user.id)
-      : { data: [], error: null },
-    user ? getCourseAttachment(catalog, course.id) : null,
-  ]);
+  const enrolledPromise = user
+    ? getUserEnrolledCourseIds(catalog, user.id)
+    : Promise.resolve([]);
+  const wishlistPromise = user
+    ? supabase.from("wishlists").select("course_id").eq("user_id", user.id)
+    : Promise.resolve({ data: [], error: null });
+  const attachmentPromise = user
+    ? getCourseAttachment(catalog, course.id)
+    : Promise.resolve(null);
+  const otherCoursesPromise = enrolledPromise.then((enrolledCourseIds) =>
+    getOtherInterestingCourses(catalog, {
+      excludeCourseId: course.id,
+      enrolledCourseIds,
+      tagId: course.tagId,
+      limit: 9,
+      // Suggestions must genuinely share this course's tag, so show fewer (or
+      // none) rather than padding the carousel with unrelated courses.
+      strictTag: true,
+    }),
+  );
+  const [enrolledCourseIds, wishlistResult, attachment, otherCourses] =
+    await Promise.all([
+      enrolledPromise,
+      wishlistPromise,
+      attachmentPromise,
+      otherCoursesPromise,
+    ]);
   const wishlistCourseIds = wishlistResult.error
     ? []
     : (wishlistResult.data ?? []).map((row) => row?.course_id).filter(Boolean);
   const isSubscribed = enrolledCourseIds.includes(course.id);
   const inWishlist = wishlistCourseIds.includes(course.id);
-  const otherCourses = await getOtherInterestingCourses(catalog, {
-    excludeCourseId: course.id,
-    enrolledCourseIds,
-    tagId: course.tagId,
-    limit: 9,
-    // Suggestions must genuinely share this course's tag, so show fewer (or
-    // none) rather than padding the carousel with unrelated courses.
-    strictTag: true,
-  });
   const loginHref = `/login?next=/courses/${encodeURIComponent(course.courseCode || code)}`;
 
   return (

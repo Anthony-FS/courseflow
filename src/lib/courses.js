@@ -227,12 +227,17 @@ export async function getCourseAttachment(supabase, courseId) {
     return null;
   }
 
+  const [fileUrl, fileSize] = await Promise.all([
+    resolveAttachmentHref(supabase, row.file_url),
+    getAttachmentFileSize(supabase, row.file_url),
+  ]);
+
   return {
     id: row.id,
     name: row.name ?? "Attachment",
-    fileUrl: await resolveAttachmentHref(supabase, row.file_url),
+    fileUrl,
     fileType: row.file_type ?? "",
-    fileSize: await getAttachmentFileSize(supabase, row.file_url),
+    fileSize,
   };
 }
 

@@ -2,24 +2,40 @@ import { createClient } from "@/lib/supabase/server";
 import { jsonError } from "@/lib/api";
 import { cache } from "react";
 
+const PROFILE_COLUMNS =
+  "id, role, is_active, full_name, date_of_birth, educational_background, avatar_url";
+
+function userFromClaims(claims) {
+  const id = claims?.sub;
+  if (!id) return null;
+
+  return {
+    id,
+    email: claims.email ?? null,
+    user_metadata: claims.user_metadata ?? {},
+  };
+}
+
+async function loadProfile(supabase, userId) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", userId)
+    .maybeSingle();
+
+  return profile ?? null;
+}
+
 export const getSessionUser = cache(async function getSessionUser() {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
+  const user = error ? null : userFromClaims(data?.claims);
 
-  if (error || !user) {
+  if (!user) {
     return { supabase, user: null, profile: null };
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "id, role, is_active, full_name, date_of_birth, educational_background, avatar_url",
-    )
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await loadProfile(supabase, user.id);
 
   return { supabase, user, profile };
 });
@@ -51,24 +67,26 @@ export async function requireUser() {
 }
 
 export async function requireAdmin() {
-  const session = await getSessionUser();
+  const session = await getAuthenticatedUser();
 
   if (!session.user) {
     return {
       ...session,
+      profile: null,
       error: jsonError("Unauthorized", 401),
     };
   }
 
-  const isAdmin =
-    session.profile?.role === "admin" && session.profile?.is_active === true;
+  const profile = await loadProfile(session.supabase, session.user.id);
+  const isAdmin = profile?.role === "admin" && profile?.is_active === true;
 
   if (!isAdmin) {
     return {
       ...session,
+      profile,
       error: jsonError("Forbidden", 403),
     };
   }
 
-  return { ...session, error: null };
+  return { ...session, profile, error: null };
 }

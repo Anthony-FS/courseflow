@@ -23,6 +23,7 @@ async function loadPublicCatalogCourses(
     pageSize,
     sortBy,
     sortDirection,
+    excludeCourseIds: [],
   });
 }
 
@@ -34,3 +35,43 @@ export const getCachedPublicCatalogCourses = unstable_cache(
     tags: ["courses"],
   },
 );
+
+async function loadMemberCatalogCourses(
+  query,
+  page,
+  pageSize,
+  sortBy,
+  sortDirection,
+  excludeCourseIdsKey,
+) {
+  const supabase = createServiceClient();
+  if (!supabase) {
+    throw new Error("Public catalog cache requires a service client");
+  }
+
+  const excludeCourseIds = JSON.parse(excludeCourseIdsKey);
+
+  return getCatalogCourses(supabase, {
+    query,
+    page,
+    pageSize,
+    sortBy,
+    sortDirection,
+    excludeCourseIds: Array.isArray(excludeCourseIds) ? excludeCourseIds : [],
+  });
+}
+
+export const getCachedMemberCatalogCourses = unstable_cache(
+  loadMemberCatalogCourses,
+  ["member-course-catalog"],
+  {
+    revalidate: PUBLIC_CATALOG_CACHE_REVALIDATE_SECONDS,
+    tags: ["courses"],
+  },
+);
+
+export function memberCatalogExcludeKey(excludeCourseIds) {
+  return JSON.stringify(
+    [...new Set(excludeCourseIds ?? [])].map((id) => String(id)).sort(),
+  );
+}
