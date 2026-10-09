@@ -2,9 +2,10 @@
 
 import { useEffect, useReducer, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Loader2, RefreshCw } from "lucide-react";
+import { BookOpen, RefreshCw } from "lucide-react";
 
 import { MyCourseCard } from "@/components/my-courses/my-course-card";
+import { MyCoursesSkeleton } from "@/components/my-courses/my-courses-skeleton";
 import { MyCoursesPagination } from "@/components/my-courses/my-courses-pagination";
 import { MyCoursesProfileCard } from "@/components/my-courses/my-courses-profile-card";
 import { loadMyCourses } from "@/lib/enrollments";
@@ -69,15 +70,7 @@ export function MyCoursesList({ member }) {
   }, [listState.currentPage, page.currentPage]);
 
   if (status === "loading") {
-    return (
-      <div
-        className="mt-12 flex items-center justify-center gap-3 text-body2 text-gray-700"
-        role="status"
-      >
-        <Loader2 className="size-5 animate-spin text-blue-500" aria-hidden />
-        Loading your courses...
-      </div>
-    );
+    return <MyCoursesSkeleton />;
   }
 
   if (status === "error") {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { AdminPagination } from "@/components/admin/pagination";
 import { SortFilterBar } from "@/components/admin/sort-filter-bar";
@@ -234,8 +234,17 @@ export function OurCoursesCatalog({
     setPage(1);
   }
 
+  function handlePageChange(nextPage) {
+    if (nextPage === page) return;
+    setPage(nextPage);
+    setCourses([]);
+    setStatus("loading");
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }
+
   const totalPages = getTotalPages(total, pageSize || 12);
-  const showPager = status === "ready" && total > 0;
+  const showPager = total > 0 && status !== "error";
+  const skeletonCount = pageSize ?? 6;
 
   return (
     <div>
@@ -281,13 +290,19 @@ export function OurCoursesCatalog({
       ) : null}
 
       {status === "loading" && courses.length === 0 ? (
-        <div
-          className="mt-16 flex items-center justify-center gap-3 text-body2 text-gray-700"
-          role="status"
+        <ul
+          className="mt-16 grid grid-cols-1 gap-6 min-[761px]:grid-cols-3"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label="Loading courses"
         >
-          <Loader2 className="size-5 animate-spin text-blue-500" aria-hidden />
-          Loading courses...
-        </div>
+          <li className="sr-only">Loading courses</li>
+          {Array.from({ length: skeletonCount }, (_, index) => (
+            <li key={index} aria-hidden="true">
+              <div className="aspect-16/10 animate-pulse rounded-2xl bg-gray-200" />
+            </li>
+          ))}
+        </ul>
       ) : null}
 
       {status !== "error" && courses.length > 0 ? (
@@ -315,7 +330,8 @@ export function OurCoursesCatalog({
           <AdminPagination
             currentPage={page}
             totalPages={totalPages}
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
+            disabled={status === "loading"}
             label="Course catalog pagination"
           />
         </div>
