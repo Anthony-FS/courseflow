@@ -13,6 +13,39 @@ function isValidUUID(str) {
   );
 }
 
+async function replaceSubLessonMaterials(supabase, courseId, subLessonId, sub) {
+  const { error: deleteError } = await supabase
+    .from("materials")
+    .delete()
+    .eq("sub_lesson_id", subLessonId);
+
+  if (deleteError) return deleteError;
+
+  if (sub.videoUrl) {
+    const { error } = await supabase.from("materials").insert({
+      course_id: courseId,
+      sub_lesson_id: subLessonId,
+      name: String(sub.videoName || `${sub.title} Video`).trim(),
+      file_url: String(sub.videoUrl),
+      file_type: "video/mp4",
+    });
+    if (error) return error;
+  }
+
+  if (sub.attachmentUrl) {
+    const { error } = await supabase.from("materials").insert({
+      course_id: courseId,
+      sub_lesson_id: subLessonId,
+      name: String(sub.attachmentName || `${sub.title} Attachment`).trim(),
+      file_url: String(sub.attachmentUrl),
+      file_type: String(sub.attachmentType || "application/pdf"),
+    });
+    if (error) return error;
+  }
+
+  return null;
+}
+
 async function resolveLessonId(supabase, lessonId) {
   if (isValidUUID(lessonId)) {
     return lessonId;
@@ -161,46 +194,91 @@ export async function PUT(request, { params }) {
     return jsonError(updateLessonError.message || "Failed to update lesson", 500);
   }
 
-  // 2. Refresh sub-lessons (clean and recreate with new video links)
+  // Keep existing sub-lesson ids. Assignments and learner progress point at
+  // those ids; deleting and recreating the rows detaches them.
   const previousUrls = await collectLessonMediaUrls(supabase, lessonId);
-  await supabase.from("sub_lessons").delete().eq("lesson_id", lessonId);
+
+  const { data: existingSubLessons, error: existingError } = await supabase
+    .from("sub_lessons")
+    .select("id")
+    .eq("lesson_id", lessonId);
+
+  if (existingError) {
+    return jsonError(existingError.message || "Failed to load sub-lessons", 500);
+  }
+
+  const existingIds = new Set(
+    (existingSubLessons ?? []).map((row) => row.id).filter(Boolean),
+  );
+  const keptIds = [];
 
   for (let i = 0; i < subLessons.length; i++) {
     const sub = subLessons[i];
-    const { data: subLesson, error: subError } = await supabase
+    const requestedId = isValidUUID(sub.id) ? String(sub.id).trim() : "";
+    const fields = {
+      title: String(sub.title).trim(),
+      description: sub.description ? String(sub.description).trim() : null,
+      sort_order: i + 1,
+    };
+
+    let subLessonId = requestedId && existingIds.has(requestedId) ? requestedId : "";
+
+    if (subLessonId) {
+      const { error: updateError } = await supabase
+        .from("sub_lessons")
+        .update(fields)
+        .eq("id", subLessonId)
+        .eq("lesson_id", lessonId);
+
+      if (updateError) {
+        return jsonError(updateError.message || "Failed to update sub-lesson", 500);
+      }
+    } else {
+      const { data: created, error: subError } = await supabase
+        .from("sub_lessons")
+        .insert({
+          course_id: courseId,
+          lesson_id: lessonId,
+          ...fields,
+        })
+        .select("id")
+        .single();
+
+      if (subError || !created?.id) {
+        return jsonError(subError?.message || "Failed to create sub-lesson", 500);
+      }
+
+      subLessonId = created.id;
+    }
+
+    keptIds.push(subLessonId);
+
+    const materialError = await replaceSubLessonMaterials(
+      supabase,
+      courseId,
+      subLessonId,
+      sub,
+    );
+    if (materialError) {
+      return jsonError(
+        materialError.message || "Failed to update sub-lesson files",
+        500,
+      );
+    }
+  }
+
+  const removedIds = [...existingIds].filter((id) => !keptIds.includes(id));
+  for (const removedId of removedIds) {
+    const { error: deleteError } = await supabase
       .from("sub_lessons")
-      .insert({
-        course_id: courseId,
-        lesson_id: lessonId,
-        title: String(sub.title).trim(),
-        description: sub.description ? String(sub.description).trim() : null,
-        sort_order: i + 1,
-      })
-      .select("id")
-      .single();
+      .delete()
+      .eq("id", removedId);
 
-    if (subError || !subLesson) {
-      continue;
-    }
-
-    if (sub.videoUrl) {
-      await supabase.from("materials").insert({
-        course_id: courseId,
-        sub_lesson_id: subLesson.id,
-        name: String(sub.videoName || `${sub.title} Video`).trim(),
-        file_url: String(sub.videoUrl),
-        file_type: "video/mp4",
-      });
-    }
-
-    if (sub.attachmentUrl) {
-      await supabase.from("materials").insert({
-        course_id: courseId,
-        sub_lesson_id: subLesson.id,
-        name: String(sub.attachmentName || `${sub.title} Attachment`).trim(),
-        file_url: String(sub.attachmentUrl),
-        file_type: String(sub.attachmentType || "application/pdf"),
-      });
+    if (deleteError) {
+      return jsonError(
+        deleteError.message || "Failed to delete removed sub-lessons",
+        500,
+      );
     }
   }
 
