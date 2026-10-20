@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { createMockSupabase, insertsFor, updatesFor } from "../helpers/mock-supabase.js";
+import { createMockSupabase, deletesFor, insertsFor, updatesFor } from "../helpers/mock-supabase.js";
+
+vi.mock("next/cache", () => ({
+  revalidateTag: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", () => ({
   requireAdmin: vi.fn(),
@@ -164,6 +168,54 @@ describe("Lesson Management API", () => {
 
       const materialInserts = insertsFor(supabase, "materials");
       expect(materialInserts.length).toBe(2); // 1 video + 1 attachment
+    });
+
+    it("updates an existing sub-lesson in place so assignment links keep the same id", async () => {
+      const subLessonId = "22222222-2222-4222-8222-222222222222";
+      const supabase = createMockSupabase({
+        subLessonsSelect: [{ id: subLessonId, lesson_id: "l-1" }],
+      });
+
+      requireAdmin.mockResolvedValue({
+        supabase,
+        user: ADMIN_USER,
+        profile: { id: ADMIN_USER.id, role: "admin", is_active: true },
+        error: null,
+      });
+
+      const response = await updateLesson(
+        new Request("http://localhost/api/admin/courses/c-1/lessons/l-1", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lessonName: "Introduction",
+            subLessons: [
+              {
+                id: subLessonId,
+                title: "What programmers do",
+                description: JSON.stringify([
+                  { type: "video", url: "course-videos/admin/lesson.mp4" },
+                ]),
+              },
+            ],
+          }),
+        }),
+        { params: Promise.resolve({ id: "c-1", lessonId: "l-1" }) },
+      );
+
+      expect(response.status).toBe(200);
+      expect(insertsFor(supabase, "sub_lessons")).toHaveLength(0);
+      expect(deletesFor(supabase, "sub_lessons")).toHaveLength(0);
+
+      const subLessonUpdate = updatesFor(supabase, "sub_lessons").find(
+        (entry) => entry.payload.title === "What programmers do",
+      );
+      expect(subLessonUpdate?.filters).toEqual(
+        expect.arrayContaining([
+          { column: "id", value: subLessonId },
+          { column: "lesson_id", value: "l-1" },
+        ]),
+      );
     });
   });
 

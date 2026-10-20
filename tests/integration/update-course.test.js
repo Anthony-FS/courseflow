@@ -6,6 +6,10 @@ import {
   updatesFor,
 } from "../helpers/mock-supabase.js";
 
+vi.mock("next/cache", () => ({
+  revalidateTag: vi.fn(),
+}));
+
 vi.mock("@/lib/auth", () => ({
   requireAdmin: vi.fn(),
 }));

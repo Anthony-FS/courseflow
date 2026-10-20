@@ -407,6 +407,7 @@ export default function LessonForm({
             hasAttachmentContentBlock(processedBlocks);
 
           return {
+            id: sub.id,
             title: sub.title.trim(),
             description: finalDescription ? finalDescription.trim() : "",
             videoUrl: videoIsInBlocks ? null : finalVideoUrl,
