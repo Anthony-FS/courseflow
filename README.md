@@ -286,6 +286,7 @@ Files in order:
 | `022_seed_basic_programming_sub_lesson_content.sql` | Expands Basic Programming sub-lesson copy |
 | `023_basic_programming_remove_videos.sql` | Keeps video only on Basic Programming's intro sub-lesson |
 | `025_promo_code_security.sql` | Restricts promo listing, rate-limits validation, and saves admin promo edits atomically |
+| `030_seed_basic_programming_assignments.sql` | Seeds text, file, url, and choice assignments for every Basic Programming sub-lesson |
 
 For the coordinated promo code application/database rollout and verification,
 see [Promo code security rollout](docs/promo-code-security.md).
